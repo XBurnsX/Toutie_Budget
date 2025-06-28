@@ -1,0 +1,513 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'dart:developer';
+import 'pie_chart_with_legend.dart';
+
+/// Widget pour afficher dynamiquement les catégories et enveloppes
+class ListeCategoriesEnveloppes extends StatelessWidget {
+  final List<Map<String, dynamic>> categories;
+  final List<Map<String, dynamic>> comptes;
+  final bool editionMode;
+  final void Function(String catId, String envId)? onRename;
+  final void Function(String catId, String envId)? onDelete;
+  final String? selectedMonthKey;
+  const ListeCategoriesEnveloppes({Key? key, required this.categories, required this.comptes, this.editionMode = false, this.onRename, this.onDelete, this.selectedMonthKey}) : super(key: key);
+
+  Color _getEtatColor(double solde, double objectif) {
+    if (solde < 0) return Colors.red;
+    if (objectif == 0) return Colors.grey;
+    if (solde >= objectif) return Colors.green;
+    if (solde >= objectif * 0.7) return Colors.yellow;
+    return Colors.orange;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final categorie = categories[index];
+        final enveloppes = categorie['enveloppes'] as List<Map<String, dynamic>>;
+
+        // Vérifier si la catégorie a des enveloppes négatives
+        final aEnveloppesNegatives = enveloppes.any((env) => (env['solde'] ?? 0.0).toDouble() < 0);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Icône d'avertissement pour les catégories avec enveloppes négatives
+                if (aEnveloppesNegatives) ...[
+                  Icon(Icons.warning, color: Colors.red[700], size: 20),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  categorie['nom'],
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: aEnveloppesNegatives ? Colors.red[400] : Colors.white70
+                  ),
+                ),
+              ],
+            ),
+            ...enveloppes.map((enveloppe) {
+              // --- Logique d'affichage de l'historique ---
+              Map<String, dynamic> historique = enveloppe['historique'] != null ? Map<String, dynamic>.from(enveloppe['historique']) : {};
+              Map<String, dynamic>? histoMois = (selectedMonthKey != null && historique[selectedMonthKey] != null) ? Map<String, dynamic>.from(historique[selectedMonthKey]) : null;
+
+              final now = DateTime.now();
+              final currentMonthKey = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+              final selectedDate = selectedMonthKey != null ? DateFormat('yyyy-MM').parse(selectedMonthKey!) : now;
+              final isFutureMonth = selectedDate.year > now.year || (selectedDate.year == now.year && selectedDate.month > now.month);
+
+              double solde;
+              double objectif;
+              double depense;
+
+              if (selectedMonthKey == null || selectedMonthKey == currentMonthKey) {
+                // Mois courant -> valeurs globales
+                solde = (enveloppe['solde'] ?? 0.0).toDouble();
+                objectif = (enveloppe['objectif'] ?? 0.0).toDouble();
+                depense = (enveloppe['depense'] ?? 0.0).toDouble();
+              } else if (histoMois != null) {
+                // Mois passé avec historique -> valeurs de l'historique
+                solde = (histoMois['solde'] ?? 0.0).toDouble();
+                objectif = (histoMois['objectif'] ?? 0.0).toDouble();
+                depense = (histoMois['depense'] ?? 0.0).toDouble();
+              } else if (isFutureMonth) {
+                // Mois futur -> valeurs projetées
+                solde = (enveloppe['solde'] ?? 0.0).toDouble(); // Report du solde actuel
+                objectif = (enveloppe['objectif'] ?? 0.0).toDouble(); // Report de l'objectif actuel
+                depense = 0.0; // Dépenses futures sont à 0
+              } else {
+                // Mois passé sans historique -> 0
+                solde = 0.0;
+                objectif = 0.0;
+                depense = 0.0;
+              }
+
+              // Détection si l'enveloppe est négative
+              final bool estNegative = solde < 0;
+
+              final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
+              final double progression = (objectif > 0)
+                ? (estDepenseAtteint ? 1.0 : (solde / objectif).clamp(0.0, 1.0))
+                : 0.0;
+              final Color etatColor = _getEtatColor(solde, objectif);
+              log('[DEBUG ENVELOPPE] mois=${selectedMonthKey ?? "courant"} | nom=${enveloppe['nom']} | solde=$solde | objectif=$objectif | depense=$depense');
+              if (objectif == 0) {
+                // Cas : aucun objectif attribué
+                final String compteId = enveloppe['provenance_compte_id'] ?? '';
+                Color bulleColor;
+                log('[BULLE-DEBUG] enveloppe=${enveloppe.toString()} | compteId="$compteId"');
+                if (solde == 0) {
+                  bulleColor = const Color(0xFF44474A); // gris foncé si aucun argent assigné
+                } else if (estNegative) {
+                  bulleColor = Colors.red; // Rouge pour les montants négatifs
+                } else if (compteId.isNotEmpty) {
+                  final compte = comptes.cast<Map<String, Object>>().firstWhere(
+                    (c) => c['id'].toString() == compteId.toString(),
+                    orElse: () => <String, Object>{},
+                  );
+                  log('[BULLE] compteId=$compteId | comptes=' + comptes.map((c) => c['id']).toList().toString() + ' | compteTrouve=' + (compte['id']?.toString() ?? 'null') + ' | couleur=' + (compte['couleur']?.toString() ?? 'null'));
+                  if (compte['couleur'] != null && compte['couleur'] is int) {
+                    try {
+                      bulleColor = Color(compte['couleur'] as int);
+                    } catch (_) {
+                      bulleColor = Colors.amber;
+                    }
+                  } else {
+                    bulleColor = Colors.amber;
+                  }
+                } else {
+                  bulleColor = Colors.amber;
+                }
+                // Couleur de la barre latéralerd automa
+                Color barreColor;
+                if (solde < 0) {
+                  barreColor = Colors.red;
+                } else if (solde == 0) {
+                  barreColor = const Color(0xFF44474A);
+                } else {
+                  barreColor = Colors.amber;
+                }
+                return Card(
+                  color: estNegative ? Theme.of(context).colorScheme.error.withOpacity(0.15) : const Color(0xFF232526),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 8,
+                          decoration: BoxDecoration(
+                            color: barreColor,
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Icône d'avertissement pour les enveloppes négatives
+                            if (estNegative) ...[
+                              Icon(Icons.warning, color: Colors.red[700], size: 20),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: Text(
+                                enveloppe['nom'],
+                                style: TextStyle(
+                                  color: estNegative ? Colors.red[800] : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16
+                                ),
+                              ),
+                            ),
+                            if (editionMode) ...[
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.white70, size: 20),
+                                    tooltip: 'Renommer',
+                                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                                    constraints: BoxConstraints(),
+                                    onPressed: () => onRename?.call(categorie['id'], enveloppe['id']),
+                                  ),
+                                  SizedBox(width: 2),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.redAccent, size: 20),
+                                    tooltip: 'Supprimer',
+                                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                                    constraints: BoxConstraints(),
+                                    onPressed: () => onDelete?.call(categorie['id'], enveloppe['id']),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              Container(
+                                // Remplacement de la bulle par le camembert avec légende
+                                child: Builder(
+                                  builder: (context) {
+                                    final List<dynamic> provenances = enveloppe['provenances'] ?? [];
+                                    if (provenances.isEmpty) {
+                                      // Si pas de provenance, bulle classique
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: bulleColor,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          '${solde.toStringAsFixed(2)} \$',
+                                          style: TextStyle(
+                                            color: estNegative ? Colors.white : (solde == 0 ? Colors.white70 : Colors.black),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    // Construction des contributions pour le camembert
+                                    final List<Contribution> contributions = provenances.map<Contribution>((prov) {
+                                      final compte = comptes.firstWhere(
+                                        (c) => c['id'].toString() == prov['compte_id'].toString(),
+                                        orElse: () => <String, dynamic>{},
+                                      );
+                                      final couleur = (compte['couleur'] != null && compte['couleur'] is int)
+                                          ? Color(compte['couleur'] as int)
+                                          : Colors.amber;
+                                      final nom = compte['nom'] ?? 'Compte';
+                                      return Contribution(
+                                        compte: nom.toString(),
+                                        couleur: couleur,
+                                        montant: (prov['montant'] as num?)?.toDouble() ?? 0.0,
+                                      );
+                                    }).toList();
+                                    return PieChartWithLegend(contributions: contributions, size: 40);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              // Pour les enveloppes avec objectif, barre latérale à droite
+              Color barreColor;
+              if (solde < 0) {
+                barreColor = Colors.red;
+              } else if (solde == 0) {
+                barreColor = const Color(0xFF44474A);
+              } else if (solde >= objectif) {
+                barreColor = Colors.green;
+              } else {
+                barreColor = Colors.amber;
+              }
+
+              // Couleur de la bulle basée sur la provenance (même logique que les enveloppes sans objectif)
+              Color bulleColor;
+              final String compteId = enveloppe['provenance_compte_id'] ?? '';
+              log('[BULLE-DEBUG] enveloppe=${enveloppe.toString()} | compteId="$compteId"');
+              if (solde == 0) {
+                bulleColor = const Color(0xFF44474A); // gris foncé si aucun argent assigné
+              } else if (estNegative) {
+                bulleColor = Colors.red; // Rouge pour les montants négatifs
+              } else if (compteId.isNotEmpty) {
+                final compte = comptes.cast<Map<String, Object>>().firstWhere(
+                  (c) => c['id'].toString() == compteId.toString(),
+                  orElse: () => <String, Object>{},
+                );
+                log('[BULLE] compteId=$compteId | comptes=' + comptes.map((c) => c['id']).toList().toString() + ' | compteTrouve=' + (compte['id']?.toString() ?? 'null') + ' | couleur=' + (compte['couleur']?.toString() ?? 'null'));
+                if (compte['couleur'] != null && compte['couleur'] is int) {
+                  try {
+                    bulleColor = Color(compte['couleur'] as int);
+                  } catch (_) {
+                    bulleColor = Colors.amber;
+                  }
+                } else {
+                  bulleColor = Colors.amber;
+                }
+              } else {
+                bulleColor = Colors.amber;
+              }
+              return Card(
+                color: estNegative ? Theme.of(context).colorScheme.error.withOpacity(0.15) : const Color(0xFF232526),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 8,
+                        decoration: BoxDecoration(
+                          color: barreColor,
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(12),
+                            bottomRight: Radius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Icône d'avertissement pour les enveloppes négatives
+                              if (estNegative) ...[
+                                Icon(Icons.warning, color: Colors.red[700], size: 18),
+                                const SizedBox(width: 8),
+                              ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      enveloppe['nom'],
+                                      style: TextStyle(
+                                        color: estNegative ? Colors.red[800] : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16
+                                      ),
+                                    ),
+                                    if (["mensuel", "datefixe", "date"].any((f) => (enveloppe['frequence_objectif']?.toString() ?? '').toLowerCase().contains(f)))
+                                      Builder(
+                                        builder: (_) {
+                                          String freq = (enveloppe['frequence_objectif']?.toString() ?? '').toLowerCase();
+                                          if (freq.contains('mensuel')) {
+                                            return Text(
+                                              '${objectif.toStringAsFixed(2)}\u00A0\$' +
+                                                ((enveloppe['objectifJour'] ?? enveloppe['objectif_jour']) != null
+                                                  ? " d'ici le "+(enveloppe['objectifJour'] ?? enveloppe['objectif_jour']).toString()
+                                                  : ''),
+                                              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            );
+                                          } else if (freq.contains('date')) {
+                                            double montantNecessaire = 0;
+                                            if (enveloppe['objectif'] != null && enveloppe['objectif_date'] != null) {
+                                              try {
+                                                DateTime dateCible = DateTime.parse(enveloppe['objectif_date']);
+
+                                                // Utiliser le mois sélectionné pour le calcul du statut
+                                                DateTime dateReference = selectedMonthKey != null
+                                                    ? DateFormat('yyyy-MM').parse(selectedMonthKey!)
+                                                    : DateTime.now();
+
+                                                // CORRECTION : Utiliser une date de création fixe au lieu du mois consulté
+                                                DateTime dateCreationObjectif;
+                                                if (enveloppe['date_creation_objectif'] != null) {
+                                                  // Si on a la vraie date de création de l'objectif
+                                                  dateCreationObjectif = DateTime.parse(enveloppe['date_creation_objectif']);
+                                                } else {
+                                                  // Fallback : utiliser juin 2025 comme exemple (à ajuster selon vos données)
+                                                  dateCreationObjectif = DateTime(2025, 6, 1);
+                                                }
+
+                                                // Calculer le nombre total de mois depuis la VRAIE création jusqu'à la date cible
+                                                int moisTotal = (dateCible.year - dateCreationObjectif.year) * 12 + (dateCible.month - dateCreationObjectif.month) + 1;
+
+                                                // Calculer le nombre de mois restants depuis le mois de référence
+                                                int moisRestants = (dateCible.year - dateReference.year) * 12 + (dateCible.month - dateReference.month) + 1;
+                                                if (moisRestants < 1) moisRestants = 1;
+
+                                                // Le montant nécessaire chaque mois est fixe : objectif total / nombre total de mois
+                                                double objectifTotal = (enveloppe['objectif'] as num?)?.toDouble() ?? 0.0;
+                                                montantNecessaire = moisTotal > 0 ? objectifTotal / moisTotal : 0;
+
+                                                // Si on est en retard, calculer le rattrapage
+                                                double soldeActuel = solde; // Utiliser le solde du mois sélectionné
+                                                int moisEcoules = (dateReference.year - dateCreationObjectif.year) * 12 + (dateReference.month - dateCreationObjectif.month) + 1;
+                                                // Variable utilisée pour le calcul mais pas affichée directement
+                                                // double montantPrevu = montantNecessaire * moisEcoules;
+
+                                                // Pour les mois futurs, utiliser le solde actuel réel au lieu du solde projeté
+                                                if (isFutureMonth) {
+                                                  soldeActuel = (enveloppe['solde'] ?? 0.0).toDouble();
+                                                }
+
+                                                if (soldeActuel < objectifTotal) {
+                                                  if (moisRestants == 1) {
+                                                    // Dernier mois : afficher simplement ce qui manque pour atteindre l'objectif
+                                                    double manquant = objectifTotal - soldeActuel;
+                                                    montantNecessaire = manquant > 0 ? manquant : 0;
+                                                  } else {
+                                                    // Autres mois : calculer ce qui manque réparti sur les mois restants
+                                                    double manquant = objectifTotal - soldeActuel;
+                                                    montantNecessaire = manquant > 0 ? (manquant / moisRestants) : 0;
+                                                  }
+                                                } else {
+                                                  // Objectif déjà atteint
+                                                  montantNecessaire = 0;
+                                                }
+
+                                              } catch (_) {
+                                                montantNecessaire = 0;
+                                              }
+                                            }
+                                            return Text(
+                                              'Nécessaire ce mois-ci : ' +
+                                                (montantNecessaire > 0 ? montantNecessaire.toStringAsFixed(2) + '\$' : '—'),
+                                              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            );
+                                          }
+                                          return const SizedBox.shrink();
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              if (["mensuel", "datefixe", "date"].any((f) => (enveloppe['frequence_objectif']?.toString() ?? '').toLowerCase().contains(f)))
+                                Container(
+                                  margin: const EdgeInsets.only(left: 8, top: 2),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: bulleColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${solde.toStringAsFixed(2)}\u00A0\$',
+                                    style: TextStyle(
+                                      color: estNegative ? Colors.white : (solde == 0 ? Colors.white70 : Colors.black),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              else if (editionMode) ...[
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.white70, size: 20),
+                                  tooltip: 'Renommer',
+                                  onPressed: () => onRename?.call(categorie['id'], enveloppe['id']),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.redAccent, size: 20),
+                                  tooltip: 'Supprimer',
+                                  onPressed: () => onDelete?.call(categorie['id'], enveloppe['id']),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (objectif > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 35),
+                                      child: LinearProgressIndicator(
+                                        value: progression,
+                                        backgroundColor: Colors.white12,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          estDepenseAtteint
+                                            ? Colors.green[800]!
+                                            : etatColor,
+                                        ),
+                                        minHeight: 6,
+                                      ),
+                                    ),
+                                  ),
+                                  Transform.translate(
+                                    offset: Offset(-17, 0),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          '${(progression * 100).toStringAsFixed(0)} %',
+                                          style: TextStyle(
+                                            color: estDepenseAtteint
+                                              ? Colors.green[800]!
+                                              : etatColor,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        if (estDepenseAtteint) ...[
+                                          SizedBox(width: 4),
+                                          Icon(Icons.check_circle, color: Colors.green[800], size: 18),
+                                          SizedBox(width: 2),
+                                          Text('Dépensé !', style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold, fontSize: 12)),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+}

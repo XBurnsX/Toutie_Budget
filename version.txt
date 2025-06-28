@@ -1,0 +1,588 @@
+FEUILLE DE ROUTE DÉTAILLÉE - APPLICATION GESTION FINANCIÈRE
+📱 VERSION 1.0 - MVP FONCTIONNEL (3-4 mois)
+DÉFINITION : Une application complètement utilisable au quotidien pour gérer ses finances personnelles de base.
+
+🎯 CRITÈRES DE SUCCÈS v1.0
+✅ Un utilisateur peut créer ses comptes et suivre ses soldes.
+
+✅ Il peut budgétiser avec des enveloppes и voir où il en est.
+
+✅ Il peut ajouter des transactions et voir l'impact immédiat.
+
+✅ L'app fonctionne sans bugs critiques sur iOS/Android.
+
+✅ Les données sont sauvegardées de manière fiable sur un compte en ligne.
+
+Phase 1 - Infrastructure & Navigation (2 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+Architecture Technique
+
+[ ] Structure Flutter/Dart complète
+
+[ ] Infrastructure Cloud (Firebase)
+
+[ ] Configuration du projet Firebase (Firestore, Authentication).
+
+[ ] Création des règles de sécurité Firestore de base.
+
+[ ] Authentification
+
+[ ] Création de la page de connexion/inscription.
+
+[ ] Implémentation de la connexion par Email/Mot de passe.
+
+[ ] Intégration de la connexion via un compte Google (Google Sign-In).
+
+[ ] Gestion de l'état de l'utilisateur (connecté/déconnecté) dans l'application.
+
+Navigation Principale
+
+[ ] Bottom Navigation Bar avec 4 onglets :
+
+💰 Budget (enveloppes)
+
+💳 Comptes (liste et détails)
+
+➕ Ajouter Transaction (ouvre la page de saisie)
+
+📊 Statistiques (vue d'ensemble)
+
+[ ] Écrans squelettes créés pour chaque onglet.
+
+[ ] Accès aux Paramètres déplacé vers une icône dans l'AppBar de l'écran Budget.
+
+LIVRABLES PHASE 1 :
+
+✅ App qui se lance sans crash.
+
+✅ Un utilisateur peut créer un compte et se connecter.
+
+✅ Navigation fluide entre tous les onglets.
+
+✅ Architecture propre pour le développement futur.
+
+Phase 2 - Gestion des Comptes (3 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+Types de Comptes Obligatoires
+
+[ ] Compte Chèques
+
+[ ] Compte Épargne
+
+[ ] Carte de Crédit
+Fonctionnalités CRUD Complètes
+
+[ ] Créer un compte
+
+[ ] Modifier un compte
+
+[ ] Supprimer/Archiver
+Calculs Automatiques
+
+[ ] Solde en temps réel
+
+[ ] Projection fin de mois
+
+LIVRABLES PHASE 2 :
+
+✅ Page "Comptes" avec liste visuelle attrayante.
+
+✅ Formulaires de création/modification sans bugs.
+
+✅ Calculs financiers précis et temps réel.
+
+✅ Minimum 3 comptes de types différents peuvent coexister.
+
+Phase 3 - Budget & Enveloppes (3 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+Système d'Enveloppes Complet
+
+[ ] Création d'enveloppes
+
+[ ] "Prêt à Placer"
+Indicateurs Visuels Obligatoires
+
+[ ] Provenance colorée (bulles)
+
+[ ] Barres de statut colorées
+Calculs Intelligents
+
+[ ] "X$ de plus nécessaire ce mois-ci"
+
+[ ] Gestion du négatif
+
+LIVRABLES PHASE 3 :
+
+✅ Page "Budget" intuitive avec vue d'ensemble.
+
+✅ Création/modification d'enveloppes sans friction.
+
+✅ Indicateurs visuels qui guident l'utilisateur.
+
+✅ "Prêt à Placer" fonctionnel et précis.
+
+Phase 4 - Transactions de Base (2 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+Page Ajout Transaction
+
+[ ] Deux sous-onglets obligatoires : Dépense & Revenu
+
+[ ] Champs intelligents
+Fractionnement des Transactions
+
+[ ] Interface de fractionnement
+Historique par Compte
+
+[ ] Liste chronologique
+
+LIVRABLES PHASE 4 :
+
+✅ Ajout de transactions fluide et rapide.
+
+✅ Historique complet et cohérent.
+
+✅ Fractionnement fonctionnel.
+
+Phase 5 - Tests, Polish & Stabilisation (1 semaine)
+CE QUI DOIT ÊTRE FAIT :
+
+Tests Obligatoires
+
+[ ] Tests des calculs financiers
+
+[ ] Tests des flux utilisateur
+
+Focus sur la Stabilisation (Pré-Release v1.0)
+Cette phase est dédiée à la résolution des bugs découverts lors des tests d'intégration. Les points suivants sont les cibles prioritaires pour assurer une version stable.
+
+[ ] 🐛 Fiabilité des Transferts : S'assurer que les virements entre comptes sont atomiques (tout ou rien) pour éviter toute incohérence de solde.
+
+[ ] 🐛 Fluidité du Flux Utilisateur : Confirmer que la redirection vers l'écran "Budget" après une transaction est systématique et immédiate.
+
+[ ] 🐛 Précision des Périodes : Valider rigoureusement que tous les filtres "Ce mois-ci" utilisent la bonne plage de dates (du 1er au dernier jour du mois).
+
+[ ] 🐛 Gestion de Fin de Prêt : Implémenter le processus d'archivage automatique pour les prêts dont le solde atteint zéro.
+
+[ ] 🐛 Cohérence Visuelle des Soldes : Garantir que tout solde négatif est affiché en rouge, sans exception, indépendamment du thème du compte.
+
+Polish Final
+
+[ ] Performance
+
+[ ] UX Final
+
+[ ] Sécurité Renforcée (Biométrie/PIN) : Ajouter une option pour verrouiller l'app.
+
+CRITÈRES DE RELEASE v1.0 :
+
+✅ 0 crash lors de tests de 1h d'utilisation intensive.
+
+✅ Tous les calculs financiers sont précis à 2 décimales.
+
+✅ L'app fonctionne offline complètement (avec synchronisation au retour de la connexion).
+
+✅ Un utilisateur novice peut créer son premier budget en < 10 minutes.
+
+🔄 VERSION 1.1 - VIREMENTS & PRÊTS (1.5 mois)
+DÉFINITION : Gérer complètement les flux d'argent : virements entre enveloppes, prêts personnels, objectifs.
+
+🎯 CRITÈRES DE SUCCÈS v1.1
+✅ Un utilisateur peut faire des virements entre enveloppes facilement.
+
+✅ Il peut prêter/emprunter de l'argent et suivre les remboursements.
+
+✅ Il peut se fixer des objectifs et voir sa progression.
+
+✅ Toutes les fonctionnalités v1.0 restent stables.
+
+Phase 1 - Système de Virements (2 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Interface de virement
+
+[ ] Virements depuis "Prêt à Placer"
+
+[ ] Virements Rapides (UX)
+
+[ ] Historique des Virements
+
+LIVRABLES PHASE 1 :
+
+✅ Icône virements en barre supérieure fonctionnelle.
+
+✅ Virements fluides avec validation des montants.
+
+✅ "Prêt à Placer" se met à jour en temps réel.
+
+✅ Historique des virements accessible et clair.
+
+Phase 2 - Prêts Personnels (3 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] 4 Types de Transactions de Prêt Obligatoires
+
+[ ] Auto-complétion des Personnes
+
+[ ] Enveloppes de Dette Automatiques
+
+[ ] Page Dédiée Prêts
+
+LIVRABLES PHASE 2 :
+
+✅ Page "Prêts" accessible depuis menu principal.
+
+✅ 4 types de transactions prêt fonctionnels.
+
+✅ Auto-complétion des noms opérationnelle.
+
+✅ Enveloppes de dette créées/supprimées automatiquement.
+
+✅ Calculs de soldes nets précis.
+
+Phase 3 - Objectifs & Fréquences (1 semaine)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Objectifs Personnalisables
+
+[ ] Objectifs Annuels avec Répartition
+
+[ ] Messages de Félicitations
+
+LIVRABLES PHASE 3 :
+
+✅ Interface d'objectifs intégrée aux enveloppes.
+
+✅ Calculs de répartition précis.
+
+✅ Messages de félicitations fonctionnels.
+
+CRITÈRES DE RELEASE v1.1 :
+
+✅ Virements entre enveloppes sans bug.
+
+✅ Prêts personnels avec calculs exacts.
+
+✅ Objectifs motivants et précis.
+
+✅ Toutes les fonctionnalités v1.0 inchangées.
+
+📋 VERSION 1.2 - PAGES ESSENTIELLES (1.5 mois)
+DÉFINITION : Compléter l'expérience utilisateur avec les pages manquantes et fonctionnalités de recherche.
+
+🎯 CRITÈRES DE SUCCÈS v1.2
+✅ Toutes les pages principales sont fonctionnelles.
+
+✅ L'utilisateur peut retrouver n'importe quelle transaction rapidement.
+
+✅ La gestion des récurrences fonctionne.
+
+✅ L'app est prête pour un lancement public.
+
+Phase 1 - Pages Manquantes (3 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Page Calendrier
+
+[ ] Page Transactions Favorites
+
+[ ] Page Abonnements et Récurrences
+
+[ ] Gestion Catégories Avancée
+
+LIVRABLES PHASE 1 :
+
+✅ Page Calendrier avec navigation fluide.
+
+✅ Transactions favorites opérationnelles.
+
+✅ Abonnements avec génération automatique.
+
+✅ Gestion catégories avancée sans perte de données.
+
+Phase 2 - Recherche & Filtrage (2 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Recherche Avancée
+
+[ ] Réconciliation des Comptes
+
+[ ] Historique Filtrable
+
+[ ] Gestion des Tags : Permettre d'ajouter des tags personnalisés aux transactions et de filtrer par tag.
+
+LIVRABLES PHASE 2 :
+
+✅ Recherche instantanée et précise.
+
+✅ Filtrage multi-critères fonctionnel.
+
+✅ Réconciliation qui trouve les écarts.
+
+✅ Export de données opérationnel.
+
+CRITÈRES DE RELEASE v1.2 :
+
+✅ Toutes les pages principales complètes.
+
+✅ Recherche trouve tout en < 1 seconde.
+
+✅ Récurrences générées automatiquement.
+
+✅ PRÊT POUR LANCEMENT PUBLIC.
+
+💹 VERSION 2.0 - INVESTISSEMENTS & ANALYSES (2 mois)
+DÉFINITION : Gestion complète du patrimoine avec comptes d'investissement et analyses financières poussées.
+
+🎯 CRITÈRES DE SUCCÈS v2.0
+✅ Un utilisateur peut suivre ses investissements en temps réel.
+
+✅ Il obtient des analyses détaillées sur ses habitudes financières.
+
+✅ Il reçoit un score de santé financière et des recommandations.
+
+✅ L'app devient un outil complet de gestion patrimoniale.
+
+Phase 1 - Comptes d'Investissement (3 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Types de Comptes d'Investissement : REER, CELI, Non-Enregistrés.
+
+[ ] Portefeuilles d'Actions
+
+[ ] Calculs Financiers Avancés
+
+LIVRABLES PHASE 1 :
+
+✅ 3 types de comptes d'investissement fonctionnels.
+
+✅ Interface portefeuille intuitive.
+
+✅ Transactions d'investissement sans erreur.
+
+Phase 2 - APIs & Prix Temps Réel (2 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Intégration APIs Financières (5+)
+
+[ ] Prix en Temps Réel
+
+[ ] Vue Gains/Pertes Temps Réel
+
+LIVRABLES PHASE 2 :
+
+✅ APIs intégrées avec failover.
+
+✅ Prix mis à jour automatiquement.
+
+✅ Calculs gains/pertes précis à la cent près.
+
+Phase 3 - Statistiques Avancées (3 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Analyse "Où va mon argent ?" (Top 5)
+
+[ ] Score de Santé Financière (sur 100)
+
+[ ] Rapports Exportables
+
+LIVRABLES PHASE 3 :
+
+✅ Analyse "Où va mon argent" précise.
+
+✅ Score de santé financière motivant.
+
+✅ Rapports exportables professionnels.
+
+CRITÈRES DE RELEASE v2.0 :
+
+✅ Investissements suivis en temps réel.
+
+✅ Analyses financières précises et utiles.
+
+✅ APP DEVIENT OUTIL PROFESSIONNEL.
+
+🔔 VERSION 3.0 - NOTIFICATIONS & ALERTES (1.5 mois)
+DÉFINITION : Rendre l'application proactive en informant l'utilisateur des événements importants.
+
+🎯 CRITÈRES DE SUCCÈS v3.0
+✅ Les utilisateurs sont guidés proactivement dans leur gestion financière.
+
+✅ Le système d'alerte est fiable et non-intrusif.
+
+✅ Les notifications sont pertinentes et personnalisables.
+
+Phase 1 - Alertes et Notifications (1.5 mois)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Système d'Alertes Personnalisables
+
+[ ] Bandeaux d'Erreur et Messages
+
+[ ] Alertes Intelligentes
+
+[ ] Détection de dépenses inhabituelles par rapport à la moyenne.
+
+[ ] Suggestions de budget si une enveloppe est constamment dépassée.
+
+[ ] Détection d'abonnements "oubliés" : Signaler une dépense récurrente après X mois en demandant si le service est toujours utilisé.
+
+LIVRABLES PHASE 1 :
+
+✅ Notifications push fonctionnelles et configurables.
+
+✅ Système de messages in-app non intrusif.
+
+✅ Alertes intelligentes apportant une réelle valeur ajoutée.
+
+CRITÈRES DE RELEASE v3.0 :
+
+✅ Notifications pertinentes et utiles.
+
+✅ Expérience utilisateur proactive et guidée.
+
+✨ VERSION 3.1 - INTERFACE ET PERSONNALISATION (1.5 mois)
+DÉFINITION : Améliorer l'expérience utilisateur en offrant des options de personnalisation et des fonctionnalités de commodité intelligentes.
+
+🎯 CRITÈRES DE SUCCÈS v3.1
+✅ L'utilisateur peut adapter l'apparence de l'application à ses goûts.
+
+✅ L'épargne peut être automatisée sans effort.
+
+✅ Les nouveaux utilisateurs sont mieux intégrés.
+
+Phase 1 - Personnalisation et UX (1 mois)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Thèmes Personnalisables
+
+[ ] Widget Android/iOS et Raccourcis
+
+[ ] Tutoriel et Gamification
+
+LIVRABLES PHASE 1 :
+
+✅ Thèmes fonctionnels et sauvegardés.
+
+✅ Widget natif opérationnel sur les deux plateformes.
+
+✅ Tutoriel engageant pour les nouveaux utilisateurs.
+
+Phase 2 - Automatisation de l'Épargne (2 semaines)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Interface de Configuration : Créer une section dans les paramètres pour activer/configurer des règles automatiques.
+
+[ ] Règle "Arrondir mes dépenses" : Chaque transaction par carte est arrondie au dollar supérieur, et la différence est automatiquement virée dans une enveloppe d'épargne.
+
+[ ] Règle "Virer les surplus" : Transférer automatiquement l'excédent du "Prêt à Placer" vers un objectif prédéfini.
+
+LIVRABLES PHASE 2 :
+
+✅ L'utilisateur peut activer et configurer des règles d'épargne.
+
+✅ Les virements automatiques sont fiables et traçables.
+
+✅ L'épargne devient passive et sans effort.
+
+CRITÈRES DE RELEASE v3.1 :
+
+✅ Interface personnalisable et engageante.
+
+✅ Automatisation de l'épargne fonctionnelle.
+
+✅ Expérience utilisateur globale améliorée.
+
+🚀 VERSION 4.0 - FONCTIONNALITÉS AVANCÉES
+DÉFINITION : Étendre l'écosystème au-delà du mobile et intégrer des technologies de pointe.
+
+🎯 CRITÈRES DE SUCCÈS v4.0
+✅ L'utilisateur peut accéder à ses données depuis une interface web.
+
+✅ L'application offre des moyens de saisie et de planification innovants.
+
+✅ L'utilisateur peut visualiser son avenir financier pour prendre de meilleures décisions.
+
+Phase 1 - Version Web (3 mois)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Infrastructure et Synchronisation
+
+[ ] Interface Web
+
+LIVRABLES PHASE 1 :
+
+✅ L'utilisateur peut se connecter sur le web et voir ses données mobiles.
+
+✅ Toute modification sur une plateforme est reflétée sur l'autre en < 2 secondes.
+
+✅ L'interface web est stable et fonctionnelle sur les navigateurs majeurs.
+
+Phase 2 - Saisie Vocale (1.5 mois)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Intégration de la Reconnaissance Vocale
+
+[ ] Commandes Vocales
+
+LIVRABLES PHASE 2 :
+
+✅ La saisie vocale transcrit correctement les commandes.
+
+✅ L'ajout de transaction par la voix fonctionne de manière fiable.
+
+✅ L'expérience est plus rapide que la saisie manuelle pour des cas simples.
+
+Phase 3 - Planification de Scénarios "Et si ?" (2 mois)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Interface de Simulation : Créer un écran dédié pour la planification de scénarios.
+
+[ ] Moteur de Calcul : Développer la logique pour simuler l'impact d'un changement.
+
+[ ] Visualisation : Afficher les résultats de manière claire avec des graphiques avant/après.
+
+LIVRABLES PHASE 3 :
+
+✅ L'utilisateur peut lancer et configurer un scénario "Et si ?".
+
+✅ Les projections d'impact sont précises et faciles à comprendre.
+
+✅ La fonctionnalité aide à la prise de décision financière.
+
+Phase 4 - Projection Visuelle "Mon Futur Moi" (1.5 mois)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] Interface de Timeline : Créer une vue chronologique interactive (5, 10, 20 ans).
+
+[ ] Moteur de Projection à Long Terme : Calculer la croissance du patrimoine en se basant sur l'épargne actuelle, les investissements et les rendements attendus.
+
+[ ] Interactivité : Permettre à l'utilisateur de modifier des variables (ex: taux d'épargne) et voir l'impact en temps réel sur la timeline.
+
+LIVRABLES PHASE 4 :
+
+✅ La timeline visuelle rend les objectifs à long terme concrets.
+
+✅ Le moteur de projection est fiable.
+
+✅ La fonctionnalité est motivante et engageante.
+
+Phase 5 - Fonctionnalités Futures (Recherche et Développement)
+CE QUI DOIT ÊTRE FAIT :
+
+[ ] R&D : Import de Données Bancaires
+
+[ ] R&D : Prévisions Budgétaires par IA
+
+CRITÈRES DE RELEASE v4.0 :
+
+✅ Version web fonctionnelle et synchronisée.
+
+✅ Saisie vocale opérationnelle pour les cas d'usage principaux.
+
+✅ Outils de planification ("Et si ?", "Mon Futur Moi") fonctionnels.
+
+✅ L'ÉCOSYSTÈME DE L'APPLICATION EST COMPLET.

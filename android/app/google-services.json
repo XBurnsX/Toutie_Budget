@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "127120738889",
+    "project_id": "toutiebudget",
+    "storage_bucket": "toutiebudget.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127120738889:android:58d74af9b314105b378d98",
+        "android_client_info": {
+          "package_name": "com.xburnsx.toutie_budget"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "127120738889-n68nc3mjbjmb8st3vaq20vmfn35gjndm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xburnsx.toutie_budget",
+            "certificate_hash": "361e7a026a7f43b175f04be48845e86e57387cd5"
+          }
+        },
+        {
+          "client_id": "127120738889-btmanl5ni2eetsaju6jeco55ip91h48q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlZv_g42zqQCa2Sfyjp2lOHUCGl_38NeA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "127120738889-btmanl5ni2eetsaju6jeco55ip91h48q.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
