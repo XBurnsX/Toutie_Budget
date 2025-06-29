@@ -28,7 +28,8 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   // Données de Firebase et état de chargement
   bool _comptesCharges = false;
 
-  double get _montantAlloue => _sousItems.fold(0.0, (sum, item) => sum + item.montant);
+  double get _montantAlloue =>
+      _sousItems.fold(0.0, (sum, item) => sum + item.montant);
   double get _montantRestant => widget.montantTotal - _montantAlloue;
   bool get _estValide => _montantRestant.abs() < 0.01; // Tolérance
 
@@ -36,7 +37,9 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   void initState() {
     super.initState();
     print('DEBUG: ModaleFractionnement.initState');
-    print('DEBUG: INITSTATE - Nombre d\\\'enveloppes: ${widget.enveloppes.length}');
+    print(
+      'DEBUG: INITSTATE - Nombre d\\\'enveloppes: ${widget.enveloppes.length}',
+    );
     if (!_comptesCharges) {
       _chargerDonneesInitiales();
     }
@@ -49,7 +52,9 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
     final comptes = <Compte>[];
     await Future.delayed(Duration(milliseconds: 100));
     print('DEBUG: _chargerDonneesInitiales comptes simulés: ${comptes.length}');
-    print('DEBUG: ÉTAPE 2 - Nombre d\\\'enveloppes passées au widget: ${widget.enveloppes.length}');
+    print(
+      'DEBUG: ÉTAPE 2 - Nombre d\\\'enveloppes passées au widget: ${widget.enveloppes.length}',
+    );
     if (mounted) {
       setState(() {
         _comptesCharges = true;
@@ -59,15 +64,16 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
     print('DEBUG: ÉTAPE 1 - FIN du chargement des données.');
   }
 
-
   void _ajouterLigneSousItem() {
     setState(() {
-      _sousItems.add(SousItemFractionnement(
-        id: 'temp_${_prochaineId++}',
-        description: '',
-        montant: 0.0,
-        enveloppeId: '',
-      ));
+      _sousItems.add(
+        SousItemFractionnement(
+          id: 'temp_${_prochaineId++}',
+          description: '',
+          montant: 0.0,
+          enveloppeId: '',
+        ),
+      );
       _montantInputs.add('');
     });
   }
@@ -86,7 +92,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
       String? description;
       if (enveloppeId != null) {
         final enveloppe = widget.enveloppes.firstWhere(
-              (env) => env['id'] == enveloppeId,
+          (env) => env['id'] == enveloppeId,
           orElse: () => {'nom': 'Enveloppe inconnue'},
         );
         description = enveloppe['nom'];
@@ -101,18 +107,20 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   }
 
   void _mettreAJourMontantInput(int index, String value) {
+    // Nettoyer le montant du symbole $ et des espaces
+    String montantTexte = value.replaceAll('\$', '').replaceAll(' ', '');
+    final montant = double.tryParse(montantTexte.replaceAll(',', '.')) ?? 0.0;
     setState(() {
       _montantInputs[index] = value;
-      final montant = double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
       _mettreAJourSousItem(index, montant: montant);
     });
   }
 
   void _confirmerFractionnement() {
-    if (_estValide && _sousItems.every((item) =>
-    item.montant > 0 &&
-        item.enveloppeId.isNotEmpty)) {
-
+    if (_estValide &&
+        _sousItems.every(
+          (item) => item.montant > 0 && item.enveloppeId.isNotEmpty,
+        )) {
       final transactionFractionnee = TransactionFractionnee(
         transactionParenteId: 'temp',
         sousItems: _sousItems,
@@ -125,36 +133,42 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   }
 
   void _ouvrirClavierNumerique(int index) {
+    // Créer un contrôleur temporaire pour ce montant
+    final TextEditingController tempController = TextEditingController(
+      text: _montantInputs[index],
+    );
+
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Important pour que le clavier ne cache pas le contenu
+      isScrollControlled:
+          true, // Important pour que le clavier ne cache pas le contenu
       builder: (_) => NumericKeyboard(
-        onKeyTap: (key) {
-          String current = _montantInputs[index];
-          if (key == '.' && current.contains('.')) return;
-          if (key == '.' && current.isEmpty) current = '0';
-          String newValue = current + key;
-          _mettreAJourMontantInput(index, newValue);
-        },
-        onBackspace: () {
-          String current = _montantInputs[index];
-          if (current.isNotEmpty) {
-            String newValue = current.substring(0, current.length - 1);
-            _mettreAJourMontantInput(index, newValue);
-          }
-        },
+        controller: tempController,
         onClear: () {
           _mettreAJourMontantInput(index, '');
         },
+        onValueChanged: (value) {
+          // Mettre à jour le montant en temps réel
+          _mettreAJourMontantInput(index, value);
+        },
         showDecimal: true,
       ),
-    );
+    ).then((_) {
+      // Nettoyer le contrôleur
+      try {
+        tempController.dispose();
+      } catch (e) {
+        // Ignorer les erreurs de suppression
+      }
+    });
   }
 
   Widget _buildLigneSousItem(int index, {bool isInMainCard = false}) {
     final sousItem = _sousItems[index];
     final theme = Theme.of(context);
-    final montantInput = _montantInputs.length > index ? _montantInputs[index] : '';
+    final montantInput = _montantInputs.length > index
+        ? _montantInputs[index]
+        : '';
 
     return Padding(
       padding: EdgeInsets.only(bottom: isInMainCard ? 16 : 0),
@@ -171,7 +185,11 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                 ),
                 child: Text(
                   'Article ${index + 1}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 12),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -187,7 +205,8 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
           ),
           const SizedBox(height: 12),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center, // centrer verticalement
+            crossAxisAlignment:
+                CrossAxisAlignment.center, // centrer verticalement
             children: [
               Expanded(
                 flex: 1,
@@ -197,16 +216,28 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                     onTap: () => _ouvrirClavierNumerique(index),
                     child: InputDecorator(
                       decoration: const InputDecoration(
-                        labelText: 'Montant (\$)',
+                        labelText: 'Montant (\$)',
                         border: OutlineInputBorder(),
                         isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 15,
+                        ),
                       ),
                       child: Text(
                         montantInput.isEmpty
                             ? '0.00'
-                            : double.tryParse(montantInput.replaceAll(',', '.'))?.toStringAsFixed(2) ?? montantInput,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                            : double.tryParse(
+                                    montantInput
+                                        .replaceAll('\$', '')
+                                        .replaceAll(' ', '')
+                                        .replaceAll(',', '.'),
+                                  )?.toStringAsFixed(2) ??
+                                  montantInput,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
@@ -221,19 +252,33 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: sousItem.enveloppeId.isEmpty ? null : sousItem.enveloppeId,
+                            value: sousItem.enveloppeId.isEmpty
+                                ? null
+                                : sousItem.enveloppeId,
                             items: widget.enveloppes.map((enveloppe) {
-                              final solde = (enveloppe['solde'] as num?)?.toDouble() ?? 0.0;
-                              final couleurCompte = _getCouleurCompteEnveloppe(enveloppe);
+                              final solde =
+                                  (enveloppe['solde'] as num?)?.toDouble() ??
+                                  0.0;
+                              final couleurCompte = _getCouleurCompteEnveloppe(
+                                enveloppe,
+                              );
                               return DropdownMenuItem<String>(
                                 value: enveloppe['id'],
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(enveloppe['nom'] ?? 'Enveloppe', overflow: TextOverflow.ellipsis),
+                                    Text(
+                                      enveloppe['nom'] ?? 'Enveloppe',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     Text(
                                       solde.toStringAsFixed(2) + ' \$',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: couleurCompte),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: couleurCompte,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -247,7 +292,8 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                               setState(() {
                                 _sousItems[index] = _sousItems[index].copyWith(
                                   enveloppeId: value ?? '',
-                                  description: enveloppe['nom'] ?? 'Enveloppe inconnue',
+                                  description:
+                                      enveloppe['nom'] ?? 'Enveloppe inconnue',
                                 );
                               });
                             },
@@ -255,7 +301,10 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                               labelText: 'Enveloppe',
                               border: OutlineInputBorder(),
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                           ),
                         ),
@@ -276,8 +325,9 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
     try {
       final List<dynamic>? provenances = enveloppe['provenances'];
       if (provenances != null && provenances.isNotEmpty) {
-        var provenance = provenances.reduce((a, b) =>
-        (a['montant'] as num) > (b['montant'] as num) ? a : b);
+        var provenance = provenances.reduce(
+          (a, b) => (a['montant'] as num) > (b['montant'] as num) ? a : b,
+        );
         final compteId = provenance['compte_id'] as String?;
         if (compteId != null && enveloppe['comptes'] != null) {
           final comptes = enveloppe['comptes'] as List<dynamic>;
@@ -295,7 +345,9 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
       }
 
       final String? provenanceCompteId = enveloppe['provenance_compte_id'];
-      if (provenanceCompteId != null && provenanceCompteId.isNotEmpty && enveloppe['comptes'] != null) {
+      if (provenanceCompteId != null &&
+          provenanceCompteId.isNotEmpty &&
+          enveloppe['comptes'] != null) {
         final comptes = enveloppe['comptes'] as List<dynamic>;
         try {
           final compte = comptes.firstWhere(
@@ -343,7 +395,9 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 color: isDark ? Colors.grey.shade800 : Colors.blue.shade50,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: Column(
                 children: [
@@ -351,18 +405,26 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                      color: isDark
+                          ? Colors.grey.shade600
+                          : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Fractionner ${widget.montantTotal.toStringAsFixed(2)} \$',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(20),
@@ -372,11 +434,19 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                       children: [
                         Text(
                           'Alloué : ${_montantAlloue.toStringAsFixed(2)} \$ / ',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         Text(
                           'Restant : ${_montantRestant.toStringAsFixed(2)} \$',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary.withAlpha(153), fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary.withAlpha(153),
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -406,10 +476,16 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
             ),
             // Boutons d'action (désactivés)
             Container(
-              padding: const EdgeInsets.all(12).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12),
+              padding: const EdgeInsets.all(
+                12,
+              ).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12),
               decoration: BoxDecoration(
                 color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
-                border: Border(top: BorderSide(color: isDark ? Colors.grey.shade700 : Colors.grey.shade200)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade200,
+                  ),
+                ),
               ),
               child: Row(
                 children: [
@@ -418,24 +494,35 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                       onPressed: _ajouterLigneSousItem,
                       icon: const Icon(Icons.add),
                       label: const Text('Ajouter'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: _estValide && _sousItems.every((item) =>
-                        item.montant > 0 &&
-                        item.enveloppeId.isNotEmpty)
-                        ? _confirmerFractionnement
-                        : null,
+                      onPressed:
+                          _estValide &&
+                              _sousItems.every(
+                                (item) =>
+                                    item.montant > 0 &&
+                                    item.enveloppeId.isNotEmpty,
+                              )
+                          ? _confirmerFractionnement
+                          : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _estValide ? Colors.green : Colors.grey,
+                        backgroundColor: _estValide
+                            ? Colors.green
+                            : Colors.grey,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      child: const Text('Confirmer', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Confirmer',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/compte.dart';
 import '../services/firebase_service.dart';
+import '../widgets/numeric_keyboard.dart';
 
 /// Page de création d'un nouveau compte bancaire, carte de crédit ou investissement
 class PageCreationCompte extends StatefulWidget {
@@ -19,6 +20,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
   String _type = 'Chèque';
   double _solde = 0.0;
   Color _couleur = Colors.green;
+  final _soldeController = TextEditingController();
 
   final List<String> _types = [
     'Chèque',
@@ -37,22 +39,31 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
             icon: const Icon(Icons.check),
             tooltip: 'Valider',
             onPressed: () async {
-              if (_formKey.currentState!.validate()) {
-                _formKey.currentState!.save();
-                final id = FirebaseFirestore.instance.collection('comptes').doc().id;
-                final compte = Compte(
-                  id: id,
-                  nom: _nom,
-                  type: _type,
-                  solde: _solde,
-                  couleur: _couleur.value,
-                  pretAPlacer: _solde,
-                  dateCreation: DateTime.now(),
-                  estArchive: false,
+              if (_nom.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Veuillez entrer un nom'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
-                await FirebaseService().ajouterCompte(compte);
-                Navigator.of(context).pop();
+                return;
               }
+              final id = FirebaseFirestore.instance
+                  .collection('comptes')
+                  .doc()
+                  .id;
+              final compte = Compte(
+                id: id,
+                nom: _nom,
+                type: _type,
+                solde: _solde,
+                couleur: _couleur.value,
+                pretAPlacer: _solde,
+                dateCreation: DateTime.now(),
+                estArchive: false,
+              );
+              await FirebaseService().ajouterCompte(compte);
+              Navigator.of(context).pop();
             },
           ),
         ],
@@ -63,13 +74,17 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
           key: _formKey,
           child: ListView(
             children: [
-              SizedBox(height: 50), // Espacement entre le titre et le premier champ
+              SizedBox(
+                height: 50,
+              ), // Espacement entre le titre et le premier champ
               TextFormField(
                 decoration: const InputDecoration(
                   labelText: 'Nom du compte',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Veuillez entrer un nom' : null,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Veuillez entrer un nom'
+                    : null,
                 onSaved: (value) => _nom = value ?? '',
               ),
               const SizedBox(height: 16),
@@ -79,10 +94,12 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                   labelText: 'Type de compte',
                   border: OutlineInputBorder(),
                 ),
-                items: _types.map((type) => DropdownMenuItem(
-                  value: type,
-                  child: Text(type),
-                )).toList(),
+                items: _types
+                    .map(
+                      (type) =>
+                          DropdownMenuItem(value: type, child: Text(type)),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   setState(() {
                     _type = value ?? 'Chèques';
@@ -90,20 +107,44 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Solde initial',
-                  border: OutlineInputBorder(),
-                  suffixText: '\$',
+              GestureDetector(
+                onTap: () => _ouvrirClavierNumerique(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Solde initial',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _soldeController.text.isEmpty
+                                  ? '0.00'
+                                  : _soldeController.text,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Text('\$', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
                 ),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Veuillez entrer un solde';
-                  final solde = double.tryParse(value.replaceAll(',', '.'));
-                  if (solde == null) return 'Veuillez entrer un nombre valide';
-                  return null;
-                },
-                onSaved: (value) => _solde = double.tryParse(value!.replaceAll(',', '.')) ?? 0.0,
               ),
               const SizedBox(height: 16),
               Row(
@@ -119,7 +160,8 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                           content: SingleChildScrollView(
                             child: BlockPicker(
                               pickerColor: _couleur,
-                              onColorChanged: (color) => Navigator.of(context).pop(color),
+                              onColorChanged: (color) =>
+                                  Navigator.of(context).pop(color),
                             ),
                           ),
                         ),
@@ -130,33 +172,40 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                         });
                       }
                     },
-                    child: CircleAvatar(
-                      backgroundColor: _couleur,
-                      radius: 16,
-                    ),
+                    child: CircleAvatar(backgroundColor: _couleur, radius: 16),
                   ),
                 ],
               ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    _formKey.currentState!.save();
-                    // Générer un id unique pour le compte
-                    final id = FirebaseFirestore.instance.collection('comptes').doc().id;
-                    final compte = Compte(
-                      id: id,
-                      nom: _nom,
-                      type: _type,
-                      solde: _solde,
-                      couleur: _couleur.value,
-                      pretAPlacer: _solde, // Prêt à placer = solde initial à la création
-                      dateCreation: DateTime.now(),
-                      estArchive: false,
+                  if (_nom.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Veuillez entrer un nom'),
+                        backgroundColor: Colors.red,
+                      ),
                     );
-                    await FirebaseService().ajouterCompte(compte);
-                    Navigator.of(context).pop();
+                    return;
                   }
+                  // Générer un id unique pour le compte
+                  final id = FirebaseFirestore.instance
+                      .collection('comptes')
+                      .doc()
+                      .id;
+                  final compte = Compte(
+                    id: id,
+                    nom: _nom,
+                    type: _type,
+                    solde: _solde,
+                    couleur: _couleur.value,
+                    pretAPlacer:
+                        _solde, // Prêt à placer = solde initial à la création
+                    dateCreation: DateTime.now(),
+                    estArchive: false,
+                  );
+                  await FirebaseService().ajouterCompte(compte);
+                  Navigator.of(context).pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
@@ -169,5 +218,40 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
         ),
       ),
     );
+  }
+
+  void _ouvrirClavierNumerique() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => NumericKeyboard(
+        controller: _soldeController,
+        onClear: () {
+          setState(() {
+            _soldeController.text = '';
+            _solde = 0.0;
+          });
+        },
+        onValueChanged: (value) {
+          setState(() {
+            _solde =
+                double.tryParse(
+                  value
+                      .replaceAll('\$', '')
+                      .replaceAll(' ', '')
+                      .replaceAll(',', '.'),
+                ) ??
+                0.0;
+          });
+        },
+        showDecimal: true,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _soldeController.dispose();
+    super.dispose();
   }
 }

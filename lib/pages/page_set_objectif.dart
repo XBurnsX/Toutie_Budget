@@ -6,7 +6,11 @@ import '../widgets/numeric_keyboard.dart';
 class PageSetObjectif extends StatefulWidget {
   final Enveloppe enveloppe;
   final Categorie categorie;
-  const PageSetObjectif({Key? key, required this.enveloppe, required this.categorie}) : super(key: key);
+  const PageSetObjectif({
+    Key? key,
+    required this.enveloppe,
+    required this.categorie,
+  }) : super(key: key);
 
   @override
   State<PageSetObjectif> createState() => _PageSetObjectifState();
@@ -23,14 +27,17 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   @override
   void initState() {
     super.initState();
-    _currentObjectif = widget.enveloppe.objectif; // Initialiser avec l'objectif existant
+    _currentObjectif =
+        widget.enveloppe.objectif; // Initialiser avec l'objectif existant
     _controller = TextEditingController(
       text: _currentObjectif > 0 ? _currentObjectif.toStringAsFixed(2) : '',
     );
     _objectifJour = widget.enveloppe.objectifJour;
     // Définir le type d'objectif basé sur l'enveloppe existante
     if (_currentObjectif > 0) {
-      _objectifType = widget.enveloppe.frequenceObjectif == 'mensuel' ? 'mois' : 'date';
+      _objectifType = widget.enveloppe.frequenceObjectif == 'mensuel'
+          ? 'mois'
+          : 'date';
       if (widget.enveloppe.objectifDate != null) {
         _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
       }
@@ -48,29 +55,15 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       context: context,
       isScrollControlled: true,
       builder: (_) => NumericKeyboard(
-        onKeyTap: (key) {
-          setState(() {
-            String currentText = _controller.text;
-            if (key == '.') {
-              if (!currentText.contains('.')) {
-                _controller.text += '.';
-              }
-            } else {
-              _controller.text += key;
-            }
-          });
-        },
-        onBackspace: () {
-          setState(() {
-            String currentText = _controller.text;
-            if (currentText.isNotEmpty) {
-              _controller.text = currentText.substring(0, currentText.length - 1);
-            }
-          });
-        },
+        controller: _controller,
         onClear: () {
           setState(() {
             _controller.text = '';
+          });
+        },
+        onValueChanged: (value) {
+          setState(() {
+            // Mettre à jour l'affichage en temps réel
           });
         },
         showDecimal: true,
@@ -79,7 +72,11 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   }
 
   void _valider() async {
-    final value = double.tryParse(_controller.text.replaceAll(',', '.'));
+    // Nettoyer le montant du symbole $ et des espaces
+    String montantTexte = _controller.text.trim();
+    montantTexte = montantTexte.replaceAll('\$', '').replaceAll(' ', '');
+    final value = double.tryParse(montantTexte.replaceAll(',', '.'));
+
     if (value == null || value <= 0) {
       setState(() {
         _errorText = 'Veuillez entrer un montant valide (> 0)';
@@ -91,7 +88,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       nom: widget.enveloppe.nom,
       solde: widget.enveloppe.solde,
       objectif: value,
-      objectifDate: _objectifType == 'date' && _selectedDate != null ? _selectedDate!.toIso8601String() : null,
+      objectifDate: _objectifType == 'date' && _selectedDate != null
+          ? _selectedDate!.toIso8601String()
+          : null,
       depense: widget.enveloppe.depense,
       archivee: widget.enveloppe.archivee,
       provenanceCompteId: widget.enveloppe.provenanceCompteId,
@@ -100,7 +99,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       objectifJour: _objectifJour,
     );
     // Mise à jour de la liste d'enveloppes dans la catégorie
-    final updatedEnvs = widget.categorie.enveloppes.map((e) => e.id == updatedEnv.id ? updatedEnv : e).toList();
+    final updatedEnvs = widget.categorie.enveloppes
+        .map((e) => e.id == updatedEnv.id ? updatedEnv : e)
+        .toList();
     final updatedCat = Categorie(
       id: widget.categorie.id,
       nom: widget.categorie.nom,
@@ -135,7 +136,11 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
             const SizedBox(height: 8),
             Text(
               widget.enveloppe.nom,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 32),
             Row(
@@ -151,7 +156,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       backgroundColor: _objectifType == 'mois'
                           ? Theme.of(context).colorScheme.secondary
                           : Colors.grey[800],
-                      foregroundColor: _objectifType == 'mois' ? Colors.black : Colors.white,
+                      foregroundColor: _objectifType == 'mois'
+                          ? Colors.black
+                          : Colors.white,
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(8),
@@ -176,7 +183,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       backgroundColor: _objectifType == 'date'
                           ? Theme.of(context).colorScheme.secondary
                           : Colors.grey[800],
-                      foregroundColor: _objectifType == 'date' ? Colors.black : Colors.white,
+                      foregroundColor: _objectifType == 'date'
+                          ? Colors.black
+                          : Colors.white,
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.only(
                           topRight: Radius.circular(8),
@@ -197,7 +206,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                     context: context,
                     initialDate: _selectedDate ?? DateTime.now(),
                     firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+                    lastDate: DateTime.now().add(
+                      const Duration(days: 365 * 10),
+                    ),
                     locale: const Locale('fr', 'CA'),
                   );
                   if (picked != null) {
@@ -207,21 +218,30 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 18,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey[900],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Theme.of(context).colorScheme.secondary, width: 1.5),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.secondary,
+                      width: 1.5,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.secondary),
+                      Icon(
+                        Icons.calendar_today,
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
                       const SizedBox(width: 10),
                       Text(
                         _selectedDate != null
-                          ? '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}'
-                          : 'Choisir une date',
+                            ? '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}'
+                            : 'Choisir une date',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.secondary,
                           fontWeight: FontWeight.bold,
@@ -238,18 +258,26 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Text('Jour du mois :', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                  const Text(
+                    'Jour du mois :',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
                   const SizedBox(width: 16),
                   DropdownButton<int>(
                     value: _objectifJour,
                     dropdownColor: Colors.grey[900],
                     style: const TextStyle(color: Colors.white, fontSize: 16),
-                    hint: const Text('Jour', style: TextStyle(color: Colors.white54)),
+                    hint: const Text(
+                      'Jour',
+                      style: TextStyle(color: Colors.white54),
+                    ),
                     items: List.generate(31, (i) => i + 1)
-                        .map((day) => DropdownMenuItem(
-                              value: day,
-                              child: Text(day.toString()),
-                            ))
+                        .map(
+                          (day) => DropdownMenuItem(
+                            value: day,
+                            child: Text(day.toString()),
+                          ),
+                        )
                         .toList(),
                     onChanged: (val) {
                       setState(() {
@@ -281,9 +309,16 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                   backgroundColor: Theme.of(context).colorScheme.secondary,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textStyle: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: Text(_currentObjectif > 0 ? 'Modifier l\'objectif' : 'Enregistrer l\'objectif'),
+                child: Text(
+                  _currentObjectif > 0
+                      ? 'Modifier l\'objectif'
+                      : 'Enregistrer l\'objectif',
+                ),
               ),
             ),
           ],

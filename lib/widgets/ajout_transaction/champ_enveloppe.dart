@@ -1,0 +1,137 @@
+import 'package:flutter/material.dart';
+import '../../models/compte.dart';
+import '../../models/transaction_model.dart';
+
+class ChampEnveloppe extends StatelessWidget {
+  final String? enveloppeSelectionnee;
+  final List<Map<String, dynamic>> categoriesFirebase;
+  final List<Compte> comptesFirebase;
+  final TypeTransaction typeSelectionne;
+  final TypeMouvementFinancier typeMouvementSelectionne;
+  final String? compteSelectionne;
+  final Function(String?) onEnveloppeChanged;
+  final Color Function(Map<String, dynamic>) getCouleurCompteEnveloppe;
+
+  const ChampEnveloppe({
+    Key? key,
+    required this.enveloppeSelectionnee,
+    required this.categoriesFirebase,
+    required this.comptesFirebase,
+    required this.typeSelectionne,
+    required this.typeMouvementSelectionne,
+    required this.compteSelectionne,
+    required this.onEnveloppeChanged,
+    required this.getCouleurCompteEnveloppe,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      value: enveloppeSelectionnee,
+      items: _buildEnveloppeItems(),
+      onChanged: (String? newValue) => onEnveloppeChanged(newValue),
+      decoration: InputDecoration(
+        hintText: 'Optionnel',
+        border: InputBorder.none,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 10.0,
+          horizontal: 10.0,
+        ),
+      ),
+      isExpanded: true,
+    );
+  }
+
+  List<DropdownMenuItem<String>> _buildEnveloppeItems() {
+    final items = <DropdownMenuItem<String>>[];
+
+    // Option "Aucune"
+    items.add(
+      const DropdownMenuItem<String>(
+        value: null,
+        child: Text("Aucune", style: TextStyle(fontStyle: FontStyle.italic)),
+      ),
+    );
+
+    // Prêts à placer dynamiques (seulement pour les revenus)
+    if (typeSelectionne != TypeTransaction.depense &&
+        compteSelectionne != null) {
+      final comptesAvecPret = comptesFirebase.where(
+        (c) => c.pretAPlacer > 0 && c.id == compteSelectionne,
+      );
+
+      for (final compte in comptesAvecPret) {
+        items.add(
+          DropdownMenuItem<String>(
+            value: 'pret_${compte.id}',
+            child: Text(
+              '${compte.nom} : Prêt à placer ${compte.pretAPlacer.toStringAsFixed(2)}',
+            ),
+          ),
+        );
+      }
+    }
+
+    // Enveloppes classiques filtrées
+    final enveloppesFiltrees = categoriesFirebase
+        .expand((cat) => (cat['enveloppes'] as List))
+        .where((env) => _estEnveloppeAffichable(env))
+        .toList();
+
+    for (final env in enveloppesFiltrees) {
+      final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
+      final couleurCompte = getCouleurCompteEnveloppe(env);
+
+      items.add(
+        DropdownMenuItem<String>(
+          value: env['id'],
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(env['nom'], overflow: TextOverflow.ellipsis),
+              ),
+              Text(
+                '${solde.toStringAsFixed(2)} \$',
+                style: TextStyle(
+                  color: couleurCompte,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  bool _estEnveloppeAffichable(Map<String, dynamic> env) {
+    final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
+
+    if (typeSelectionne == TypeTransaction.depense &&
+        compteSelectionne != null) {
+      // Gestion multi-provenances
+      if (env['provenances'] != null &&
+          (env['provenances'] as List).isNotEmpty) {
+        return (env['provenances'] as List).any(
+              (prov) => prov['compte_id'] == compteSelectionne,
+            ) ||
+            solde == 0;
+      }
+
+      // Gestion ancienne provenance unique
+      if (env['provenance_compte_id'] != null) {
+        return env['provenance_compte_id'] == compteSelectionne || solde == 0;
+      }
+
+      // Sinon, ne pas afficher sauf si solde == 0
+      return solde == 0;
+    }
+
+    // Sinon (revenu ou pas de compte sélectionné), tout afficher
+    return true;
+  }
+}
