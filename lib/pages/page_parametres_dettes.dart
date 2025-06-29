@@ -194,8 +194,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       border: OutlineInputBorder(),
                     ),
                     readOnly: true,
-                    onTap: () =>
-                        _ouvrirClavierNumerique(_simulateurPrincipalController),
+                    onTap: () => _ouvrirClavierNumerique(
+                      _simulateurPrincipalController,
+                      isMoney: true,
+                    ),
                     onChanged: _calculerSimulateur,
                   ),
                 ),
@@ -211,6 +213,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     onTap: () => _ouvrirClavierNumerique(
                       _simulateurDureeController,
                       showDecimal: false,
+                      isMoney: false,
                     ),
                     onChanged: _calculerSimulateur,
                   ),
@@ -230,8 +233,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       border: OutlineInputBorder(),
                     ),
                     readOnly: true,
-                    onTap: () =>
-                        _ouvrirClavierNumerique(_simulateurTauxController),
+                    onTap: () => _ouvrirClavierNumerique(
+                      _simulateurTauxController,
+                      isMoney: false,
+                    ),
                     onChanged: _calculerPaiement,
                   ),
                 ),
@@ -381,7 +386,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           suffixText: '%',
                         ),
                         readOnly: true,
-                        onTap: () => _ouvrirClavierNumerique(_tauxController),
+                        onTap: () => _ouvrirClavierNumerique(
+                          _tauxController,
+                          isMoney: false,
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Veuillez entrer un taux d\'intérêt';
@@ -409,8 +417,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           suffixText: '\$24',
                         ),
                         readOnly: true,
-                        onTap: () =>
-                            _ouvrirClavierNumerique(_prixAchatController),
+                        onTap: () => _ouvrirClavierNumerique(
+                          _prixAchatController,
+                          isMoney: true,
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Veuillez entrer un prix d\'achat';
@@ -441,6 +451,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         onTap: () => _ouvrirClavierNumerique(
                           _nombrePaiementsController,
                           showDecimal: false,
+                          isMoney: false,
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -469,8 +480,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           suffixText: '\$24',
                         ),
                         readOnly: true,
-                        onTap: () =>
-                            _ouvrirClavierNumerique(_montantMensuelController),
+                        onTap: () => _ouvrirClavierNumerique(
+                          _montantMensuelController,
+                          isMoney: true,
+                        ),
                       ),
                     ),
                   ],
@@ -535,6 +548,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         onTap: () => _ouvrirClavierNumerique(
                           _paiementsEffectuesController,
                           showDecimal: false,
+                          isMoney: false,
                         ),
                       ),
                     ),
@@ -790,6 +804,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   void _ouvrirClavierNumerique(
     TextEditingController controller, {
     bool showDecimal = true,
+    bool isMoney = true,
   }) {
     showModalBottomSheet(
       context: context,
@@ -802,6 +817,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           child: NumericKeyboard(
             controller: controller,
             showDecimal: showDecimal,
+            isMoney: isMoney,
           ),
         );
       },

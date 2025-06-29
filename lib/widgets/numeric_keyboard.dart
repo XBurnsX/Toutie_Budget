@@ -6,6 +6,7 @@ class NumericKeyboard extends StatefulWidget {
   final bool showDecimal;
   final Function(String)? onValueChanged;
   final VoidCallback? onDone;
+  final bool isMoney;
 
   const NumericKeyboard({
     super.key,
@@ -14,6 +15,7 @@ class NumericKeyboard extends StatefulWidget {
     this.showDecimal = true,
     this.onValueChanged,
     this.onDone,
+    this.isMoney = true,
   });
 
   @override
@@ -22,47 +24,56 @@ class NumericKeyboard extends StatefulWidget {
 
 class _NumericKeyboardState extends State<NumericKeyboard> {
   void _onKeyTap(String key) {
-    String currentText = widget.controller.text;
-    if (currentText != '0.00 \$') {
-      currentText = currentText.replaceAll('\$', '').replaceAll(' ', '');
-    }
-    if (currentText == '0.00' ||
-        currentText == '0.00 \$' ||
-        currentText.isEmpty) {
-      if (key == '-') {
-        widget.controller.text = '-0.00 \$';
-      } else {
-        widget.controller.text = '0.0$key \$';
+    if (widget.isMoney) {
+      String currentText = widget.controller.text;
+      if (currentText != '0.00 \$') {
+        currentText = currentText.replaceAll('\$', '').replaceAll(' ', '');
       }
-    } else if (key == '-') {
-      if (currentText.startsWith('-')) {
-        widget.controller.text = '${currentText.substring(1)} \$';
+      if (currentText == '0.00' ||
+          currentText == '0.00 \$' ||
+          currentText.isEmpty) {
+        if (key == '-') {
+          widget.controller.text = '-0.00 \$';
+        } else {
+          widget.controller.text = '0.0$key \$';
+        }
+      } else if (key == '-') {
+        if (currentText.startsWith('-')) {
+          widget.controller.text = '${currentText.substring(1)} \$';
+        } else {
+          widget.controller.text = '-$currentText \$';
+        }
       } else {
-        widget.controller.text = '-$currentText \$';
+        bool isNegative = currentText.startsWith('-');
+        String positiveText =
+            (isNegative ? currentText.substring(1) : currentText).replaceAll(
+              '.',
+              '',
+            );
+
+        String newText = positiveText + key;
+
+        while (newText.length > 1 && newText.startsWith('0')) {
+          newText = newText.substring(1);
+        }
+
+        if (newText.length < 3) {
+          newText = newText.padLeft(3, '0');
+        }
+
+        String partieEntiere = newText.substring(0, newText.length - 2);
+        String partieDecimale = newText.substring(newText.length - 2);
+
+        String result = '$partieEntiere.$partieDecimale \$';
+        widget.controller.text = isNegative ? '-$result' : result;
       }
     } else {
-      bool isNegative = currentText.startsWith('-');
-      String positiveText =
-          (isNegative ? currentText.substring(1) : currentText).replaceAll(
-            '.',
-            '',
-          );
-
-      String newText = positiveText + key;
-
-      while (newText.length > 1 && newText.startsWith('0')) {
-        newText = newText.substring(1);
+      String currentText = widget.controller.text;
+      if (currentText == '0') {
+        widget.controller.text = key;
+      } else {
+        widget.controller.text = currentText + key;
       }
-
-      if (newText.length < 3) {
-        newText = newText.padLeft(3, '0');
-      }
-
-      String partieEntiere = newText.substring(0, newText.length - 2);
-      String partieDecimale = newText.substring(newText.length - 2);
-
-      String result = '$partieEntiere.$partieDecimale \$';
-      widget.controller.text = isNegative ? '-$result' : result;
     }
     widget.controller.selection = TextSelection.fromPosition(
       TextPosition(offset: widget.controller.text.length),
@@ -70,38 +81,49 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
     widget.onValueChanged?.call(widget.controller.text);
   }
 
-  // AMÉLIORATION: Gestion plus robuste du backspace
   void _onBackspace() {
-    String currentText = widget.controller.text
-        .replaceAll('\$', '')
-        .replaceAll(' ', '');
+    if (widget.isMoney) {
+      String currentText = widget.controller.text
+          .replaceAll('\$', '')
+          .replaceAll(' ', '');
 
-    bool isNegative = currentText.startsWith('-');
-    String positiveText = (isNegative ? currentText.substring(1) : currentText)
-        .replaceAll('.', '');
+      bool isNegative = currentText.startsWith('-');
+      String positiveText =
+          (isNegative ? currentText.substring(1) : currentText).replaceAll(
+            '.',
+            '',
+          );
 
-    if (positiveText.length > 1) {
-      positiveText = positiveText.substring(0, positiveText.length - 1);
+      if (positiveText.length > 1) {
+        positiveText = positiveText.substring(0, positiveText.length - 1);
+      } else {
+        positiveText = '0';
+      }
+
+      if (positiveText.length < 3) {
+        positiveText = positiveText.padLeft(3, '0');
+      }
+
+      String partieEntiere = positiveText.substring(0, positiveText.length - 2);
+      String partieDecimale = positiveText.substring(positiveText.length - 2);
+      String result = '$partieEntiere.$partieDecimale \$';
+
+      if (isNegative && result != '0.00 \$') {
+        widget.controller.text = '-$result';
+      } else {
+        widget.controller.text = result;
+      }
     } else {
-      positiveText = '0';
+      String currentText = widget.controller.text;
+      if (currentText.length > 1) {
+        widget.controller.text = currentText.substring(
+          0,
+          currentText.length - 1,
+        );
+      } else {
+        widget.controller.text = '0';
+      }
     }
-
-    // On reformate comme pour _onKeyTap
-    if (positiveText.length < 3) {
-      positiveText = positiveText.padLeft(3, '0');
-    }
-
-    String partieEntiere = positiveText.substring(0, positiveText.length - 2);
-    String partieDecimale = positiveText.substring(positiveText.length - 2);
-    String result = '$partieEntiere.$partieDecimale \$';
-
-    // On ne remet le signe négatif que si la valeur n'est pas "0.00"
-    if (isNegative && result != '0.00 \$') {
-      widget.controller.text = '-$result';
-    } else {
-      widget.controller.text = result;
-    }
-
     widget.controller.selection = TextSelection.fromPosition(
       TextPosition(offset: widget.controller.text.length),
     );
@@ -157,9 +179,6 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
 
   @override
   Widget build(BuildContext context) {
-    final montant = widget.controller.text.isEmpty
-        ? '0.00 \$'
-        : widget.controller.text;
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -182,32 +201,34 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // VOS MODIFICATIONS ICI: La largeur est ajustée pour inclure le padding des boutons
-                // (largeur bouton + padding) * 2 + espacement
-                // (85 + 4) * 2 + 35  ->  89 * 2 + 35 = 213.
-                // En fait, plus simple: (largeur bouton1) + (espace) + (largeur bouton2)
-                // 89 + 35 + 89 = 213
                 SizedBox(
                   width: 213,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        montant,
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                        textAlign: TextAlign.left,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: widget.controller,
+                        builder: (context, value, child) {
+                          String displayText = value.text.isEmpty
+                              ? (widget.isMoney ? '0.00 \$' : '0')
+                              : value.text;
+                          return Text(
+                            displayText,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            textAlign: TextAlign.left,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
                       ),
                       Container(
                         margin: const EdgeInsets.only(top: 2),
                         height: 2,
-                        // VOS MODIFICATIONS ICI: La ligne a aussi la nouvelle largeur
                         width: 213,
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -215,7 +236,6 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                   ),
                 ),
                 const SizedBox(width: 35),
-                // VOS MODIFICATIONS ICI: Le bouton est maintenant dans un Padding, comme les autres
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     vertical: 6.0,
@@ -258,7 +278,6 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                 _buildOvalButton('3'),
               ],
             ),
-            // ... reste du code inchangé ...
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
