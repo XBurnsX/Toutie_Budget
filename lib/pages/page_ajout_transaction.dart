@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/ajout_transaction_controller.dart';
 import '../models/transaction_model.dart';
-import '../models/compte.dart';
 import '../models/fractionnement_model.dart';
 import '../widgets/ajout_transaction/selecteur_type_transaction.dart';
 import '../widgets/ajout_transaction/champ_montant.dart';

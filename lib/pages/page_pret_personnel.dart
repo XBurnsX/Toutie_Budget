@@ -4,13 +4,14 @@ import '../models/dette.dart';
 import '../services/dette_service.dart';
 
 class PagePretPersonnel extends StatefulWidget {
-  const PagePretPersonnel({Key? key}) : super(key: key);
+  const PagePretPersonnel({super.key});
 
   @override
   State<PagePretPersonnel> createState() => _PagePretPersonnelState();
 }
 
-class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTickerProviderStateMixin {
+class _PagePretPersonnelState extends State<PagePretPersonnel>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final DetteService _detteService = DetteService();
 
@@ -53,12 +54,18 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
 
   Widget _buildListeDettes({String? type, required bool archive}) {
     return StreamBuilder<List<Dette>>(
-      stream: archive ? _detteService.dettesArchivees() : _detteService.dettesActives(),
+      stream: archive
+          ? _detteService.dettesArchivees()
+          : _detteService.dettesActives(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final dettes = snapshot.data?.where((d) => type == null || d.type == type).toList() ?? [];
+        final dettes =
+            snapshot.data
+                ?.where((d) => type == null || d.type == type)
+                .toList() ??
+            [];
         if (dettes.isEmpty) {
           return const Center(child: Text('Aucune donnée.'));
         }
@@ -82,8 +89,12 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
             return ListTile(
               title: Text('${dette.nomTiers}${archive ? typeLabel : ''}'),
               subtitle: archive
-                ? Text('Montant initial : ${dette.montantInitial.toStringAsFixed(2)}') // Pas de solde pour les archivées
-                : Text('Montant initial : ${dette.montantInitial.toStringAsFixed(2)}\nSolde : ${dette.solde.toStringAsFixed(2)}'), // Avec solde pour les actives
+                  ? Text(
+                      'Montant initial : ${dette.montantInitial.toStringAsFixed(2)}',
+                    ) // Pas de solde pour les archivées
+                  : Text(
+                      'Montant initial : ${dette.montantInitial.toStringAsFixed(2)}\nSolde : ${dette.solde.toStringAsFixed(2)}',
+                    ), // Avec solde pour les actives
               trailing: archive ? const Icon(Icons.archive) : null,
               onTap: () => _showDetailDette(dette),
             );
@@ -113,8 +124,12 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                   Row(
                     children: [
                       Icon(
-                        dette.type == 'pret' ? Icons.call_made : Icons.call_received,
-                        color: dette.type == 'pret' ? Colors.green : Colors.orange,
+                        dette.type == 'pret'
+                            ? Icons.call_made
+                            : Icons.call_received,
+                        color: dette.type == 'pret'
+                            ? Colors.green
+                            : Colors.orange,
                         size: 24,
                       ),
                       const SizedBox(width: 12),
@@ -123,26 +138,40 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              dette.type == 'pret' ? 'Prêt accordé à' : 'Dette envers',
-                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              dette.type == 'pret'
+                                  ? 'Prêt accordé à'
+                                  : 'Dette envers',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
                             ),
                             Text(
                               dette.nomTiers,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       if (dette.archive)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.grey.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Text(
                             'ARCHIVÉ',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                     ],
@@ -163,26 +192,49 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Montant initial', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              const Text(
+                                'Montant initial',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
                               Text(
                                 '${dette.montantInitial.toStringAsFixed(2)} \$',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        Container(width: 1, height: 40, color: Colors.grey.withOpacity(0.3)),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.grey.withOpacity(0.3),
+                        ),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('Solde actuel', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              const Text(
+                                'Solde actuel',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
                               Text(
                                 '${dette.solde.toStringAsFixed(2)} \$',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: dette.solde == 0 ? Colors.green : (dette.type == 'pret' ? Colors.blue : Colors.orange),
+                                  color: dette.solde == 0
+                                      ? Colors.green
+                                      : (dette.type == 'pret'
+                                            ? Colors.blue
+                                            : Colors.orange),
                                 ),
                               ),
                             ],
@@ -203,11 +255,18 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Soldé le ${DateFormat('dd/MM/yyyy').format(dette.dateArchivage!)}',
-                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500),
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -233,7 +292,10 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                         ? const Center(
                             child: Text(
                               'Aucun mouvement',
-                              style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           )
                         : ListView.builder(
@@ -254,10 +316,20 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _ajouterRemboursement(dette),
-                            icon: Icon(dette.type == 'pret' ? Icons.call_made : Icons.call_received),
-                            label: Text(dette.type == 'pret' ? 'Remboursement reçu' : 'Rembourser'),
+                            icon: Icon(
+                              dette.type == 'pret'
+                                  ? Icons.call_made
+                                  : Icons.call_received,
+                            ),
+                            label: Text(
+                              dette.type == 'pret'
+                                  ? 'Remboursement reçu'
+                                  : 'Rembourser',
+                            ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: dette.type == 'pret' ? Colors.green : Colors.orange,
+                              backgroundColor: dette.type == 'pret'
+                                  ? Colors.green
+                                  : Colors.orange,
                               foregroundColor: Colors.white,
                             ),
                           ),
@@ -265,11 +337,11 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () => _archiverManuellement(dette),
-                          child: const Text('Archiver'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey,
                             foregroundColor: Colors.white,
                           ),
+                          child: const Text('Archiver'),
                         ),
                       ],
                     ),
@@ -348,7 +420,10 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
                 if (mouvement.note?.isNotEmpty == true)
                   Text(
                     mouvement.note!,
-                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
               ],
             ),
@@ -373,7 +448,9 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
       context,
       '/ajout_transaction',
       arguments: {
-        'typeRemboursement': dette.type == 'pret' ? 'remboursement_recu' : 'remboursement_effectue',
+        'typeRemboursement': dette.type == 'pret'
+            ? 'remboursement_recu'
+            : 'remboursement_effectue',
         'nomTiers': dette.nomTiers,
         'montantSuggere': dette.solde,
       },
@@ -397,7 +474,10 @@ class _PagePretPersonnelState extends State<PagePretPersonnel> with SingleTicker
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Archiver', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Archiver',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Page d'affichage des statistiques financières
 class PageStatistiques extends StatelessWidget {
-  const PageStatistiques({Key? key}) : super(key: key);
+  const PageStatistiques({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,4 +14,3 @@ class PageStatistiques extends StatelessWidget {
     );
   }
 }
-

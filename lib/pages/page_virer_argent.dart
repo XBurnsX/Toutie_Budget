@@ -8,10 +8,10 @@ import '../widgets/numeric_keyboard.dart';
 
 class PageVirerArgent extends StatefulWidget {
   const PageVirerArgent({
-    Key? key,
+    super.key,
     this.destinationPreselectionnee,
     this.montantPreselectionne,
-  }) : super(key: key);
+  });
 
   final String? destinationPreselectionnee;
   final double? montantPreselectionne;
@@ -211,10 +211,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                 if (comptesSnapshot.hasError || catSnapshot.hasError) {
                   return Center(
                     child: Text(
-                      'Erreur : ' +
-                          (comptesSnapshot.error?.toString() ?? '') +
-                          '\n' +
-                          (catSnapshot.error?.toString() ?? ''),
+                      'Erreur : ${comptesSnapshot.error?.toString() ?? ''}\n${catSnapshot.error?.toString() ?? ''}',
                       style: const TextStyle(color: Colors.red),
                     ),
                   );
@@ -302,7 +299,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                   } else if (obj is Enveloppe) {
                     solde = obj.solde;
                   }
-                  return solde.toStringAsFixed(2) + ' \$';
+                  return '${solde.toStringAsFixed(2)} \$';
                 }
 
                 Color getSoldeColor(dynamic obj) {
@@ -480,12 +477,12 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: montant.isNotEmpty ? effacerTout : null,
-                            child: const Text('Effacer tout'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red[100],
                               foregroundColor: Colors.red[900],
                               minimumSize: const Size.fromHeight(40),
                             ),
+                            child: const Text('Effacer tout'),
                           ),
                         ),
                       ],
@@ -545,8 +542,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                                 if (source is Compte &&
                                     destination is Enveloppe) {
                                   debugPrint(
-                                    '[DEBUG] destination brut: ' +
-                                        destination.toString(),
+                                    '[DEBUG] destination brut: $destination',
                                   );
 
                                   // Vérifier si l'enveloppe contient déjà de l'argent d'un autre compte
@@ -857,13 +853,17 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                                 debugPrint(
                                   '[DEBUG] Finally block: _isProcessing = $_isProcessing',
                                 );
-                                if (_isProcessing)
+                                if (_isProcessing) {
                                   setState(() {
                                     _isProcessing = false;
                                   });
+                                }
                               }
                             }
                           : null,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                       child: Text(
                         source == null ||
                                 destination == null ||
@@ -872,9 +872,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                             ? 'Remplir tous les champs'
                             : 'Valider le virement',
                       ),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
                     ),
                     if (!virementPossible()) const SizedBox.shrink(),
                   ],
@@ -882,7 +879,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
               } catch (e, stack) {
                 return Center(
                   child: Text(
-                    'Exception : ' + e.toString() + '\n' + stack.toString(),
+                    'Exception : $e\n$stack',
                     style: const TextStyle(color: Colors.red),
                   ),
                 );

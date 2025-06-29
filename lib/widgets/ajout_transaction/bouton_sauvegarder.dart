@@ -11,13 +11,13 @@ class BoutonSauvegarder extends StatelessWidget {
   final bool estFractionnee;
 
   const BoutonSauvegarder({
-    Key? key,
+    super.key,
     required this.estValide,
     required this.onSauvegarder,
     this.isLoading = false,
     this.onFractionner,
     this.estFractionnee = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

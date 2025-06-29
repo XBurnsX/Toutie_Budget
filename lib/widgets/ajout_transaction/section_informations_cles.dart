@@ -26,7 +26,7 @@ class SectionInformationsCles extends StatelessWidget {
   final Function(TypeMouvementFinancier) onTypeMouvementChanged;
 
   const SectionInformationsCles({
-    Key? key,
+    super.key,
     required this.typeMouvementSelectionne,
     required this.payeController,
     required this.listeTiersConnus,
@@ -46,7 +46,7 @@ class SectionInformationsCles extends StatelessWidget {
     required this.onMarqueurChanged,
     required this.noteController,
     required this.onTypeMouvementChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
