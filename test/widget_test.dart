@@ -9,8 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:toutie_budget/main.dart';
+import 'firebase_test_config.dart';
 
 void main() {
+  setUpAll(() async {
+    // Initialiser Firebase pour tous les tests
+    await setupFirebaseForTests();
+  });
+
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());

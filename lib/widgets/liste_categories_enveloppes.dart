@@ -150,7 +150,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 } else if (compteId.isNotEmpty) {
                   final compte = comptes.firstWhere(
                     (c) => c['id'].toString() == compteId.toString(),
-                    orElse: () => <String, dynamic>{},
+                    orElse: () => <String, Object>{},
                   );
                   log(
                     '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
@@ -305,7 +305,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                           (c) =>
                                               c['id'].toString() ==
                                               prov['compte_id'].toString(),
-                                          orElse: () => <String, dynamic>{},
+                                          orElse: () => <String, Object>{},
                                         );
                                         final couleur =
                                             (compte['couleur'] != null &&
@@ -363,7 +363,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               } else if (compteId.isNotEmpty) {
                 final compte = comptes.firstWhere(
                   (c) => c['id'].toString() == compteId.toString(),
-                  orElse: () => <String, dynamic>{},
+                  orElse: () => <String, Object>{},
                 );
                 log(
                   '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
