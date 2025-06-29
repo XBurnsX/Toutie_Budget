@@ -47,6 +47,10 @@ class DetteService {
     // Ajouter le mouvement à l'historique
     await doc.update({
       'historique': FieldValue.arrayUnion([mouvement.toMap()]),
+      // Incrémenter automatiquement le compteur de paiements effectués pour les remboursements
+      if (mouvement.type == 'remboursement_recu' ||
+          mouvement.type == 'remboursement_effectue')
+        'paiementsEffectues': FieldValue.increment(1),
     });
 
     // Recalculer et mettre à jour le solde automatiquement

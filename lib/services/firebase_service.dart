@@ -5,6 +5,7 @@ import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../models/transaction_model.dart' as app_model;
 import '../models/dette.dart';
+import 'dette_service.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -167,6 +168,48 @@ class FirebaseService {
         transaction.montant,
         transaction.type,
       );
+    }
+
+    // 4. Si la transaction est un remboursement effectué sur une dette manuelle,
+    //    créer un mouvement pour mettre à jour automatiquement la dette (historique,
+    //    solde, paiementsEffectues).
+    if (transaction.typeMouvement ==
+            app_model.TypeMouvementFinancier.remboursementEffectue &&
+        transaction.compteDePassifAssocie != null &&
+        transaction.compteDePassifAssocie!.isNotEmpty) {
+      try {
+        final detteDoc = await firestore
+            .collection('dettes')
+            .doc(transaction.compteDePassifAssocie!)
+            .get();
+
+        if (detteDoc.exists) {
+          final data = detteDoc.data() as Map<String, dynamic>;
+          final estManuelle = data['estManuelle'] == true;
+
+          if (estManuelle) {
+            final mouvement = MouvementDette(
+              id: firestore.collection('mouvements').doc().id,
+              date: transaction.date,
+              montant: -transaction
+                  .montant, // négatif pour un remboursement effectué
+              type: 'remboursement_effectue',
+              note:
+                  transaction.note ?? 'Remboursement effectué via transaction',
+            );
+
+            await DetteService().ajouterMouvement(
+              transaction.compteDePassifAssocie!,
+              mouvement,
+            );
+          }
+        }
+      } catch (e) {
+        // Ne pas faire échouer toute la transaction si la mise à jour de la dette échoue.
+        print(
+          'Erreur lors de la tentative de synchronisation dette manuelle: $e',
+        );
+      }
     }
   }
 

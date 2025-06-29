@@ -6,6 +6,8 @@ import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/widgets/month_picker.dart';
 import 'package:toutie_budget/services/calcul_pret_service.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class PageParametresDettes extends StatefulWidget {
   final Dette dette;
@@ -42,6 +44,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   String? _erreurSimulateur;
   bool _afficherResultatsCalcul = false;
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _detteListener;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +54,23 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _dateDebutController.addListener(_onParametresChanges);
     _tauxController.addListener(_onParametresChanges);
     _prixAchatController.addListener(_onParametresChanges);
+
+    // Écouter en temps réel les modifications du document dette pour mettre à jour
+    _detteListener = FirebaseFirestore.instance
+        .collection('dettes')
+        .doc(widget.dette.id)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists) return;
+          final data = snapshot.data();
+          if (data == null) return;
+          final paiements = (data['paiementsEffectues'] as num?)?.toInt() ?? 0;
+          if (_paiementsEffectuesController.text != paiements.toString()) {
+            setState(() {
+              _paiementsEffectuesController.text = paiements.toString();
+            });
+          }
+        });
   }
 
   void _chargerDonnees() {
@@ -130,6 +151,29 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   void _onParametresChanges() {
     // Fonction centrale qui recalcule tout ce qui doit l'être
     _calculerDateFinParDefaut();
+
+    // Vérifier que la date de fin courante ne dépasse pas la durée maximale
+    final dateDebut = _parseDate(_dateDebutController.text);
+    final dureeMois = int.tryParse(_nombrePaiementsController.text);
+    final dateFinMax = (dateDebut != null && dureeMois != null && dureeMois > 0)
+        ? DateTime(
+            dateDebut.year,
+            dateDebut.month + dureeMois - 1,
+            dateDebut.day,
+          )
+        : null;
+
+    final dateFinCourante = _parseDate(_dateFinController.text);
+
+    if (dateFinMax != null &&
+        dateFinCourante != null &&
+        dateFinCourante.isAfter(dateFinMax)) {
+      // Remettre la date au maximum autorisé
+      setState(() {
+        _dateFinController.text = _formaterDate(dateFinMax);
+      });
+    }
+
     // Potentiellement d'autres calculs à l'avenir
   }
 
@@ -146,6 +190,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       if (_dateFinController.text != _formaterDate(dateFin)) {
         setState(() {
           _dateFinController.text = _formaterDate(dateFin);
+          _recalculerPaiementMensuel();
         });
       }
     }
@@ -867,6 +912,29 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       return;
     }
 
+    // Validation supplémentaire : la date de fin ne doit pas dépasser la durée max
+    final dateDebut = _parseDate(_dateDebutController.text);
+    final dateFin = _parseDate(_dateFinController.text);
+    final dureeMoisMax = int.tryParse(_nombrePaiementsController.text) ?? 0;
+    if (dateDebut != null && dateFin != null && dureeMoisMax > 0) {
+      final dateFinMax = DateTime(
+        dateDebut.year,
+        dateDebut.month + dureeMoisMax - 1,
+        dateDebut.day,
+      );
+      if (dateFin.isAfter(dateFinMax)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('La date de fin dépasse la durée du prêt.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     try {
       final nouveauSolde = _calculerValeursPret()['soldeRestant'];
       final ancienSolde = widget.dette.solde;
@@ -1034,6 +1102,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _dateDebutController.removeListener(_onParametresChanges);
     _tauxController.removeListener(_onParametresChanges);
     _prixAchatController.removeListener(_onParametresChanges);
+
+    // Annuler l'abonnement Firestore
+    _detteListener?.cancel();
     super.dispose();
   }
 
