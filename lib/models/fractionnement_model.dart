@@ -59,9 +59,10 @@ class TransactionFractionnee {
     required this.montantTotal,
   });
 
-  double get montantAlloue => sousItems.fold(0.0, (sum, item) => sum + item.montant);
+  double get montantAlloue =>
+      sousItems.fold(0.0, (sum, item) => sum + item.montant);
   double get montantRestant => montantTotal - montantAlloue;
-  bool get estValide => montantRestant == 0.0;
+  bool get estValide => (montantRestant.abs() < 0.01);
 
   Map<String, dynamic> toJson() => {
     'transactionParenteId': transactionParenteId,

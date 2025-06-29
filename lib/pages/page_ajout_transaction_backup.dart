@@ -1269,249 +1269,106 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
 
             // --- BOUTON SAUVEGARDER (LOGIQUE MODIFIÉE) ---
             ElevatedButton(
-              onPressed:
-                  (_payeController.text.trim().isEmpty ||
-                      // Il faut soit une enveloppe, soit un fractionnement
-                      (!_estFractionnee &&
-                          !(_typeMouvementSelectionne ==
-                                  TypeMouvementFinancier.pretAccorde ||
-                              _typeMouvementSelectionne ==
-                                  TypeMouvementFinancier.remboursementRecu ||
-                              _typeMouvementSelectionne ==
-                                  TypeMouvementFinancier.detteContractee ||
-                              _typeMouvementSelectionne ==
-                                  TypeMouvementFinancier
-                                      .remboursementEffectue) &&
-                          (_enveloppeSelectionnee == null ||
-                              _enveloppeSelectionnee!.isEmpty)))
-                  ? null // Désactive le bouton si la condition n'est pas remplie
-                  : () async {
-                      final double montantDouble =
-                          double.tryParse(
-                            _montantController.text
-                                .replaceAll('\$', '')
-                                .replaceAll(' ', '')
-                                .replaceAll(',', '.'),
-                          ) ??
-                          0.0;
-                      final String tiersTexte = _payeController.text.trim();
-                      if (montantDouble <= 0) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Veuillez entrer un montant valide.',
-                              ),
-                            ),
-                          );
-                        }
-                        return;
-                      }
-                      if (_compteSelectionne == null ||
-                          _compteSelectionne!.isEmpty) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Veuillez sélectionner le compte de destination.',
-                              ),
-                            ),
-                          );
-                        }
-                        return;
-                      }
+              onPressed: () {
+                // Validation du montant
+                final double montantDouble =
+                    double.tryParse(
+                      _montantController.text
+                          .replaceAll('\$', '')
+                          .replaceAll(' ', '')
+                          .replaceAll(',', '.'),
+                    ) ??
+                    0.0;
 
-                      // Validation spécifique pour les transactions fractionnées
-                      if (_estFractionnee && _transactionFractionnee != null) {
-                        if (!_transactionFractionnee!.estValide) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Le fractionnement n\'est pas valide. Vérifiez que la somme des sous-items égale le montant total.',
-                                ),
-                              ),
-                            );
-                          }
-                          return;
-                        }
-                      }
+                if (montantDouble <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez entrer un montant valide.'),
+                    ),
+                  );
+                  return;
+                }
 
-                      final compte = _comptesFirebase.firstWhere(
-                        (c) => c.id == _compteSelectionne,
-                        orElse: () => throw Exception(
-                          'Aucun compte correspondant trouvé pour l\'id sélectionné.',
+                // Validation du compte
+                if (_compteSelectionne == null || _compteSelectionne!.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Veuillez sélectionner le compte de destination.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                // Validation du tiers (sauf pour les transactions fractionnées)
+                final String tiersTexte = _payeController.text.trim();
+                if (!_estFractionnee && tiersTexte.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Veuillez saisir le tiers.')),
+                  );
+                  return;
+                }
+
+                // Validation de l'enveloppe (sauf pour les transactions fractionnées et les prêts/dettes)
+                if (!_estFractionnee &&
+                    !(_typeMouvementSelectionne ==
+                            TypeMouvementFinancier.pretAccorde ||
+                        _typeMouvementSelectionne ==
+                            TypeMouvementFinancier.remboursementRecu ||
+                        _typeMouvementSelectionne ==
+                            TypeMouvementFinancier.detteContractee ||
+                        _typeMouvementSelectionne ==
+                            TypeMouvementFinancier.remboursementEffectue) &&
+                    (_enveloppeSelectionnee == null ||
+                        _enveloppeSelectionnee!.isEmpty)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez sélectionner une enveloppe.'),
+                    ),
+                  );
+                  return;
+                }
+
+                // Validation spécifique pour les transactions fractionnées
+                if (_estFractionnee && _transactionFractionnee != null) {
+                  print('DEBUG: Validation fractionnement...');
+                  print(
+                    'DEBUG: Montant total = ${_transactionFractionnee!.montantTotal}',
+                  );
+                  print(
+                    'DEBUG: Montant alloué = ${_transactionFractionnee!.montantAlloue}',
+                  );
+                  print(
+                    'DEBUG: Montant restant = ${_transactionFractionnee!.montantRestant}',
+                  );
+                  print(
+                    'DEBUG: Est valide = ${_transactionFractionnee!.estValide}',
+                  );
+                  print('DEBUG: Sous-items:');
+                  for (var item in _transactionFractionnee!.sousItems) {
+                    print('  - ${item.description}: ${item.montant}');
+                  }
+
+                  if (!_transactionFractionnee!.estValide) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Le fractionnement n\'est pas valide.\n'
+                          'Montant total: ${_transactionFractionnee!.montantTotal}\n'
+                          'Montant alloué: ${_transactionFractionnee!.montantAlloue}\n'
+                          'Différence: ${_transactionFractionnee!.montantRestant}',
                         ),
-                      );
-                      final argentService = ArgentService();
-                      final detteService = DetteService();
-                      final firebaseService = FirebaseService();
-                      final String transactionId = DateTime.now()
-                          .millisecondsSinceEpoch
-                          .toString();
-                      final DateTime now = DateTime.now();
-                      String? detteId;
-                      final user = FirebaseAuth.instance.currentUser;
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                    return;
+                  }
+                }
 
-                      // --- LOGIQUE SELON LE TYPE DE MOUVEMENT ---
-                      try {
-                        print('DEBUG: Début de la logique de sauvegarde...');
-                        // Calculer estFractionneeFinal pour toutes les sections
-                        final bool estFractionneeFinal =
-                            _estFractionnee &&
-                            _transactionFractionnee != null &&
-                            _transactionFractionnee!.sousItems.isNotEmpty;
-                        print(
-                          'DEBUG: estFractionneeFinal = $estFractionneeFinal',
-                        );
-
-                        if (widget.modeModification &&
-                            widget.transactionExistante != null) {
-                          print('DEBUG: Mode modification détecté...');
-                          // Mise à jour de la transaction existante
-                          final user = FirebaseAuth.instance.currentUser;
-                          final nouvelleTransaction = app_model.Transaction(
-                            id: widget.transactionExistante!.id,
-                            userId: user?.uid ?? '',
-                            type: _typeSelectionne,
-                            typeMouvement: _typeMouvementSelectionne,
-                            montant: montantDouble,
-                            tiers: tiersTexte,
-                            compteId: compte.id,
-                            compteDePassifAssocie: null,
-                            date: _dateSelectionnee,
-                            enveloppeId: estFractionneeFinal
-                                ? null
-                                : _enveloppeSelectionnee,
-                            marqueur: _marqueurSelectionne,
-                            note: _noteController.text.trim().isEmpty
-                                ? null
-                                : _noteController.text.trim(),
-                            estFractionnee: estFractionneeFinal,
-                            sousItems: estFractionneeFinal
-                                ? _transactionFractionnee!.sousItems
-                                      .map((item) => item.toJson())
-                                      .toList()
-                                : null,
-                          );
-                          print(
-                            'DEBUG: Transaction de modification créée, tentative de sauvegarde...',
-                          );
-                          try {
-                            await firebaseService.ajouterTransaction(
-                              nouvelleTransaction,
-                            );
-                          } catch (e, stack) {
-                            print('ERREUR lors de la sauvegarde: $e');
-                            print(stack);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Erreur lors de la sauvegarde de la transaction.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                        } else {
-                          print('DEBUG: Mode création détecté...');
-                          // Création d'une nouvelle transaction
-
-                          // Gérer les dettes/prêts selon le type de mouvement en utilisant DetteService
-                          if (_typeMouvementSelectionne ==
-                                  app_model
-                                      .TypeMouvementFinancier
-                                      .detteContractee ||
-                              _typeMouvementSelectionne ==
-                                  app_model
-                                      .TypeMouvementFinancier
-                                      .pretAccorde) {
-                            await _creerDetteViaDettesService(
-                              tiersTexte,
-                              montantDouble,
-                              _typeMouvementSelectionne,
-                            );
-                          }
-
-                          // Gérer les remboursements via DetteService
-                          if (_typeMouvementSelectionne ==
-                                  app_model
-                                      .TypeMouvementFinancier
-                                      .remboursementRecu ||
-                              _typeMouvementSelectionne ==
-                                  app_model
-                                      .TypeMouvementFinancier
-                                      .remboursementEffectue) {
-                            await _traiterRemboursementViaDettesService(
-                              tiersTexte,
-                              montantDouble,
-                              _typeMouvementSelectionne,
-                              transactionId,
-                            );
-                          }
-
-                          final nouvelleTransaction = app_model.Transaction(
-                            id: transactionId,
-                            userId: user?.uid ?? '',
-                            type: _typeSelectionne,
-                            typeMouvement: _typeMouvementSelectionne,
-                            montant: montantDouble,
-                            tiers: tiersTexte,
-                            compteId: compte.id,
-                            compteDePassifAssocie:
-                                null, // Pas besoin de comptes associés avec DetteService
-                            date: _dateSelectionnee,
-                            enveloppeId: estFractionneeFinal
-                                ? null
-                                : _enveloppeSelectionnee,
-                            marqueur: _marqueurSelectionne,
-                            note: _noteController.text.trim().isEmpty
-                                ? null
-                                : _noteController.text.trim(),
-                            estFractionnee: estFractionneeFinal,
-                            sousItems: estFractionneeFinal
-                                ? _transactionFractionnee!.sousItems
-                                      .map((item) => item.toJson())
-                                      .toList()
-                                : null,
-                          );
-                          print(
-                            'DEBUG: Nouvelle transaction créée, tentative de sauvegarde...',
-                          );
-                          try {
-                            await firebaseService.ajouterTransaction(
-                              nouvelleTransaction,
-                            );
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Transaction sauvegardée avec succès !',
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e, stack) {
-                            print('ERREUR lors de la sauvegarde: $e');
-                            print(stack);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Erreur lors de la sauvegarde de la transaction.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Erreur: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    },
+                // Si toutes les validations passent, exécuter la sauvegarde
+                _sauvegarderTransaction();
+              },
               child: const Text('Sauvegarder'),
             ),
           ],
@@ -1760,6 +1617,173 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
             content: Text('Erreur lors du traitement du remboursement: $e'),
           ),
         );
+      }
+    }
+  }
+
+  void _sauvegarderTransaction() async {
+    final double montantDouble =
+        double.tryParse(
+          _montantController.text
+              .replaceAll('\$', '')
+              .replaceAll(' ', '')
+              .replaceAll(',', '.'),
+        ) ??
+        0.0;
+    final String tiersTexte = _payeController.text.trim();
+
+    final compte = _comptesFirebase.firstWhere(
+      (c) => c.id == _compteSelectionne,
+      orElse: () => throw Exception(
+        'Aucun compte correspondant trouvé pour l\'id sélectionné.',
+      ),
+    );
+    final argentService = ArgentService();
+    final detteService = DetteService();
+    final firebaseService = FirebaseService();
+    final String transactionId = DateTime.now().millisecondsSinceEpoch
+        .toString();
+    final DateTime now = DateTime.now();
+    String? detteId;
+    final user = FirebaseAuth.instance.currentUser;
+
+    // --- LOGIQUE SELON LE TYPE DE MOUVEMENT ---
+    try {
+      print('DEBUG: Début de la logique de sauvegarde...');
+      // Calculer estFractionneeFinal pour toutes les sections
+      final bool estFractionneeFinal =
+          _estFractionnee &&
+          _transactionFractionnee != null &&
+          _transactionFractionnee!.sousItems.isNotEmpty;
+      print('DEBUG: estFractionneeFinal = $estFractionneeFinal');
+
+      if (widget.modeModification && widget.transactionExistante != null) {
+        print('DEBUG: Mode modification détecté...');
+        // Mise à jour de la transaction existante
+        final user = FirebaseAuth.instance.currentUser;
+        final nouvelleTransaction = app_model.Transaction(
+          id: widget.transactionExistante!.id,
+          userId: user?.uid ?? '',
+          type: _typeSelectionne,
+          typeMouvement: _typeMouvementSelectionne,
+          montant: montantDouble,
+          tiers: tiersTexte,
+          compteId: compte.id,
+          compteDePassifAssocie: null,
+          date: _dateSelectionnee,
+          enveloppeId: estFractionneeFinal ? null : _enveloppeSelectionnee,
+          marqueur: _marqueurSelectionne,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+          estFractionnee: estFractionneeFinal,
+          sousItems: estFractionneeFinal
+              ? _transactionFractionnee!.sousItems
+                    .map((item) => item.toJson())
+                    .toList()
+              : null,
+        );
+        print(
+          'DEBUG: Transaction de modification créée, tentative de sauvegarde...',
+        );
+        try {
+          await firebaseService.ajouterTransaction(nouvelleTransaction);
+        } catch (e, stack) {
+          print('ERREUR lors de la sauvegarde: $e');
+          print(stack);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Erreur lors de la sauvegarde de la transaction.',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      } else {
+        print('DEBUG: Mode création détecté...');
+        // Création d'une nouvelle transaction
+
+        // Gérer les dettes/prêts selon le type de mouvement en utilisant DetteService
+        if (_typeMouvementSelectionne ==
+                app_model.TypeMouvementFinancier.detteContractee ||
+            _typeMouvementSelectionne ==
+                app_model.TypeMouvementFinancier.pretAccorde) {
+          await _creerDetteViaDettesService(
+            tiersTexte,
+            montantDouble,
+            _typeMouvementSelectionne,
+          );
+        }
+
+        // Gérer les remboursements via DetteService
+        if (_typeMouvementSelectionne ==
+                app_model.TypeMouvementFinancier.remboursementRecu ||
+            _typeMouvementSelectionne ==
+                app_model.TypeMouvementFinancier.remboursementEffectue) {
+          await _traiterRemboursementViaDettesService(
+            tiersTexte,
+            montantDouble,
+            _typeMouvementSelectionne,
+            transactionId,
+          );
+        }
+
+        final nouvelleTransaction = app_model.Transaction(
+          id: transactionId,
+          userId: user?.uid ?? '',
+          type: _typeSelectionne,
+          typeMouvement: _typeMouvementSelectionne,
+          montant: montantDouble,
+          tiers: tiersTexte,
+          compteId: compte.id,
+          compteDePassifAssocie:
+              null, // Pas besoin de comptes associés avec DetteService
+          date: _dateSelectionnee,
+          enveloppeId: estFractionneeFinal ? null : _enveloppeSelectionnee,
+          marqueur: _marqueurSelectionne,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+          estFractionnee: estFractionneeFinal,
+          sousItems: estFractionneeFinal
+              ? _transactionFractionnee!.sousItems
+                    .map((item) => item.toJson())
+                    .toList()
+              : null,
+        );
+        print('DEBUG: Nouvelle transaction créée, tentative de sauvegarde...');
+        try {
+          await firebaseService.ajouterTransaction(nouvelleTransaction);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Transaction sauvegardée avec succès !'),
+              ),
+            );
+          }
+        } catch (e, stack) {
+          print('ERREUR lors de la sauvegarde: $e');
+          print(stack);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Erreur lors de la sauvegarde de la transaction.',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erreur: ${e.toString()}')));
       }
     }
   }
