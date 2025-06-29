@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import '../models/compte.dart';
 import '../models/fractionnement_model.dart';
+import '../models/dette.dart';
 import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
 
@@ -45,17 +46,53 @@ class AjoutTransactionController extends ChangeNotifier {
 
   // Validation
   bool get estValide {
-    final montant =
-        double.tryParse(montantController.text.replaceAll(',', '.')) ?? 0.0;
+    // Améliorer le parsing du montant pour accepter différents formats
+    String montantTexte = montantController.text.trim();
+    print(
+      'DEBUG: Validation - montantController.text: "${montantController.text}"',
+    );
+    print('DEBUG: Validation - montantTexte initial: "$montantTexte"');
+
+    if (montantTexte.isEmpty ||
+        montantTexte == '0.00' ||
+        montantTexte == '0.00 \$') {
+      montantTexte = '0';
+      print(
+        'DEBUG: Validation - montantTexte après condition: "$montantTexte"',
+      );
+    }
+
+    // Nettoyer le symbole $ et les espaces
+    montantTexte = montantTexte.replaceAll('\$', '').replaceAll(' ', '');
+    print('DEBUG: Validation - montantTexte après nettoyage: "$montantTexte"');
+
+    // Remplacer les virgules par des points et nettoyer le texte
+    montantTexte = montantTexte.replaceAll(',', '.');
+
+    // Si c'est un nombre entier, ajouter .00
+    if (montantTexte.contains('.') == false && montantTexte != '0') {
+      montantTexte += '.00';
+    }
+
+    print('DEBUG: Validation - montantTexte final: "$montantTexte"');
+    final montant = double.tryParse(montantTexte) ?? 0.0;
+    print('DEBUG: Validation - montant parsé: $montant');
+
     final tiersTexte = payeController.text.trim();
+    print('DEBUG: Validation - tiersTexte: "$tiersTexte"');
+    print('DEBUG: Validation - _compteSelectionne: $_compteSelectionne');
 
     if (montant <= 0 || tiersTexte.isEmpty || _compteSelectionne == null) {
+      print(
+        'DEBUG: Validation - ÉCHEC: montant=$montant, tiersTexte="$tiersTexte", compte=$_compteSelectionne',
+      );
       return false;
     }
 
     // Validation spécifique pour les transactions fractionnées
     if (_estFractionnee && _transactionFractionnee != null) {
       if (!_transactionFractionnee!.estValide) {
+        print('DEBUG: Validation - ÉCHEC: fractionnement invalide');
         return false;
       }
     }
@@ -70,9 +107,11 @@ class AjoutTransactionController extends ChangeNotifier {
             _typeMouvementSelectionne ==
                 TypeMouvementFinancier.remboursementEffectue) &&
         (_enveloppeSelectionnee == null || _enveloppeSelectionnee!.isEmpty)) {
+      print('DEBUG: Validation - ÉCHEC: enveloppe manquante');
       return false;
     }
 
+    print('DEBUG: Validation - SUCCÈS');
     return true;
   }
 
@@ -208,6 +247,7 @@ class AjoutTransactionController extends ChangeNotifier {
           tiersTexte,
           montant,
           _typeMouvementSelectionne,
+          detteService,
         );
       }
 
@@ -221,6 +261,7 @@ class AjoutTransactionController extends ChangeNotifier {
           montant,
           _typeMouvementSelectionne,
           transactionId,
+          detteService,
         );
       }
 
@@ -254,13 +295,59 @@ class AjoutTransactionController extends ChangeNotifier {
     }
   }
 
-  // Méthodes pour les dettes (simplifiées)
+  // Méthodes pour les dettes (complètes)
   Future<void> _creerDetteViaDettesService(
     String nomTiers,
     double montant,
     TypeMouvementFinancier typeMouvement,
+    DetteService detteService,
   ) async {
-    // Implémentation simplifiée - à compléter selon vos besoins
+    try {
+      final user = FirebaseService().auth.currentUser;
+      if (user == null) return;
+
+      final String detteId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      // Déterminer le type de dette selon le mouvement
+      String typeDette;
+      if (typeMouvement == TypeMouvementFinancier.detteContractee) {
+        typeDette = 'dette'; // Je dois de l'argent
+      } else if (typeMouvement == TypeMouvementFinancier.pretAccorde) {
+        typeDette = 'pret'; // On me doit de l'argent
+      } else {
+        return; // Pour les remboursements, on ne crée pas de nouvelle dette
+      }
+
+      // Créer la dette
+      final nouvelleDette = Dette(
+        id: detteId,
+        nomTiers: nomTiers.trim().isNotEmpty
+            ? nomTiers.trim()
+            : 'Tiers générique',
+        montantInitial: montant,
+        solde: montant,
+        type: typeDette,
+        historique: [
+          MouvementDette(
+            id: '${detteId}_initial',
+            type: typeDette,
+            montant: typeDette == 'dette'
+                ? montant
+                : -montant, // Négatif pour les prêts accordés
+            date: DateTime.now(),
+            note: 'Création initiale',
+          ),
+        ],
+        archive: false,
+        dateCreation: DateTime.now(),
+        dateArchivage: null,
+        userId: user.uid,
+      );
+
+      await detteService.creerDette(nouvelleDette);
+    } catch (e) {
+      print('Erreur lors de la création de la dette: $e');
+    }
   }
 
   Future<void> _traiterRemboursementViaDettesService(
@@ -268,8 +355,87 @@ class AjoutTransactionController extends ChangeNotifier {
     double montant,
     TypeMouvementFinancier typeMouvement,
     String transactionId,
+    DetteService detteService,
   ) async {
-    // Implémentation simplifiée - à compléter selon vos besoins
+    try {
+      final user = FirebaseService().auth.currentUser;
+      if (user == null) return;
+
+      // Déterminer le type de remboursement
+      String typeRemboursement;
+      String typeDetteRecherche;
+
+      if (typeMouvement == TypeMouvementFinancier.remboursementRecu) {
+        typeRemboursement = 'remboursement_recu';
+        typeDetteRecherche = 'pret'; // Chercher dans les prêts accordés
+      } else {
+        typeRemboursement = 'remboursement_effectue';
+        typeDetteRecherche = 'dette'; // Chercher dans les dettes contractées
+      }
+
+      // Trouver les dettes actives pour ce tiers
+      final dettesActives = await detteService.dettesActives().first;
+
+      // Recherche plus flexible : d'abord une correspondance exacte, puis une correspondance partielle
+      var dettesATiers = dettesActives
+          .where(
+            (d) =>
+                d.nomTiers.toLowerCase() == nomTiers.toLowerCase() &&
+                d.type == typeDetteRecherche,
+          )
+          .toList();
+
+      // Si aucune correspondance exacte, essayer une correspondance partielle
+      if (dettesATiers.isEmpty) {
+        dettesATiers = dettesActives
+            .where(
+              (d) =>
+                  (d.nomTiers.toLowerCase().contains(nomTiers.toLowerCase()) ||
+                      nomTiers.toLowerCase().contains(
+                        d.nomTiers.toLowerCase(),
+                      )) &&
+                  d.type == typeDetteRecherche,
+            )
+            .toList();
+      }
+
+      if (dettesATiers.isEmpty) {
+        print(
+          'Aucune dette trouvée pour "$nomTiers" de type "$typeDetteRecherche"',
+        );
+        return;
+      }
+
+      // Trier par date de création (plus ancien en premier)
+      dettesATiers.sort((a, b) => a.dateCreation.compareTo(b.dateCreation));
+
+      double montantRestant = montant;
+
+      // Traitement en cascade pour rembourser les dettes dans l'ordre
+      for (final dette in dettesATiers) {
+        if (montantRestant <= 0) break;
+
+        final montantAPayer = montantRestant >= dette.solde
+            ? dette.solde
+            : montantRestant;
+
+        // Créer le mouvement de remboursement
+        final mouvement = MouvementDette(
+          id: '${transactionId}_${dette.id}',
+          date: DateTime.now(),
+          montant: -montantAPayer, // Négatif car c'est un remboursement
+          type: typeRemboursement,
+          note: 'Remboursement via transaction $transactionId',
+        );
+
+        // Ajouter le mouvement à la dette
+        await detteService.ajouterMouvement(dette.id, mouvement);
+
+        montantRestant -= montantAPayer;
+      }
+    } catch (e) {
+      print('Erreur lors du traitement du remboursement: $e');
+    }
   }
 
   @override

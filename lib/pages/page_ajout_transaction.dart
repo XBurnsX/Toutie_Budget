@@ -207,11 +207,13 @@ class _EcranAjoutTransactionRefactoredState
                   // Champ montant
                   ChampMontant(
                     controller: controller.montantController,
-                    typeSelectionne: controller.typeSelectionne,
                     estFractionnee: controller.estFractionnee,
                     onFractionnementSupprime: () =>
                         controller.setFractionnement(null),
-                    onMontantChange: () {},
+                    onMontantChange: () {
+                      // Déclencher la validation du contrôleur
+                      controller.notifyListeners();
+                    },
                   ),
 
                   // Section informations clés
@@ -235,6 +237,7 @@ class _EcranAjoutTransactionRefactoredState
                     marqueurSelectionne: controller.marqueurSelectionne,
                     onMarqueurChanged: controller.setMarqueurSelectionne,
                     noteController: controller.noteController,
+                    onTypeMouvementChanged: controller.setTypeMouvement,
                   ),
 
                   const SizedBox(height: 20),

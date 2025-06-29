@@ -23,6 +23,7 @@ class SectionInformationsCles extends StatelessWidget {
   final String? marqueurSelectionne;
   final Function(String?) onMarqueurChanged;
   final TextEditingController noteController;
+  final Function(TypeMouvementFinancier) onTypeMouvementChanged;
 
   const SectionInformationsCles({
     Key? key,
@@ -44,6 +45,7 @@ class SectionInformationsCles extends StatelessWidget {
     required this.marqueurSelectionne,
     required this.onMarqueurChanged,
     required this.noteController,
+    required this.onTypeMouvementChanged,
   }) : super(key: key);
 
   @override
@@ -206,8 +208,7 @@ class SectionInformationsCles extends StatelessWidget {
       }).toList(),
       onChanged: (TypeMouvementFinancier? newValue) {
         if (newValue != null) {
-          // Cette logique devrait être gérée par le contrôleur
-          // Pour l'instant, on ne fait rien ici
+          onTypeMouvementChanged(newValue);
         }
       },
       decoration: const InputDecoration(

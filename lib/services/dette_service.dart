@@ -5,7 +5,9 @@ import '../models/compte.dart';
 import 'firebase_service.dart';
 
 class DetteService {
-  final CollectionReference dettesRef = FirebaseFirestore.instance.collection('dettes');
+  final CollectionReference dettesRef = FirebaseFirestore.instance.collection(
+    'dettes',
+  );
 
   Future<void> creerDette(Dette dette) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -36,7 +38,10 @@ class DetteService {
   Future<void> _creerCompteDetteAutomatique(Dette dette) async {
     try {
       // Générer un ID unique pour le compte
-      final compteId = FirebaseFirestore.instance.collection('comptes').doc().id;
+      final compteId = FirebaseFirestore.instance
+          .collection('comptes')
+          .doc()
+          .id;
 
       // Créer le compte dette avec un nom formaté
       final nomCompte = "Prêt : ${dette.nomTiers}";
@@ -63,16 +68,19 @@ class DetteService {
       // ET marquer que ce compte a été créé automatiquement
       await dettesRef.doc(dette.id).update({
         'compteAssocie': compteId,
-        'compteAutoCreated': true, // Marqueur pour identifier les comptes auto-créés
+        'compteAutoCreated':
+            true, // Marqueur pour identifier les comptes auto-créés
       });
-
     } catch (e) {
       print('Erreur lors de la création du compte dette automatique: $e');
       // Ne pas bloquer la création de la dette si la création du compte échoue
     }
   }
 
-  Future<void> ajouterMouvement(String detteId, MouvementDette mouvement) async {
+  Future<void> ajouterMouvement(
+    String detteId,
+    MouvementDette mouvement,
+  ) async {
     final doc = dettesRef.doc(detteId);
 
     // Ajouter le mouvement à l'historique
@@ -105,7 +113,8 @@ class DetteService {
 
       for (MouvementDette mouvement in historique) {
         // Les remboursements sont stockés avec un montant négatif, donc on les additionne directement
-        if (mouvement.type == 'remboursement_recu' || mouvement.type == 'remboursement_effectue') {
+        if (mouvement.type == 'remboursement_recu' ||
+            mouvement.type == 'remboursement_effectue') {
           nouveauSolde += mouvement.montant; // montant est déjà négatif
         }
       }
@@ -121,10 +130,7 @@ class DetteService {
 
       // Si le solde est maintenant à 0, archiver automatiquement la dette
       if (nouveauSolde == 0) {
-        await doc.update({
-          'archive': true,
-          'dateArchivage': Timestamp.now(),
-        });
+        await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
 
         // Archiver le compte associé si la dette est soldée
         await _archiverCompteAssocie(detteId);
@@ -134,47 +140,10 @@ class DetteService {
     }
   }
 
-  Future<void> _synchroniserCompteAssocie(String detteId, double montantRemboursement) async {
-    try {
-      // Récupérer la dette pour obtenir l'ID du compte associé
-      final detteDoc = await dettesRef.doc(detteId).get();
-      if (!detteDoc.exists) return;
-
-      final detteData = detteDoc.data() as Map<String, dynamic>;
-      final compteAssocieId = detteData['compteAssocie'] as String?;
-
-      if (compteAssocieId != null) {
-        // Mettre à jour le solde du compte (ajouter le remboursement pour réduire la dette)
-        await FirebaseService().updateCompte(compteAssocieId, {
-          'solde': FieldValue.increment(montantRemboursement),
-        });
-      }
-    } catch (e) {
-      print('Erreur lors de la synchronisation du compte associé: $e');
-    }
-  }
-
-  Future<void> ajusterSoldeEtArchiver(String detteId, double nouveauSolde) async {
-    final doc = dettesRef.doc(detteId);
-
-    if (nouveauSolde <= 0) {
-      // Dette remboursée complètement
-      await doc.update({
-        'solde': 0,
-        'archive': true,
-        'dateArchivage': Timestamp.now(),
-      });
-
-      // Supprimer automatiquement le compte associé quand la dette est soldée
-      await _supprimerCompteAssocie(detteId);
-    } else {
-      await doc.update({'solde': nouveauSolde});
-      // Mettre à jour le solde du compte associé
-      await _mettreAJourCompteAssocie(detteId, nouveauSolde);
-    }
-  }
-
-  Future<void> _mettreAJourCompteAssocie(String detteId, double nouveauSolde) async {
+  Future<void> _mettreAJourCompteAssocie(
+    String detteId,
+    double nouveauSolde,
+  ) async {
     try {
       final detteDoc = await dettesRef.doc(detteId).get();
       if (!detteDoc.exists) return;
@@ -200,7 +169,8 @@ class DetteService {
 
       final detteData = detteDoc.data() as Map<String, dynamic>;
       final compteAssocieId = detteData['compteAssocie'] as String?;
-      final compteAutoCreated = detteData['compteAutoCreated'] as bool? ?? false;
+      final compteAutoCreated =
+          detteData['compteAutoCreated'] as bool? ?? false;
 
       if (compteAssocieId != null && compteAutoCreated) {
         // Archiver SEULEMENT les comptes créés automatiquement
@@ -208,11 +178,15 @@ class DetteService {
           'estArchive': true,
           'dateSuppression': DateTime.now().toIso8601String(),
         });
-        print('Compte de dette automatique $compteAssocieId archivé (dette soldée)');
+        print(
+          'Compte de dette automatique $compteAssocieId archivé (dette soldée)',
+        );
       } else if (compteAssocieId != null && !compteAutoCreated) {
         // Pour les comptes créés manuellement, mettre le solde à 0 et nettoyer le nom
         await _archiverCompteManuelAvecNettoyage(compteAssocieId);
-        print('Compte de dette manuel $compteAssocieId mis à jour (solde = 0, compte conservé)');
+        print(
+          'Compte de dette manuel $compteAssocieId mis à jour (solde = 0, compte conservé)',
+        );
       }
     } catch (e) {
       print('Erreur lors de la gestion du compte associé: $e');
@@ -222,7 +196,10 @@ class DetteService {
   Future<void> _archiverCompteManuelAvecNettoyage(String compteId) async {
     try {
       // Récupérer les informations du compte
-      final compteDoc = await FirebaseFirestore.instance.collection('comptes').doc(compteId).get();
+      final compteDoc = await FirebaseFirestore.instance
+          .collection('comptes')
+          .doc(compteId)
+          .get();
       if (!compteDoc.exists) return;
 
       final compteData = compteDoc.data() as Map<String, dynamic>;
@@ -230,7 +207,9 @@ class DetteService {
 
       // Nettoyer le nom en enlevant le mot "emprunt"
       String nomNettoye = nomActuel;
-      nomNettoye = nomNettoye.replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '').trim();
+      nomNettoye = nomNettoye
+          .replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '')
+          .trim();
       // Nettoyer les espaces multiples
       nomNettoye = nomNettoye.replaceAll(RegExp(r'\s+'), ' ').trim();
 
@@ -240,7 +219,9 @@ class DetteService {
         'nom': nomNettoye,
       });
 
-      print('Compte manuel mis à jour: "$nomActuel" → "$nomNettoye" (solde = 0)');
+      print(
+        'Compte manuel mis à jour: "$nomActuel" → "$nomNettoye" (solde = 0)',
+      );
     } catch (e) {
       print('Erreur lors du nettoyage du nom du compte manuel: $e');
     }
@@ -250,10 +231,7 @@ class DetteService {
     final doc = dettesRef.doc(detteId);
 
     // Archiver la dette
-    await doc.update({
-      'archive': true,
-      'dateArchivage': Timestamp.now(),
-    });
+    await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
 
     // Archiver le compte associé aussi
     await _archiverCompteAssocie(detteId);
@@ -289,27 +267,43 @@ class DetteService {
     print('DEBUG - Utilisateur connecté: ${user?.uid}');
     if (user == null) return Stream.value([]);
 
-    return dettesRef.where('archive', isEqualTo: false).where('userId', isEqualTo: user.uid).snapshots().map((snap) {
-      print('DEBUG - Nombre de dettes trouvées: ${snap.docs.length}');
-      final dettes = snap.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        print('DEBUG - Dette trouvée: ${doc.id}, userId: ${data['userId']}, nomTiers: ${data['nomTiers']}');
-        return Dette.fromMap(data);
-      }).toList();
-      return dettes;
-    });
+    return dettesRef
+        .where('archive', isEqualTo: false)
+        .where('userId', isEqualTo: user.uid)
+        .snapshots()
+        .map((snap) {
+          print('DEBUG - Nombre de dettes trouvées: ${snap.docs.length}');
+          final dettes = snap.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            print(
+              'DEBUG - Dette trouvée: ${doc.id}, userId: ${data['userId']}, nomTiers: ${data['nomTiers']}',
+            );
+            return Dette.fromMap(data);
+          }).toList();
+          return dettes;
+        });
   }
 
   Stream<List<Dette>> dettesArchivees() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return Stream.value([]);
-    return dettesRef.where('archive', isEqualTo: true).where('userId', isEqualTo: user.uid).snapshots().map((snap) =>
-      snap.docs.map((doc) => Dette.fromMap(doc.data() as Map<String, dynamic>)).toList()
-    );
+    return dettesRef
+        .where('archive', isEqualTo: true)
+        .where('userId', isEqualTo: user.uid)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => Dette.fromMap(doc.data() as Map<String, dynamic>))
+              .toList(),
+        );
   }
 
   // Nouvelle méthode pour gérer les remboursements en cascade
-  Future<void> effectuerRemboursementCascade(String nomTiers, double montantTotal, String typeRemboursement) async {
+  Future<void> effectuerRemboursementCascade(
+    String nomTiers,
+    double montantTotal,
+    String typeRemboursement,
+  ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
@@ -370,7 +364,9 @@ class DetteService {
     }
 
     if (montantRestant > 0) {
-      throw Exception("Montant excédentaire de ${montantRestant.toStringAsFixed(2)}\$ - toutes les dettes de $nomTiers sont remboursées");
+      throw Exception(
+        "Montant excédentaire de ${montantRestant.toStringAsFixed(2)}\$ - toutes les dettes de $nomTiers sont remboursées",
+      );
     }
   }
 
@@ -421,14 +417,17 @@ class DetteService {
   Future<List<String>> remboursementEnCascade({
     required String nomTiers,
     required double montantTotal,
-    required String typeRemboursement, // 'remboursement_recu' ou 'remboursement_effectue'
+    required String
+    typeRemboursement, // 'remboursement_recu' ou 'remboursement_effectue'
     required String transactionId,
     String? note,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
-    final typeDetteRecherche = typeRemboursement == 'remboursement_recu' ? 'pret' : 'dette';
+    final typeDetteRecherche = typeRemboursement == 'remboursement_recu'
+        ? 'pret'
+        : 'dette';
     final dettes = await dettesActives().first;
 
     // Filtrer et trier les dettes du tiers par date de création (plus ancien en premier)
@@ -447,13 +446,17 @@ class DetteService {
       if (montantRestant <= 0) break;
 
       final soldeAbsolu = dette.solde.abs();
-      final montantAPayer = montantRestant >= soldeAbsolu ? soldeAbsolu : montantRestant;
+      final montantAPayer = montantRestant >= soldeAbsolu
+          ? soldeAbsolu
+          : montantRestant;
 
       // Créer le mouvement pour cette dette
       final mouvement = MouvementDette(
         id: '${transactionId}_${dette.id}',
         date: maintenant,
-        montant: typeRemboursement == 'remboursement_recu' ? -montantAPayer : montantAPayer, // Positif pour remboursement effectué, négatif pour remboursement reçu
+        montant: typeRemboursement == 'remboursement_recu'
+            ? -montantAPayer
+            : montantAPayer, // Positif pour remboursement effectué, négatif pour remboursement reçu
         type: typeRemboursement,
         note: note ?? 'Remboursement automatique en cascade',
       );
@@ -479,13 +482,17 @@ class DetteService {
 
       // Vérifier si la dette est soldée
       if (nouveauSolde <= 0) {
-        messagesArchivage.add('${typeDetteRecherche == 'pret' ? 'Prêt à' : 'Dette envers'} ${dette.nomTiers} de ${dette.montantInitial.toStringAsFixed(2)}\$ soldé et archivé.');
+        messagesArchivage.add(
+          '${typeDetteRecherche == 'pret' ? 'Prêt à' : 'Dette envers'} ${dette.nomTiers} de ${dette.montantInitial.toStringAsFixed(2)}\$ soldé et archivé.',
+        );
       }
     }
 
     // Si il reste encore de l'argent et aucune dette active trouvée
     if (montantRestant > 0) {
-      messagesArchivage.add('Remboursement partiel : ${(montantTotal - montantRestant).toStringAsFixed(2)}\$ appliqué. ${montantRestant.toStringAsFixed(2)}\$ non utilisé (aucune dette active trouvée).');
+      messagesArchivage.add(
+        'Remboursement partiel : ${(montantTotal - montantRestant).toStringAsFixed(2)}\$ appliqué. ${montantRestant.toStringAsFixed(2)}\$ non utilisé (aucune dette active trouvée).',
+      );
     }
 
     return messagesArchivage;
@@ -496,6 +503,32 @@ class DetteService {
     final dettes = await dettesActives().first;
     return dettes
         .where((d) => d.nomTiers == nomTiers && d.type == typeDette)
-        .fold<double>(0.0, (double total, Dette dette) => total + dette.solde.abs());
+        .fold<double>(
+          0.0,
+          (double total, Dette dette) => total + dette.solde.abs(),
+        );
+  }
+
+  Future<void> ajusterSoldeEtArchiver(
+    String detteId,
+    double nouveauSolde,
+  ) async {
+    final doc = dettesRef.doc(detteId);
+
+    if (nouveauSolde <= 0) {
+      // Dette remboursée complètement
+      await doc.update({
+        'solde': 0,
+        'archive': true,
+        'dateArchivage': Timestamp.now(),
+      });
+
+      // Supprimer automatiquement le compte associé quand la dette est soldée
+      await _supprimerCompteAssocie(detteId);
+    } else {
+      await doc.update({'solde': nouveauSolde});
+      // Mettre à jour le solde du compte associé
+      await _mettreAJourCompteAssocie(detteId, nouveauSolde);
+    }
   }
 }
