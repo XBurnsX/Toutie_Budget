@@ -516,9 +516,14 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                     (dateCible.month -
                                                         dateReference.month) +
                                                     1;
+<<<<<<< HEAD
                                                 if (moisRestants < 1) {
                                                   moisRestants = 1;
                                                 }
+=======
+                                                if (moisRestants < 1)
+                                                  moisRestants = 1;
+>>>>>>> 7fea5e12077e07f7ddc954ca137ce4e482403c37
 
                                                 // Le montant nécessaire chaque mois est fixe : objectif total / nombre total de mois
                                                 double objectifTotal =
