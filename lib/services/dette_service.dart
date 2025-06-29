@@ -375,7 +375,7 @@ class DetteService {
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
     print(
-      'DEBUG: DetteService.ajouterDette appelé pour dette ID: ${dette.id}, nomTiers: ${dette.nomTiers}, type: ${dette.type}',
+      'DEBUG: DetteService.ajouterDette appelé pour dette ID: ${dette.id}, nomTiers: ${dette.nomTiers}, type: ${dette.type}, estManuelle: ${dette.estManuelle}',
     );
 
     final detteAvecUser = Dette(
@@ -389,11 +389,23 @@ class DetteService {
       dateCreation: dette.dateCreation,
       dateArchivage: dette.dateArchivage,
       userId: user.uid,
+      estManuelle: dette.estManuelle,
+      tauxInteret: dette.tauxInteret,
+      dateFinObjectif: dette.dateFinObjectif,
+      montantMensuelCalcule: dette.montantMensuelCalcule,
+      dateFin: dette.dateFin,
+      montantMensuel: dette.montantMensuel,
+      prixAchat: dette.prixAchat,
+      nombrePaiements: dette.nombrePaiements,
+      dateDebut: dette.dateDebut,
+      paiementsEffectues: dette.paiementsEffectues,
     );
 
     // Créer la dette dans Firestore
     await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
-    print('DEBUG: Dette sauvegardée dans Firestore: ${dette.id}');
+    print(
+      'DEBUG: Dette sauvegardée dans Firestore: ${dette.id} avec estManuelle: ${dette.estManuelle}',
+    );
   }
 
   /// Sauvegarde les paramètres d'intérêt d'une dette manuelle
@@ -455,6 +467,33 @@ class DetteService {
     } catch (e) {
       print('Erreur lors de la sauvegarde des paramètres de dette: $e');
       throw Exception('Erreur lors de la sauvegarde des paramètres de dette');
+    }
+  }
+
+  /// Met à jour les dettes existantes pour ajouter le champ estManuelle si manquant
+  Future<void> mettreAJourDettesExistantes() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur connecté");
+
+    try {
+      final dettesQuery = await dettesRef
+          .where('userId', isEqualTo: user.uid)
+          .where('archive', isEqualTo: false)
+          .get();
+
+      for (var doc in dettesQuery.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        // Si le champ estManuelle n'existe pas, l'ajouter
+        if (!data.containsKey('estManuelle')) {
+          print('DEBUG: Mise à jour dette ${doc.id} - ajout estManuelle: true');
+          await dettesRef.doc(doc.id).update({'estManuelle': true});
+        }
+      }
+
+      print('DEBUG: Mise à jour des dettes existantes terminée');
+    } catch (e) {
+      print('Erreur lors de la mise à jour des dettes existantes: $e');
     }
   }
 }

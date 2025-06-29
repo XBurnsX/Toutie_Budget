@@ -6,6 +6,7 @@ import 'package:toutie_budget/pages/page_login.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
 import 'package:toutie_budget/services/update_service.dart';
+import 'package:toutie_budget/services/dette_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'models/categorie.dart';
@@ -154,6 +155,13 @@ class _MyHomePageState extends State<MyHomePage> {
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         UpdateService().checkAndProposeUpdate(context);
+      }
+    });
+
+    // Mettre à jour les dettes existantes pour ajouter le champ estManuelle
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        DetteService().mettreAJourDettesExistantes();
       }
     });
   }

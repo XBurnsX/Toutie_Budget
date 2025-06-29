@@ -129,6 +129,14 @@ class PageComptes extends StatelessWidget {
                         ...dettesContractees,
                       ];
 
+                      // Debug pour voir toutes les dettes
+                      print('DEBUG: Dettes affichées:');
+                      for (var dette in dettesContractees) {
+                        print(
+                          '  - ${dette.nomTiers}: estManuelle=${dette.estManuelle}, type=${dette.type}',
+                        );
+                      }
+
                       if (dettesAfficher.isNotEmpty) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,6 +458,11 @@ class PageComptes extends StatelessWidget {
     final isDetteManuelle =
         dette.estManuelle; // Vérifier si c'est une dette manuelle
 
+    // Debug pour voir les valeurs
+    print(
+      'DEBUG: Dette ${dette.nomTiers} - estManuelle: $isDetteManuelle, type: ${dette.type}',
+    );
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
@@ -460,15 +473,24 @@ class PageComptes extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: () {
             // Navigation conditionnelle selon le type de dette
-            if (isDetteManuelle) {
-              // Navigation vers la page paramètres de dette pour les dettes manuelles
+            print(
+              'DEBUG: Navigation pour dette ${dette.nomTiers} - estManuelle: $isDetteManuelle, type: ${dette.type}',
+            );
+
+            // TEMPORAIRE: Forcer la navigation vers PageParametresDettes pour toutes les dettes
+            if (dette.type == 'dette') {
+              print(
+                'DEBUG: Redirection vers PageParametresDettes (dette de type "dette")',
+              );
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => PageParametresDettes(dette: dette),
                 ),
               );
             } else {
-              // Navigation vers la page prêt personnel pour les dettes automatiques
+              print(
+                'DEBUG: Redirection vers PagePretPersonnel (prêt de type "pret")',
+              );
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const PagePretPersonnel(),
@@ -512,24 +534,6 @@ class PageComptes extends StatelessWidget {
                             : 'Prêt accordé',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
-                      if (isDetteManuelle)
-                        Text(
-                          'Dette manuelle',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.blue[700],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        )
-                      else
-                        Text(
-                          'Géré via Prêts Personnels',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.orange[700],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
                     ],
                   ),
                 ),

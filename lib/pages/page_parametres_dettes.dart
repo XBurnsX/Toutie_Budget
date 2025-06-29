@@ -5,6 +5,7 @@ import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/widgets/month_picker.dart';
+import 'package:toutie_budget/services/calcul_pret_service.dart';
 
 class PageParametresDettes extends StatefulWidget {
   final Dette dette;
@@ -39,6 +40,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   double? _soldeRestantCalcule;
   double? _coutTotalCalcule;
   String? _erreurSimulateur;
+  bool _afficherResultatsCalcul = false;
 
   @override
   void initState() {
@@ -138,14 +140,25 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
               _buildFormulaire(),
               const SizedBox(height: 16),
               _buildCalculsAutomatiques(),
+              const SizedBox(height: 24),
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: _sauvegarder,
+                  icon: const Icon(Icons.save),
+                  label: const Text('Sauvegarder'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _sauvegarder,
-        label: const Text('Sauvegarder'),
-        icon: const Icon(Icons.save),
       ),
     );
   }
@@ -230,12 +243,12 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: _erreurSimulateur != null
-                      ? Colors.red.shade50
-                      : Colors.blue.shade50,
+                  color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _erreurSimulateur != null ? Colors.red : Colors.blue,
+                    color: _erreurSimulateur != null
+                        ? Colors.red
+                        : Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 child: Column(
@@ -249,17 +262,26 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     if (_paiementCalcule != null)
                       Text(
                         'Paiement mensuel: \$${_paiementCalcule!.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     if (_coutTotalCalcule != null)
                       Text(
                         'Coût total: \$${_coutTotalCalcule!.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     if (_soldeRestantCalcule != null)
                       Text(
                         'Solde restant: \$${_soldeRestantCalcule!.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                   ],
                 ),
@@ -289,30 +311,32 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       if (principal != null && duree != null && duree > 0) {
         if (taux != null) {
           // Calculer le paiement mensuel avec le taux donné
-          final tauxMensuel = taux / 100 / 12;
-          final montantMensuel =
-              principal *
-              (tauxMensuel * math.pow(1 + tauxMensuel, duree)) /
-              (math.pow(1 + tauxMensuel, duree) - 1);
-
-          final coutTotal = montantMensuel * duree;
-
+          final montantMensuel = CalculPretService.calculerPaiementMensuel(
+            principal: principal,
+            tauxAnnuel: taux,
+            dureeMois: duree,
+          );
+          final coutTotal = CalculPretService.calculerCoutTotal(
+            paiementMensuel: montantMensuel,
+            dureeMois: duree,
+          );
           setState(() {
             _paiementCalcule = montantMensuel;
             _coutTotalCalcule = coutTotal;
           });
         } else if (paiement != null) {
           // Calculer le taux avec le paiement donné
-          final taux = _calculerTauxPourPaiementMensuel(
+          final tauxEffectif = CalculPretService.calculerTauxEffectif(
             principal: principal,
             paiementMensuel: paiement,
-            nombrePaiements: duree,
+            dureeMois: duree,
           );
-
-          final coutTotal = paiement * duree;
-
+          final coutTotal = CalculPretService.calculerCoutTotal(
+            paiementMensuel: paiement,
+            dureeMois: duree,
+          );
           setState(() {
-            _tauxCalcule = taux;
+            _tauxCalcule = tauxEffectif;
             _coutTotalCalcule = coutTotal;
           });
         }
@@ -328,206 +352,242 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _calculerSimulateur('');
   }
 
-  double _calculerTauxPourPaiementMensuel({
-    required double principal,
-    required double paiementMensuel,
-    required int nombrePaiements,
-  }) {
-    double low = 0.0;
-    double high = 2.0; // 200% annuel max
-    double epsilon = 0.01;
-
-    while ((high - low) > 1e-6) {
-      double mid = (low + high) / 2;
-      double tauxMensuel = mid / 12;
-
-      // Calculer le paiement avec ce taux
-      double numerateur =
-          principal * tauxMensuel * math.pow(1 + tauxMensuel, nombrePaiements);
-      double denominateur = math.pow(1 + tauxMensuel, nombrePaiements) - 1;
-      double paiementCalcule = numerateur / denominateur;
-
-      if ((paiementCalcule - paiementMensuel).abs() < epsilon) {
-        return mid * 100; // Retourne le taux annuel en %
-      } else if (paiementCalcule > paiementMensuel) {
-        // Paiement trop élevé, il faut baisser le taux
-        high = mid;
-      } else {
-        // Paiement trop bas, il faut augmenter le taux
-        low = mid;
-      }
-    }
-
-    return (low + high) / 2 * 100;
-  }
-
   Widget _buildFormulaire() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Paramètres de la dette',
+          'Informations principales',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 16),
-
-        // Date de début du prêt
-        TextFormField(
-          controller: _dateDebutController,
-          decoration: const InputDecoration(
-            labelText: 'Date de début du prêt',
-            border: OutlineInputBorder(),
-            suffixIcon: Icon(Icons.calendar_today),
-            helperText: 'Date à laquelle le prêt a été contracté',
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // Taux d'intérêt
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _tauxController,
+                        decoration: const InputDecoration(
+                          labelText: 'Taux d\'intérêt annuel',
+                          border: OutlineInputBorder(),
+                          suffixText: '%',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez entrer un taux d\'intérêt';
+                          }
+                          final taux = double.tryParse(value);
+                          if (taux == null || taux < 0) {
+                            return 'Veuillez entrer un taux valide';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Prix d'achat
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _prixAchatController,
+                        decoration: const InputDecoration(
+                          labelText: 'Prix d\'achat',
+                          border: OutlineInputBorder(),
+                          suffixText: '\$24',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez entrer un prix d\'achat';
+                          }
+                          final prix = double.tryParse(value);
+                          if (prix == null || prix <= 0) {
+                            return 'Veuillez entrer un prix valide';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Durée du prêt
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _nombrePaiementsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Durée du prêt',
+                          border: OutlineInputBorder(),
+                          suffixText: 'mois',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez entrer la durée du prêt';
+                          }
+                          final mois = int.tryParse(value);
+                          if (mois == null || mois <= 0) {
+                            return 'Veuillez entrer une durée valide';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Montant mensuel
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _montantMensuelController,
+                        decoration: const InputDecoration(
+                          labelText: 'Paiement mensuel',
+                          border: OutlineInputBorder(),
+                          suffixText: '\$24',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          readOnly: true,
-          onTap: () async {
-            final date = await showDatePicker(
-              context: context,
-              initialDate:
-                  _parseDate(_dateDebutController.text) ?? DateTime.now(),
-              firstDate: DateTime.now().subtract(
-                const Duration(days: 3650),
-              ), // 10 ans en arrière
-              lastDate: DateTime.now(),
-            );
-            if (date != null) {
-              setState(() {
-                _dateDebutController.text = _formaterDate(date);
-                _calculerPaiementsEffectues();
-              });
-            }
-          },
         ),
-        const SizedBox(height: 16),
-
-        // Taux d'intérêt
-        TextFormField(
-          controller: _tauxController,
-          decoration: const InputDecoration(
-            labelText: 'Taux d\'intérêt annuel (%)',
-            border: OutlineInputBorder(),
-            helperText: 'Ex: 25.07 pour 25.07% APR',
-          ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Veuillez entrer un taux d\'intérêt';
-            }
-            final taux = double.tryParse(value);
-            if (taux == null || taux < 0) {
-              return 'Veuillez entrer un taux valide';
-            }
-            return null;
-          },
+        const SizedBox(height: 24),
+        const Text(
+          'Paramètres avancés',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 16),
-
-        // Prix d'achat
-        TextFormField(
-          controller: _prixAchatController,
-          decoration: const InputDecoration(
-            labelText: 'Prix d\'achat (\$)',
-            border: OutlineInputBorder(),
-            helperText: 'Montant initial de la dette',
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // Date de début (bouton)
+                Row(
+                  children: [
+                    const Icon(Icons.date_range),
+                    const SizedBox(width: 8),
+                    const Text('Date de début :'),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              _parseDate(_dateDebutController.text) ??
+                              DateTime.now(),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 3650),
+                          ),
+                          lastDate: DateTime.now(),
+                        );
+                        if (date != null) {
+                          setState(() {
+                            _dateDebutController.text = _formaterDate(date);
+                            _calculerPaiementsEffectues();
+                          });
+                        }
+                      },
+                      child: Text(_dateDebutController.text),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Nombre de paiements effectués
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _paiementsEffectuesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Paiements effectués',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Veuillez entrer un prix d\'achat';
-            }
-            final prix = double.tryParse(value);
-            if (prix == null || prix <= 0) {
-              return 'Veuillez entrer un prix valide';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Durée du prêt
-        TextFormField(
-          controller: _nombrePaiementsController,
-          decoration: const InputDecoration(
-            labelText: 'Durée du prêt (mois)',
-            border: OutlineInputBorder(),
-            helperText: 'Nombre total de paiements mensuels',
-          ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Veuillez entrer la durée du prêt';
-            }
-            final nombre = int.tryParse(value);
-            if (nombre == null || nombre <= 0) {
-              return 'Veuillez entrer une durée valide';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Paiements effectués
-        TextFormField(
-          controller: _paiementsEffectuesController,
-          decoration: const InputDecoration(
-            labelText: 'Paiements effectués',
-            border: OutlineInputBorder(),
-            helperText: 'Nombre de paiements déjà effectués',
-          ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Veuillez entrer le nombre de paiements effectués';
-            }
-            final nombre = int.tryParse(value);
-            if (nombre == null || nombre < 0) {
-              return 'Veuillez entrer un nombre valide';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Montant mensuel (calculé automatiquement)
-        TextFormField(
-          controller: _montantMensuelController,
-          decoration: const InputDecoration(
-            labelText: 'Montant mensuel (\$)',
-            border: OutlineInputBorder(),
-            helperText: 'Montant à payer chaque mois (calculé automatiquement)',
-          ),
-          keyboardType: TextInputType.number,
-          readOnly: true,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Veuillez calculer le montant mensuel';
-            }
-            final montant = double.tryParse(value);
-            if (montant == null || montant <= 0) {
-              return 'Veuillez calculer un montant valide';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Date de fin (calculée automatiquement)
-        TextFormField(
-          controller: _dateFinController,
-          decoration: const InputDecoration(
-            labelText: 'Date de fin (calculée)',
-            border: OutlineInputBorder(),
-            suffixIcon: Icon(Icons.calendar_today),
-            helperText: 'Date de fin calculée automatiquement',
-          ),
-          readOnly: true,
         ),
       ],
     );
   }
 
   Widget _buildCalculsAutomatiques() {
+    print('DEBUG: _buildCalculsAutomatiques appelée');
+    final prixAchat = double.tryParse(_prixAchatController.text);
+    final tauxInteret = double.tryParse(_tauxController.text);
+    final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
+    final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
+    final paiementMensuelSaisi = double.tryParse(
+      _montantMensuelController.text,
+    );
+    print(
+      'DEBUG: prixAchat=$prixAchat, tauxInteret=$tauxInteret, nombrePaiements=$nombrePaiements, paiementsEffectues=$paiementsEffectues, paiementMensuelSaisi=$paiementMensuelSaisi, _afficherResultatsCalcul=$_afficherResultatsCalcul',
+    );
+    double? montantMensuel;
+    double? coutTotal;
+    double? soldeRestant;
+    double? interetsPayes;
+
+    if (_afficherResultatsCalcul &&
+        prixAchat != null &&
+        tauxInteret != null &&
+        nombrePaiements != null) {
+      print('DEBUG: Bloc principal exécuté');
+      montantMensuel = CalculPretService.calculerPaiementMensuel(
+        principal: prixAchat,
+        tauxAnnuel: tauxInteret,
+        dureeMois: nombrePaiements,
+      );
+      coutTotal = CalculPretService.calculerCoutTotal(
+        paiementMensuel: paiementMensuelSaisi ?? montantMensuel,
+        dureeMois: nombrePaiements,
+      );
+      if (paiementsEffectues != null && paiementMensuelSaisi != null) {
+        print('DEBUG: Bloc soldeRestant contrat exécuté');
+        final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
+        soldeRestant =
+            coutTotal! - (paiementMensuelEffectif * paiementsEffectues);
+        print(
+          'DEBUG SOLDE CONTRAT: coutTotal=$coutTotal, paiementMensuel=$paiementMensuelEffectif, paiementsEffectues=$paiementsEffectues, soldeRestant=$soldeRestant',
+        );
+        final totalPaye = paiementMensuelEffectif * paiementsEffectues;
+        final capitalRembourse = prixAchat - (soldeRestant ?? 0);
+        interetsPayes = totalPaye - capitalRembourse;
+      } else if (paiementsEffectues != null) {
+        print('DEBUG: Bloc else if exécuté');
+        soldeRestant = CalculPretService.calculerSoldeRestant(
+          principal: prixAchat,
+          tauxAnnuel: tauxInteret,
+          dureeMois: nombrePaiements,
+          paiementsEffectues: paiementsEffectues,
+        );
+        final totalPaye = montantMensuel * paiementsEffectues;
+        final capitalRembourse = prixAchat - (soldeRestant ?? 0);
+        interetsPayes = totalPaye - capitalRembourse;
+      }
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -546,7 +606,34 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: _calculerMontantMensuel,
+              onPressed: () {
+                setState(() {
+                  _afficherResultatsCalcul = true;
+                  // Calcul du montant mensuel et remplissage automatique du champ si vide
+                  final prixAchat = double.tryParse(_prixAchatController.text);
+                  final tauxInteret = double.tryParse(_tauxController.text);
+                  final nombrePaiements = int.tryParse(
+                    _nombrePaiementsController.text,
+                  );
+                  if (prixAchat != null &&
+                      tauxInteret != null &&
+                      nombrePaiements != null) {
+                    final montantMensuel =
+                        CalculPretService.calculerPaiementMensuel(
+                          principal: prixAchat,
+                          tauxAnnuel: tauxInteret,
+                          dureeMois: nombrePaiements,
+                        );
+                    if ((_montantMensuelController.text.isEmpty ||
+                            double.tryParse(_montantMensuelController.text) ==
+                                null) &&
+                        montantMensuel != null) {
+                      _montantMensuelController.text = montantMensuel
+                          .toStringAsFixed(2);
+                    }
+                  }
+                });
+              },
               icon: const Icon(Icons.calculate),
               label: const Text('Calculer le montant mensuel'),
               style: ElevatedButton.styleFrom(
@@ -555,14 +642,47 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
               ),
             ),
             const SizedBox(height: 16),
-            if (_montantMensuelController.text.isNotEmpty) ...[
-              _buildResultatCalcul(
-                'Montant mensuel',
-                _montantMensuelController.text,
+            if (_afficherResultatsCalcul &&
+                prixAchat != null &&
+                tauxInteret != null &&
+                nombrePaiements != null) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  'DEBUG: prixAchat= ${prixAchat.toStringAsFixed(2)}, tauxInteret= ${tauxInteret.toStringAsFixed(2)}, paiementMensuel= ${paiementMensuelSaisi?.toStringAsFixed(2) ?? '-'}, paiementsEffectues= ${paiementsEffectues ?? '-'}',
+                  style: const TextStyle(fontSize: 12, color: Colors.orange),
+                ),
               ),
-              _buildResultatCalcul('Coût total', _calculerCoutTotal()),
-              _buildResultatCalcul('Solde restant', _calculerSoldeRestant()),
-              _buildResultatCalcul('Intérêts payés', _calculerInteretsPayes()),
+              if (paiementMensuelSaisi != null)
+                _buildResultatCalcul(
+                  'Paiement mensuel saisi',
+                  paiementMensuelSaisi.toStringAsFixed(2) + ' \$',
+                )
+              else if (montantMensuel != null)
+                _buildResultatCalcul(
+                  'Paiement mensuel (calculé)',
+                  montantMensuel.toStringAsFixed(2) + ' \$',
+                ),
+              if (coutTotal != null)
+                _buildResultatCalcul(
+                  'Coût total',
+                  coutTotal.toStringAsFixed(2) + ' \$',
+                ),
+              if (soldeRestant != null)
+                _buildResultatCalcul(
+                  'Solde restant',
+                  soldeRestant.toStringAsFixed(2) + ' \$',
+                ),
+              if (interetsPayes != null)
+                _buildResultatCalcul(
+                  'Intérêts payés',
+                  interetsPayes.toStringAsFixed(2) + ' \$',
+                ),
+            ] else ...[
+              const Text(
+                'Remplissez les champs puis cliquez sur "Calculer le montant mensuel" pour voir les résultats.',
+                style: TextStyle(color: Colors.grey),
+              ),
             ],
           ],
         ),
@@ -584,93 +704,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         ],
       ),
     );
-  }
-
-  void _calculerMontantMensuel() {
-    try {
-      final prixAchat = double.tryParse(_prixAchatController.text);
-      final tauxInteret = double.tryParse(_tauxController.text);
-      final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
-
-      if (prixAchat != null && tauxInteret != null && nombrePaiements != null) {
-        final tauxMensuel = tauxInteret / 100 / 12;
-        final montantMensuel =
-            prixAchat *
-            (tauxMensuel * math.pow(1 + tauxMensuel, nombrePaiements)) /
-            (math.pow(1 + tauxMensuel, nombrePaiements) - 1);
-
-        setState(() {
-          _montantMensuelController.text = montantMensuel.toStringAsFixed(2);
-          _calculerDateFin();
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur de calcul: $e')));
-    }
-  }
-
-  void _calculerDateFin() {
-    final dateDebut = _parseDate(_dateDebutController.text);
-    final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
-
-    if (dateDebut != null && nombrePaiements != null) {
-      final dateFin = DateTime(
-        dateDebut.year,
-        dateDebut.month + nombrePaiements,
-        dateDebut.day,
-      );
-      _dateFinController.text = _formaterDate(dateFin);
-    }
-  }
-
-  String _calculerCoutTotal() {
-    final montantMensuel = double.tryParse(_montantMensuelController.text);
-    final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
-
-    if (montantMensuel != null && nombrePaiements != null) {
-      final coutTotal = montantMensuel * nombrePaiements;
-      return '\$${coutTotal.toStringAsFixed(2)}';
-    }
-    return '—';
-  }
-
-  String _calculerSoldeRestant() {
-    final coutTotal = double.tryParse(
-      _calculerCoutTotal().replaceAll('\$', '').replaceAll('—', '0'),
-    );
-    final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
-    final montantMensuel = double.tryParse(_montantMensuelController.text);
-
-    if (coutTotal != null &&
-        paiementsEffectues != null &&
-        montantMensuel != null) {
-      final totalPaye = montantMensuel * paiementsEffectues;
-      final soldeRestant = coutTotal - totalPaye;
-      return '\$${soldeRestant.toStringAsFixed(2)}';
-    }
-    return '—';
-  }
-
-  String _calculerInteretsPayes() {
-    final prixAchat = double.tryParse(_prixAchatController.text);
-    final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
-    final montantMensuel = double.tryParse(_montantMensuelController.text);
-    final soldeRestant = double.tryParse(
-      _calculerSoldeRestant().replaceAll('\$', '').replaceAll('—', '0'),
-    );
-
-    if (prixAchat != null &&
-        paiementsEffectues != null &&
-        montantMensuel != null &&
-        soldeRestant != null) {
-      final totalPaye = montantMensuel * paiementsEffectues;
-      final capitalRembourse = prixAchat - soldeRestant;
-      final interetsPayes = totalPaye - capitalRembourse;
-      return '\$${interetsPayes.toStringAsFixed(2)}';
-    }
-    return '—';
   }
 
   void _sauvegarder() async {
