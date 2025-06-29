@@ -4,6 +4,7 @@ import 'package:toutie_budget/pages/page_transactions_compte.dart';
 import 'package:toutie_budget/pages/page_modification_compte.dart';
 import 'package:toutie_budget/pages/page_reconciliation.dart';
 import 'package:toutie_budget/pages/page_pret_personnel.dart';
+import 'package:toutie_budget/pages/page_parametres_dettes.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/models/dette.dart';
@@ -228,12 +229,38 @@ class PageComptes extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // Navigation vers la page transactions du compte
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => PageTransactionsCompte(compte: compte),
-              ),
-            );
+            // Navigation conditionnelle selon le type de compte
+            if (compte.type == 'Dette') {
+              // Pour les comptes de type Dette, créer une Dette manuelle et naviguer vers les paramètres
+              final detteManuelle = Dette(
+                id: compte.id,
+                nomTiers: compte.nom,
+                type: 'dette',
+                montantInitial: compte.solde.abs(),
+                solde: compte.solde,
+                historique: [],
+                archive: false,
+                dateCreation: DateTime.now(),
+                userId: '',
+                estManuelle: true,
+                dateDebut: DateTime.now(),
+                paiementsEffectues: 0,
+                montantMensuel: 0.0,
+              );
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      PageParametresDettes(dette: detteManuelle),
+                ),
+              );
+            } else {
+              // Navigation vers la page transactions du compte pour les autres types
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PageTransactionsCompte(compte: compte),
+                ),
+              );
+            }
           },
           onLongPress: () {
             // Menu CRUD pour tous les comptes
@@ -420,8 +447,8 @@ class PageComptes extends StatelessWidget {
 
   Widget _buildDetteCard(Dette dette, BuildContext context) {
     final color = Colors.red; // Couleur rouge pour les dettes
-    final isDetteAutomatique =
-        true; // Toutes les dettes de la collection sont automatiques
+    final isDetteManuelle =
+        dette.estManuelle; // Vérifier si c'est une dette manuelle
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -432,12 +459,22 @@ class PageComptes extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // Navigation vers la page prêt personnel pour les dettes automatiques
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const PagePretPersonnel(),
-              ),
-            );
+            // Navigation conditionnelle selon le type de dette
+            if (isDetteManuelle) {
+              // Navigation vers la page paramètres de dette pour les dettes manuelles
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PageParametresDettes(dette: dette),
+                ),
+              );
+            } else {
+              // Navigation vers la page prêt personnel pour les dettes automatiques
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PagePretPersonnel(),
+                ),
+              );
+            }
           },
           onLongPress: () {
             // Pas de menu pour les dettes automatiques
@@ -475,7 +512,16 @@ class PageComptes extends StatelessWidget {
                             : 'Prêt accordé',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
-                      if (isDetteAutomatique)
+                      if (isDetteManuelle)
+                        Text(
+                          'Dette manuelle',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blue[700],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      else
                         Text(
                           'Géré via Prêts Personnels',
                           style: TextStyle(
@@ -526,7 +572,10 @@ class PageComptes extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.account_balance, color: Colors.grey[400]),
+                Icon(
+                  isDetteManuelle ? Icons.settings : Icons.account_balance,
+                  color: Colors.grey[400],
+                ),
               ],
             ),
           ),

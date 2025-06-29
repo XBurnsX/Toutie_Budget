@@ -395,4 +395,66 @@ class DetteService {
     await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
     print('DEBUG: Dette sauvegardée dans Firestore: ${dette.id}');
   }
+
+  /// Sauvegarde les paramètres d'intérêt d'une dette manuelle
+  Future<void> sauvegarderParametresInteret({
+    required String detteId,
+    required double tauxInteret,
+    required DateTime dateFinObjectif,
+    required double montantMensuelCalcule,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur connecté");
+
+    try {
+      await dettesRef.doc(detteId).update({
+        'tauxInteret': tauxInteret,
+        'dateFinObjectif': Timestamp.fromDate(dateFinObjectif),
+        'montantMensuelCalcule': montantMensuelCalcule,
+      });
+
+      print('DEBUG: Paramètres d\'intérêt sauvegardés pour dette: $detteId');
+    } catch (e) {
+      print('Erreur lors de la sauvegarde des paramètres d\'intérêt: $e');
+      throw Exception('Erreur lors de la sauvegarde des paramètres d\'intérêt');
+    }
+  }
+
+  /// Sauvegarde tous les paramètres d'une dette manuelle
+  Future<void> sauvegarderParametresDette(Dette dette) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur connecté");
+
+    try {
+      final updates = <String, dynamic>{};
+
+      if (dette.tauxInteret != null) {
+        updates['tauxInteret'] = dette.tauxInteret;
+      }
+      if (dette.dateDebut != null) {
+        updates['dateDebut'] = Timestamp.fromDate(dette.dateDebut!);
+      }
+      if (dette.dateFin != null) {
+        updates['dateFin'] = Timestamp.fromDate(dette.dateFin!);
+      }
+      if (dette.montantMensuel != null) {
+        updates['montantMensuel'] = dette.montantMensuel;
+      }
+      if (dette.prixAchat != null) {
+        updates['prixAchat'] = dette.prixAchat;
+      }
+      if (dette.nombrePaiements != null) {
+        updates['nombrePaiements'] = dette.nombrePaiements;
+      }
+      if (dette.paiementsEffectues != null) {
+        updates['paiementsEffectues'] = dette.paiementsEffectues;
+      }
+
+      await dettesRef.doc(dette.id).update(updates);
+      print('DEBUG: Paramètres de dette sauvegardés pour dette: ${dette.id}');
+    } catch (e) {
+      print('Erreur lors de la sauvegarde des paramètres de dette: $e');
+      throw Exception('Erreur lors de la sauvegarde des paramètres de dette');
+    }
+  }
 }

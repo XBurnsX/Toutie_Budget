@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:toutie_budget/models/compte.dart';
 import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/argent_service.dart';
+import 'dart:math' as math;
 
 void main() {
   setUpAll(() async {
@@ -69,6 +70,68 @@ void main() {
           comptes.where((c) => c < 0).fold(0.0, (a, b) => a + b) +
           categories.where((c) => c < 0).fold(0.0, (a, b) => a + b);
       expect(totalNegatif, -170.0);
+    });
+
+    test('Calcul montant mensuel avec intérêts - dette simple', () {
+      // Test sans intérêts
+      final soldeActuel = 1000.0;
+      final tauxInteret = 0.0;
+      final moisRestants = 12;
+
+      final montantMensuel = soldeActuel / moisRestants;
+      expect(montantMensuel, closeTo(83.33, 0.01));
+    });
+
+    test('Calcul montant mensuel avec intérêts - dette avec intérêts', () {
+      // Test avec intérêts
+      final soldeActuel = 10000.0;
+      final tauxInteret = 5.0; // 5% annuel
+      final moisRestants = 12;
+
+      final tauxMensuel = tauxInteret / 100 / 12;
+      final numerateur =
+          soldeActuel * tauxMensuel * math.pow(1 + tauxMensuel, moisRestants);
+      final denominateur = math.pow(1 + tauxMensuel, moisRestants) - 1;
+      final montantMensuel = numerateur / denominateur;
+
+      // Le montant mensuel devrait être supérieur à 10000/12 = 833.33 à cause des intérêts
+      expect(montantMensuel, greaterThan(833.33));
+      expect(montantMensuel, closeTo(856.07, 0.01)); // Valeur approximative
+    });
+
+    test('Calcul total intérêts payés', () {
+      final soldeActuel = 1000.0;
+      final tauxInteret = 12.0; // 12% annuel
+      final montantMensuel = 100.0;
+      final moisRestants = 12;
+
+      double soldeRestant = soldeActuel;
+      double totalInterets = 0.0;
+
+      for (int mois = 0; mois < moisRestants && soldeRestant > 0; mois++) {
+        final interetMensuel = soldeRestant * (tauxInteret / 100 / 12);
+        final capitalMensuel = montantMensuel - interetMensuel;
+
+        if (capitalMensuel > soldeRestant) {
+          totalInterets += interetMensuel;
+          break;
+        }
+
+        totalInterets += interetMensuel;
+        soldeRestant -= capitalMensuel;
+      }
+
+      // Avec 12% d'intérêt, on devrait payer des intérêts significatifs
+      expect(totalInterets, greaterThan(0));
+      expect(totalInterets, closeTo(66.67, 1.0)); // Approximation
+    });
+
+    test('Calcul mois entre deux dates', () {
+      final debut = DateTime(2025, 1, 1);
+      final fin = DateTime(2025, 12, 1);
+
+      final mois = (fin.year - debut.year) * 12 + (fin.month - debut.month);
+      expect(mois, 11); // 11 mois entre janvier et décembre
     });
   });
 
