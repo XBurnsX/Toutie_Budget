@@ -356,17 +356,26 @@ class DetteService {
     String detteId,
     double nouveauSolde,
   ) async {
-    final doc = dettesRef.doc(detteId);
+    final docRef = dettesRef.doc(detteId);
+    final compteRef = FirebaseFirestore.instance
+        .collection('comptes')
+        .doc(detteId);
+
+    // Mettre à jour le solde dans la collection 'dettes'
+    await docRef.update({'solde': nouveauSolde});
+
+    // Mettre à jour le solde dans la collection 'comptes' (en négatif)
+    await compteRef.update({'solde': -nouveauSolde});
 
     if (nouveauSolde <= 0) {
-      // Dette remboursée complètement
-      await doc.update({
-        'solde': 0,
+      await docRef.update({
         'archive': true,
-        'dateArchivage': Timestamp.now(),
+        'dateArchivage': FieldValue.serverTimestamp(),
       });
-    } else {
-      await doc.update({'solde': nouveauSolde});
+      await compteRef.update({
+        'estArchive': true,
+        'dateSuppression': DateTime.now().toIso8601String(),
+      });
     }
   }
 
@@ -432,41 +441,42 @@ class DetteService {
     }
   }
 
-  /// Sauvegarde tous les paramètres d'une dette manuelle
-  Future<void> sauvegarderParametresDette(Dette dette) async {
+  /// Sauvegarde tous les paramètres d'une dette manuelle et met à jour les soldes
+  Future<void> sauvegarderDetteManuelleComplet(Dette dette) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
+    final docRef = dettesRef.doc(dette.id);
+    final compteRef = FirebaseFirestore.instance
+        .collection('comptes')
+        .doc(dette.id);
+
     try {
-      final updates = <String, dynamic>{};
+      // 1. Mettre à jour l'intégralité du document dans la collection 'dettes'
+      await docRef.set(dette.toMap());
+      print('DEBUG: Document de dette complet sauvegardé: ${dette.id}');
 
-      if (dette.tauxInteret != null) {
-        updates['tauxInteret'] = dette.tauxInteret;
-      }
-      if (dette.dateDebut != null) {
-        updates['dateDebut'] = Timestamp.fromDate(dette.dateDebut!);
-      }
-      if (dette.dateFin != null) {
-        updates['dateFin'] = Timestamp.fromDate(dette.dateFin!);
-      }
-      if (dette.montantMensuel != null) {
-        updates['montantMensuel'] = dette.montantMensuel;
-      }
-      if (dette.prixAchat != null) {
-        updates['prixAchat'] = dette.prixAchat;
-      }
-      if (dette.nombrePaiements != null) {
-        updates['nombrePaiements'] = dette.nombrePaiements;
-      }
-      if (dette.paiementsEffectues != null) {
-        updates['paiementsEffectues'] = dette.paiementsEffectues;
-      }
+      // 2. Mettre à jour le solde dans le compte associé (en négatif)
+      await compteRef.update({'solde': -dette.solde});
+      print(
+        'DEBUG: Solde du compte mis à jour: ${-dette.solde} pour ${dette.id}',
+      );
 
-      await dettesRef.doc(dette.id).update(updates);
-      print('DEBUG: Paramètres de dette sauvegardés pour dette: ${dette.id}');
+      // 3. Gérer l'archivage si le solde est nul ou négatif
+      if (dette.solde <= 0) {
+        await docRef.update({
+          'archive': true,
+          'dateArchivage': FieldValue.serverTimestamp(),
+        });
+        await compteRef.update({
+          'estArchive': true,
+          'dateSuppression': DateTime.now().toIso8601String(),
+        });
+        print('DEBUG: Dette et compte archivés: ${dette.id}');
+      }
     } catch (e) {
-      print('Erreur lors de la sauvegarde des paramètres de dette: $e');
-      throw Exception('Erreur lors de la sauvegarde des paramètres de dette');
+      print('Erreur lors de la sauvegarde complète de la dette: $e');
+      throw Exception('Erreur lors de la sauvegarde complète de la dette');
     }
   }
 

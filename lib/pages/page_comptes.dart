@@ -120,21 +120,33 @@ class PageComptes extends StatelessWidget {
                     stream: DetteService().dettesActives(),
                     builder: (context, dettesSnapshot) {
                       final dettesActives = dettesSnapshot.data ?? [];
-                      // Filtrer pour n'afficher que les dettes contractées (pas les prêts accordés)
-                      final dettesContractees = dettesActives
-                          .where((d) => d.type == 'dette')
+                      // On récupère les IDs des dettes qui sont déjà gérées comme des comptes manuels
+                      final idsDettesManuelles = dettesManuelles
+                          .map((c) => c.id)
+                          .toSet();
+
+                      // Filtrer pour n'afficher que les dettes contractées qui ne sont PAS déjà des comptes manuels
+                      final dettesAutomatiques = dettesActives
+                          .where(
+                            (d) =>
+                                d.type == 'dette' &&
+                                !idsDettesManuelles.contains(d.id),
+                          )
                           .toList();
+
                       final dettesAfficher = [
                         ...dettesManuelles,
-                        ...dettesContractees,
+                        ...dettesAutomatiques,
                       ];
 
                       // Debug pour voir toutes les dettes
                       print('DEBUG: Dettes affichées:');
-                      for (var dette in dettesContractees) {
-                        print(
-                          '  - ${dette.nomTiers}: estManuelle=${dette.estManuelle}, type=${dette.type}',
-                        );
+                      for (var item in dettesAfficher) {
+                        if (item is Compte) {
+                          print('  - Compte (manuelle): ${item.nom}');
+                        } else if (item is Dette) {
+                          print('  - Dette (auto): ${item.nomTiers}');
+                        }
                       }
 
                       if (dettesAfficher.isNotEmpty) {
@@ -227,6 +239,10 @@ class PageComptes extends StatelessWidget {
     bool isCheque,
   ) {
     final color = Color(compte.couleur);
+    final isDette = compte.type == 'Dette';
+
+    // Pour les dettes, le solde affiché est toujours celui du compte
+    final soldeAffiche = compte.solde;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -236,33 +252,40 @@ class PageComptes extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            // Navigation conditionnelle selon le type de compte
-            if (compte.type == 'Dette') {
-              // Pour les comptes de type Dette, créer une Dette manuelle et naviguer vers les paramètres
-              final detteManuelle = Dette(
-                id: compte.id,
-                nomTiers: compte.nom,
-                type: 'dette',
-                montantInitial: compte.solde.abs(),
-                solde: compte.solde,
-                historique: [],
-                archive: false,
-                dateCreation: DateTime.now(),
-                userId: '',
-                estManuelle: true,
-                dateDebut: DateTime.now(),
-                paiementsEffectues: 0,
-                montantMensuel: 0.0,
-              );
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      PageParametresDettes(dette: detteManuelle),
-                ),
-              );
+          onTap: () async {
+            if (isDette) {
+              // Pour une dette manuelle, on doit récupérer l'objet Dette complet
+              // pour passer toutes les infos à la page des paramètres.
+              final dette = await DetteService().getDette(compte.id);
+
+              if (dette != null && context.mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PageParametresDettes(dette: dette),
+                  ),
+                );
+              } else if (context.mounted) {
+                // Fallback si la dette n'existe pas encore dans la collection 'dettes'
+                final detteManuelle = Dette(
+                  id: compte.id,
+                  nomTiers: compte.nom,
+                  type: 'dette',
+                  montantInitial: compte.solde.abs(),
+                  solde: soldeAffiche,
+                  historique: [],
+                  archive: false,
+                  dateCreation: DateTime.now(),
+                  userId: '',
+                  estManuelle: true,
+                );
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        PageParametresDettes(dette: detteManuelle),
+                  ),
+                );
+              }
             } else {
-              // Navigation vers la page transactions du compte pour les autres types
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => PageTransactionsCompte(compte: compte),
@@ -270,10 +293,7 @@ class PageComptes extends StatelessWidget {
               );
             }
           },
-          onLongPress: () {
-            // Menu CRUD pour tous les comptes
-            _showCompteMenu(context, compte, isCheque);
-          },
+          onLongPress: () => _showCompteMenu(context, compte, isCheque),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -310,11 +330,11 @@ class PageComptes extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${compte.solde.toStringAsFixed(2)} \$',
+                      '${soldeAffiche.toStringAsFixed(2)} \$',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: compte.solde >= 0
+                        color: soldeAffiche >= 0
                             ? Colors.green[700]
                             : Colors.red[700],
                       ),

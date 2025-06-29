@@ -5,6 +5,7 @@ import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/widgets/month_picker.dart';
 import 'package:toutie_budget/services/calcul_pret_service.dart';
+import 'package:toutie_budget/services/firebase_service.dart';
 
 class PageParametresDettes extends StatefulWidget {
   final Dette dette;
@@ -585,49 +586,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   Widget _buildCalculsAutomatiques() {
-    final prixAchat = _toDouble(_prixAchatController.text);
-    final tauxInteret = _toDouble(_tauxController.text);
-    final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
-    final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
-    final paiementMensuelSaisi = _toDouble(_montantMensuelController.text);
-
-    double? montantMensuel;
-    double? coutTotal;
-    double? soldeRestant;
-    double? interetsPayes;
-
-    if (_afficherResultatsCalcul &&
-        prixAchat != null &&
-        tauxInteret != null &&
-        nombrePaiements != null) {
-      montantMensuel = CalculPretService.calculerPaiementMensuel(
-        principal: prixAchat,
-        tauxAnnuel: tauxInteret,
-        dureeMois: nombrePaiements,
-      );
-
-      // Utiliser le paiement mensuel saisi s'il existe, sinon utiliser le calculé
-      final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
-
-      coutTotal = CalculPretService.calculerCoutTotal(
-        paiementMensuel: paiementMensuelEffectif,
-        dureeMois: nombrePaiements,
-      );
-
-      if (paiementsEffectues != null) {
-        // Nouveau calcul simplifié demandé :
-        // 1) paiement total effectué = paiementsEffectues * paiementMensuelEffectif
-        // 2) solde restant = coût total - paiement total effectué
-        final totalPaye = paiementMensuelEffectif * paiementsEffectues;
-        soldeRestant = coutTotal - totalPaye;
-
-        if (soldeRestant < 0) soldeRestant = 0;
-
-        // Calcul des intérêts payés
-        final capitalRembourse = prixAchat - soldeRestant;
-        interetsPayes = totalPaye - capitalRembourse;
-      }
-    }
+    final calculs = _calculerValeursPret();
+    final soldeRestant = calculs['soldeRestant'];
 
     return Card(
       child: Padding(
@@ -668,6 +628,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   final nombrePaiements = int.tryParse(
                     _nombrePaiementsController.text,
                   );
+                  final calculs = _calculerValeursPret();
+                  final montantMensuel = calculs['montantMensuel'];
 
                   print('Valeurs parsées:');
                   print('  prixAchat: $prixAchat');
@@ -682,16 +644,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       nombrePaiements > 0) {
                     print('Tous les champs sont valides, calcul en cours...');
                     try {
-                      final montantMensuel =
-                          CalculPretService.calculerPaiementMensuel(
-                            principal: prixAchat,
-                            tauxAnnuel: tauxInteret,
-                            dureeMois: nombrePaiements,
-                          );
-                      print('montantMensuel calculé: $montantMensuel');
-
-                      if ((_montantMensuelController.text.isEmpty ||
-                          _toDouble(_montantMensuelController.text) == null)) {
+                      if (montantMensuel != null &&
+                          (_montantMensuelController.text.isEmpty ||
+                              _toDouble(_montantMensuelController.text) ==
+                                  null)) {
                         print(
                           'Remplissage automatique du champ montant mensuel',
                         );
@@ -729,38 +685,35 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
               ),
             ),
             const SizedBox(height: 16),
-            if (_afficherResultatsCalcul &&
-                prixAchat != null &&
-                tauxInteret != null &&
-                nombrePaiements != null) ...[
+            if (_afficherResultatsCalcul) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: SizedBox.shrink(),
               ),
-              if (paiementMensuelSaisi != null)
+              if (calculs['paiementMensuelSaisi'] != null)
                 _buildResultatCalcul(
                   'Paiement mensuel saisi',
-                  paiementMensuelSaisi.toStringAsFixed(2) + ' \$',
+                  calculs['paiementMensuelSaisi']!.toStringAsFixed(2) + ' \$',
                 )
-              else if (montantMensuel != null)
+              else if (calculs['montantMensuel'] != null)
                 _buildResultatCalcul(
                   'Paiement mensuel (calculé)',
-                  montantMensuel.toStringAsFixed(2) + ' \$',
+                  calculs['montantMensuel']!.toStringAsFixed(2) + ' \$',
                 ),
-              if (coutTotal != null)
+              if (calculs['coutTotal'] != null)
                 _buildResultatCalcul(
                   'Coût total',
-                  coutTotal.toStringAsFixed(2) + ' \$',
+                  calculs['coutTotal']!.toStringAsFixed(2) + ' \$',
                 ),
-              if (soldeRestant != null)
+              if (calculs['soldeRestant'] != null)
                 _buildResultatCalcul(
                   'Solde restant',
-                  soldeRestant.toStringAsFixed(2) + ' \$',
+                  calculs['soldeRestant']!.toStringAsFixed(2) + ' \$',
                 ),
-              if (interetsPayes != null)
+              if (calculs['interetsPayes'] != null)
                 _buildResultatCalcul(
                   'Intérêts payés',
-                  interetsPayes.toStringAsFixed(2) + ' \$',
+                  calculs['interetsPayes']!.toStringAsFixed(2) + ' \$',
                 ),
             ] else ...[
               const Text(
@@ -796,17 +749,33 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     try {
+      final nouveauSolde = _calculerValeursPret()['soldeRestant'];
+      final ancienSolde = widget.dette.solde;
+
+      // Créer l'objet Dette complet avec toutes les informations à jour
       final detteModifiee = widget.dette.copyWith(
         tauxInteret: _toDouble(_tauxController.text) ?? 0,
         dateDebut: _parseDate(_dateDebutController.text),
         dateFin: _parseDate(_dateFinController.text),
         montantMensuel: _toDouble(_montantMensuelController.text) ?? 0,
         prixAchat: _toDouble(_prixAchatController.text) ?? 0,
-        nombrePaiements: int.parse(_nombrePaiementsController.text),
-        paiementsEffectues: int.parse(_paiementsEffectuesController.text),
+        nombrePaiements: int.tryParse(_nombrePaiementsController.text),
+        paiementsEffectues: int.tryParse(_paiementsEffectuesController.text),
+        solde: nouveauSolde, // On met à jour le solde ici pour la sauvegarde
       );
 
-      await DetteService().sauvegarderParametresDette(detteModifiee);
+      // Appeler la méthode de sauvegarde unifiée
+      await DetteService().sauvegarderDetteManuelleComplet(detteModifiee);
+
+      // Si le solde a changé, créer une transaction d'ajustement
+      if (nouveauSolde != null && ancienSolde != nouveauSolde) {
+        final montantAjustement = ancienSolde - nouveauSolde;
+        await FirebaseService().creerTransactionAjustementSoldeDette(
+          detteId: widget.dette.id,
+          nomCompte: widget.dette.nomTiers, // ou le nom du compte si différent
+          montantAjustement: montantAjustement,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -821,6 +790,79 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         );
       }
     }
+  }
+
+  Map<String, double?> _calculerValeursPret() {
+    print('--- NOUVEAU CALCUL DES VALEURS DU PRÊT ---');
+    final prixAchat = _toDouble(_prixAchatController.text);
+    final tauxInteret = _toDouble(_tauxController.text);
+    final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
+    final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
+    final paiementMensuelSaisi = _toDouble(_montantMensuelController.text);
+
+    print('  Prix Achat: $prixAchat');
+    print('  Taux Intérêt: $tauxInteret');
+    print('  Nombre Paiements: $nombrePaiements');
+    print('  Paiements Effectués: $paiementsEffectues');
+    print('  Paiement Mensuel Saisi: $paiementMensuelSaisi');
+
+    double? montantMensuel;
+    double? coutTotal;
+    double? soldeRestant;
+    double? interetsPayes;
+
+    if (prixAchat != null &&
+        tauxInteret != null &&
+        nombrePaiements != null &&
+        nombrePaiements > 0) {
+      montantMensuel = CalculPretService.calculerPaiementMensuel(
+        principal: prixAchat,
+        tauxAnnuel: tauxInteret,
+        dureeMois: nombrePaiements,
+      );
+
+      final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
+
+      if (paiementMensuelEffectif != null) {
+        coutTotal = CalculPretService.calculerCoutTotal(
+          paiementMensuel: paiementMensuelEffectif,
+          dureeMois: nombrePaiements,
+        );
+
+        if (paiementsEffectues != null) {
+          final totalPaye = paiementMensuelEffectif * paiementsEffectues;
+          soldeRestant = coutTotal - totalPaye;
+
+          if (soldeRestant < 0) soldeRestant = 0;
+
+          // Calcul des intérêts payés
+          if (soldeRestant != null) {
+            final capitalRembourse = prixAchat - soldeRestant;
+            interetsPayes = totalPaye - capitalRembourse;
+          }
+        }
+      }
+    } else if (paiementMensuelSaisi != null &&
+        nombrePaiements != null &&
+        paiementsEffectues != null) {
+      coutTotal = paiementMensuelSaisi * nombrePaiements;
+      final totalPaye = paiementMensuelSaisi * paiementsEffectues;
+      soldeRestant = coutTotal - totalPaye;
+      if (soldeRestant < 0) soldeRestant = 0;
+    }
+
+    print('  -> Montant Mensuel Calculé: $montantMensuel');
+    print('  -> Coût Total: $coutTotal');
+    print('  -> Solde Restant: $soldeRestant');
+    print('  -> Intérêts Payés: $interetsPayes');
+
+    return {
+      'montantMensuel': montantMensuel,
+      'coutTotal': coutTotal,
+      'soldeRestant': soldeRestant,
+      'interetsPayes': interetsPayes,
+      'paiementMensuelSaisi': paiementMensuelSaisi,
+    };
   }
 
   DateTime? _parseDate(String dateStr) {

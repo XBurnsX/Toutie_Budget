@@ -170,6 +170,43 @@ class FirebaseService {
     }
   }
 
+  /// Crée une transaction interne pour refléter un ajustement de solde sur une dette manuelle
+  Future<void> creerTransactionAjustementSoldeDette({
+    required String detteId,
+    required String nomCompte,
+    required double montantAjustement,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
+
+    // Le montant de l'ajustement est la différence, on le considère comme une "dépense"
+    // si le solde a diminué (remboursement), ou un "revenu" si le solde a augmenté.
+    final typeTransaction = montantAjustement > 0
+        ? app_model.TypeTransaction.depense
+        : app_model.TypeTransaction.revenu;
+
+    final transaction = app_model.Transaction(
+      id: firestore.collection('transactions').doc().id,
+      userId: user.uid,
+      type: typeTransaction,
+      typeMouvement: app_model.TypeMouvementFinancier.ajustement,
+      montant: montantAjustement.abs(),
+      compteId: detteId, // L'ID de la dette est utilisé comme compteId
+      date: DateTime.now(),
+      tiers: 'Ajustement de solde',
+      note: 'Ajustement automatique du solde de la dette: $nomCompte',
+      estFractionnee: false,
+      // On ne lie pas à une enveloppe pour ne pas impacter le budget
+      enveloppeId: null,
+    );
+
+    // On sauvegarde la transaction SANS mettre à jour les soldes d'enveloppe
+    await firestore
+        .collection('transactions')
+        .doc(transaction.id)
+        .set(transaction.toJson());
+  }
+
   // Méthode helper pour mettre à jour le solde d'un compte
   Future<void> _mettreAJourSoldeCompte(
     String compteId,

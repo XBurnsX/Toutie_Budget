@@ -1,7 +1,4 @@
-enum TypeTransaction {
-  depense,
-  revenu,
-}
+enum TypeTransaction { depense, revenu }
 
 extension TypeTransactionExtension on TypeTransaction {
   bool get estDepense => this == TypeTransaction.depense;
@@ -15,11 +12,19 @@ enum TypeMouvementFinancier {
   remboursementRecu,
   detteContractee,
   remboursementEffectue,
+  ajustement,
 }
 
 extension TypeMouvementFinancierExtension on TypeMouvementFinancier {
-  bool get estDepense => this == TypeMouvementFinancier.depenseNormale || this == TypeMouvementFinancier.pretAccorde || this == TypeMouvementFinancier.remboursementEffectue;
-  bool get estRevenu => this == TypeMouvementFinancier.revenuNormal || this == TypeMouvementFinancier.remboursementRecu || this == TypeMouvementFinancier.detteContractee;
+  bool get estDepense =>
+      this == TypeMouvementFinancier.depenseNormale ||
+      this == TypeMouvementFinancier.pretAccorde ||
+      this == TypeMouvementFinancier.remboursementEffectue ||
+      this == TypeMouvementFinancier.ajustement;
+  bool get estRevenu =>
+      this == TypeMouvementFinancier.revenuNormal ||
+      this == TypeMouvementFinancier.remboursementRecu ||
+      this == TypeMouvementFinancier.detteContractee;
 }
 
 class Transaction {
@@ -80,7 +85,9 @@ class Transaction {
       id: json['id'],
       userId: json['userId'],
       type: TypeTransaction.values.byName(json['type']),
-      typeMouvement: TypeMouvementFinancier.values.byName(json['typeMouvement']),
+      typeMouvement: TypeMouvementFinancier.values.byName(
+        json['typeMouvement'],
+      ),
       montant: (json['montant'] as num).toDouble(),
       compteId: json['compteId'],
       date: DateTime.parse(json['date']),
