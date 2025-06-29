@@ -18,15 +18,21 @@ class FirebaseService {
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  final CollectionReference comptesRef = FirebaseFirestore.instance.collection('comptes');
-  final CollectionReference categoriesRef = FirebaseFirestore.instance.collection('categories');
-  final CollectionReference tiersRef = FirebaseFirestore.instance.collection('tiers');
+  final CollectionReference comptesRef = FirebaseFirestore.instance.collection(
+    'comptes',
+  );
+  final CollectionReference categoriesRef = FirebaseFirestore.instance
+      .collection('categories');
+  final CollectionReference tiersRef = FirebaseFirestore.instance.collection(
+    'tiers',
+  );
 
   FirebaseAuth get auth => _auth;
 
   Future<UserCredential> signInWithGoogle() async {
     final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-    final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+    final GoogleSignInAuthentication? googleAuth =
+        await googleUser?.authentication;
     final credential = GoogleAuthProvider.credential(
       accessToken: googleAuth?.accessToken,
       idToken: googleAuth?.idToken,
@@ -47,9 +53,13 @@ class FirebaseService {
     String nomCompteNettoye = compte.nom;
     if (compte.type == 'Dette') {
       // Enlever le mot "emprunt" (insensible à la casse)
-      nomCompteNettoye = nomCompteNettoye.replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '').trim();
+      nomCompteNettoye = nomCompteNettoye
+          .replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '')
+          .trim();
       // Nettoyer les espaces multiples
-      nomCompteNettoye = nomCompteNettoye.replaceAll(RegExp(r'\s+'), ' ').trim();
+      nomCompteNettoye = nomCompteNettoye
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
 
       // Si après nettoyage le nom est vide, garder le nom original
       if (nomCompteNettoye.isEmpty) {
@@ -59,21 +69,22 @@ class FirebaseService {
 
     // Assure que le compte est bien associé à l'utilisateur actuel
     final compteAvecUser = Compte(
-        id: compte.id,
-        userId: user.uid, // On force l'ID de l'utilisateur connecté
-        nom: nomCompteNettoye, // Utiliser le nom nettoyé
-        type: compte.type,
-        solde: compte.solde,
-        couleur: compte.couleur,
-        pretAPlacer: compte.pretAPlacer,
-        dateCreation: compte.dateCreation,
-        estArchive: compte.estArchive);
+      id: compte.id,
+      userId: user.uid, // On force l'ID de l'utilisateur connecté
+      nom: nomCompteNettoye, // Utiliser le nom nettoyé
+      type: compte.type,
+      solde: compte.solde,
+      couleur: compte.couleur,
+      pretAPlacer: compte.pretAPlacer,
+      dateCreation: compte.dateCreation,
+      estArchive: compte.estArchive,
+    );
 
     // Créer le compte dans Firestore
     await comptesRef.doc(compte.id).set(compteAvecUser.toMap());
 
     // Si c'est un compte de type "Dette", créer automatiquement une dette dans la collection dettes
-    if (compte.type == 'Dette') {
+    if (compte.type == 'Dette' && compte.detteAssocieeId == null) {
       await _creerDetteDepuisCompte(compteAvecUser);
     }
   }
@@ -81,7 +92,8 @@ class FirebaseService {
   Future<void> _creerDetteDepuisCompte(Compte compte) async {
     try {
       // Importer le service dette et les modèles nécessaires
-      final CollectionReference dettesRef = FirebaseFirestore.instance.collection('dettes');
+      final CollectionReference dettesRef = FirebaseFirestore.instance
+          .collection('dettes');
 
       // Extraire le nom du tiers depuis le nom du compte (logique améliorée)
       String nomTiers;
@@ -92,7 +104,9 @@ class FirebaseService {
         if (parts.length > 1) {
           nomTiers = parts[1].trim();
           // Enlever le mot "emprunt" s'il est présent (insensible à la casse)
-          nomTiers = nomTiers.replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '').trim();
+          nomTiers = nomTiers
+              .replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '')
+              .trim();
           // Nettoyer les espaces multiples
           nomTiers = nomTiers.replaceAll(RegExp(r'\s+'), ' ').trim();
         } else {
@@ -103,7 +117,12 @@ class FirebaseService {
         // Pas de ":", utiliser le nom complet du compte en nettoyant
         nomTiers = compte.nom;
         // Enlever les mots "prêt", "dette", "emprunt" (insensible à la casse)
-        nomTiers = nomTiers.replaceAll(RegExp(r'\b(prêt|dette|emprunt)\b', caseSensitive: false), '').trim();
+        nomTiers = nomTiers
+            .replaceAll(
+              RegExp(r'\b(prêt|dette|emprunt)\b', caseSensitive: false),
+              '',
+            )
+            .trim();
         // Nettoyer les espaces multiples
         nomTiers = nomTiers.replaceAll(RegExp(r'\s+'), ' ').trim();
       }
@@ -134,7 +153,8 @@ class FirebaseService {
         nomTiers: nomTiers,
         montantInitial: montantInitial,
         solde: montantInitial,
-        type: 'dette', // C'est toujours une dette contractée quand cré��e depuis un compte Dette
+        type:
+            'dette', // C'est toujours une dette contractée quand créée depuis un compte Dette
         historique: [mouvementInitial],
         archive: false,
         dateCreation: compte.dateCreation,
@@ -153,10 +173,9 @@ class FirebaseService {
 
       print('Dette créée automatiquement depuis le compte: ${compte.nom}');
       print('Dette ID: $detteId, Tiers: $nomTiers, Montant: $montantInitial');
-
     } catch (e) {
       print('Erreur lors de la création de la dette depuis le compte: $e');
-      // Ne pas bloquer la création du compte si la cr��ation de la dette échoue
+      // Ne pas bloquer la création du compte si la création de la dette échoue
     }
   }
 
@@ -165,10 +184,11 @@ class FirebaseService {
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
     // Assure que la catégorie est bien associée à l'utilisateur actuel
     final categorieAvecUser = Categorie(
-        id: categorie.id,
-        userId: user.uid, // On force l'ID de l'utilisateur connecté
-        nom: categorie.nom,
-        enveloppes: categorie.enveloppes);
+      id: categorie.id,
+      userId: user.uid, // On force l'ID de l'utilisateur connecté
+      nom: categorie.nom,
+      enveloppes: categorie.enveloppes,
+    );
     await categoriesRef.doc(categorie.id).set(categorieAvecUser.toMap());
   }
 
@@ -178,11 +198,18 @@ class FirebaseService {
       return Stream.value([]); // Retourne un stream vide si pas d'utilisateur
     }
     return categoriesRef
-        .where('userId', isEqualTo: user.uid) // Ne lit que les catégories de l'utilisateur
+        .where(
+          'userId',
+          isEqualTo: user.uid,
+        ) // Ne lit que les catégories de l'utilisateur
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>),
+              )
+              .toList(),
+        );
   }
 
   Future<void> ajouterTransaction(app_model.Transaction transaction) async {
@@ -207,13 +234,22 @@ class FirebaseService {
     );
 
     // 1. Sauvegarder la transaction
-    await firestore.collection('transactions').doc(transaction.id).set(transactionAvecUser.toJson());
+    await firestore
+        .collection('transactions')
+        .doc(transaction.id)
+        .set(transactionAvecUser.toJson());
 
     // 2. Mettre à jour le solde du compte (avec gestion des prêts à placer)
-    await _mettreAJourSoldeCompte(transaction.compteId, transaction.montant, transaction.type, transaction.typeMouvement);
+    await _mettreAJourSoldeCompte(
+      transaction.compteId,
+      transaction.montant,
+      transaction.type,
+      transaction.typeMouvement,
+    );
 
     // 2.5. Mettre à jour le compte de passif associé si présent (pour les prêts/dettes)
-    if (transaction.compteDePassifAssocie != null && transaction.compteDePassifAssocie!.isNotEmpty) {
+    if (transaction.compteDePassifAssocie != null &&
+        transaction.compteDePassifAssocie!.isNotEmpty) {
       await _mettreAJourComptePassifAssocie(
         transaction.compteDePassifAssocie!,
         transaction.montant,
@@ -226,7 +262,8 @@ class FirebaseService {
       // Transaction fractionnée - mettre à jour plusieurs enveloppes
       for (var sousItem in transaction.sousItems!) {
         final enveloppeId = sousItem['enveloppeId'] as String?;
-        final montantSousItem = (sousItem['montant'] as num?)?.toDouble() ?? 0.0;
+        final montantSousItem =
+            (sousItem['montant'] as num?)?.toDouble() ?? 0.0;
 
         if (enveloppeId != null && montantSousItem > 0) {
           await _mettreAJourSoldeEnveloppe(
@@ -236,7 +273,8 @@ class FirebaseService {
           );
         }
       }
-    } else if (transaction.enveloppeId != null && transaction.enveloppeId!.isNotEmpty) {
+    } else if (transaction.enveloppeId != null &&
+        transaction.enveloppeId!.isNotEmpty) {
       // Transaction normale - mettre à jour une seule enveloppe
       await _mettreAJourSoldeEnveloppe(
         transaction.enveloppeId!,
@@ -261,7 +299,8 @@ class FirebaseService {
       if (compteSnapshot.exists) {
         final compteData = compteSnapshot.data() as Map<String, dynamic>;
         final soldeActuel = (compteData['solde'] as num?)?.toDouble() ?? 0.0;
-        final pretAPlacerActuel = (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
+        final pretAPlacerActuel =
+            (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
 
         double nouveauSolde;
         double nouveauPretAPlacer = pretAPlacerActuel;
@@ -306,6 +345,9 @@ class FirebaseService {
           'solde': nouveauSolde,
           'pretAPlacer': nouveauPretAPlacer,
         });
+
+        // Si c'est un compte de dette, mettre à jour la dette correspondante
+        await _mettreAJourDetteDepuisCompte(compteId, nouveauSolde);
       }
     });
   }
@@ -324,7 +366,8 @@ class FirebaseService {
       if (compteSnapshot.exists) {
         final compteData = compteSnapshot.data() as Map<String, dynamic>;
         final soldeActuel = (compteData['solde'] as num?)?.toDouble() ?? 0.0;
-        final pretAPlacerActuel = (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
+        final pretAPlacerActuel =
+            (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
 
         double nouveauSolde = soldeActuel;
         double nouveauPretAPlacer = pretAPlacerActuel;
@@ -374,13 +417,19 @@ class FirebaseService {
     app_model.TypeTransaction typeTransaction,
   ) async {
     // Trouver la catégorie contenant cette enveloppe
-    final categoriesSnapshot = await categoriesRef.where('userId', isEqualTo: _auth.currentUser?.uid).get();
+    final categoriesSnapshot = await categoriesRef
+        .where('userId', isEqualTo: _auth.currentUser?.uid)
+        .get();
 
     for (var catDoc in categoriesSnapshot.docs) {
       final catData = catDoc.data() as Map<String, dynamic>;
-      final enveloppes = List<Map<String, dynamic>>.from(catData['enveloppes'] ?? []);
+      final enveloppes = List<Map<String, dynamic>>.from(
+        catData['enveloppes'] ?? [],
+      );
 
-      final enveloppeIndex = enveloppes.indexWhere((env) => env['id'] == enveloppeId);
+      final enveloppeIndex = enveloppes.indexWhere(
+        (env) => env['id'] == enveloppeId,
+      );
 
       if (enveloppeIndex != -1) {
         // Utiliser une transaction pour cette catégorie spécifique
@@ -390,13 +439,21 @@ class FirebaseService {
 
           if (catSnapshot.exists) {
             final catData = catSnapshot.data() as Map<String, dynamic>;
-            final enveloppes = List<Map<String, dynamic>>.from(catData['enveloppes'] ?? []);
-            final enveloppeIndex = enveloppes.indexWhere((env) => env['id'] == enveloppeId);
+            final enveloppes = List<Map<String, dynamic>>.from(
+              catData['enveloppes'] ?? [],
+            );
+            final enveloppeIndex = enveloppes.indexWhere(
+              (env) => env['id'] == enveloppeId,
+            );
 
             if (enveloppeIndex != -1) {
-              final enveloppe = Map<String, dynamic>.from(enveloppes[enveloppeIndex]);
-              final soldeActuel = (enveloppe['solde'] as num?)?.toDouble() ?? 0.0;
-              final depenseActuelle = (enveloppe['depense'] as num?)?.toDouble() ?? 0.0;
+              final enveloppe = Map<String, dynamic>.from(
+                enveloppes[enveloppeIndex],
+              );
+              final soldeActuel =
+                  (enveloppe['solde'] as num?)?.toDouble() ?? 0.0;
+              final depenseActuelle =
+                  (enveloppe['depense'] as num?)?.toDouble() ?? 0.0;
 
               // Calculer les nouveaux soldes
               double nouveauSolde;
@@ -456,11 +513,16 @@ class FirebaseService {
     await comptesRef.doc(compteId).update(data);
   }
 
-  Future<void> restaurerEnveloppe(String categorieId, String enveloppeId) async {
+  Future<void> restaurerEnveloppe(
+    String categorieId,
+    String enveloppeId,
+  ) async {
     final doc = await categoriesRef.doc(categorieId).get();
     if (!doc.exists) return;
     final data = doc.data() as Map<String, dynamic>;
-    final enveloppes = List<Map<String, dynamic>>.from(data['enveloppes'] ?? []);
+    final enveloppes = List<Map<String, dynamic>>.from(
+      data['enveloppes'] ?? [],
+    );
     for (var env in enveloppes) {
       if (env['id'] == enveloppeId) {
         env['archive'] = false;
@@ -480,9 +542,11 @@ class FirebaseService {
         .where('compteId', isEqualTo: compteId)
         .orderBy('date', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => app_model.Transaction.fromJson(doc.data()))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => app_model.Transaction.fromJson(doc.data()))
+              .toList(),
+        );
   }
 
   Stream<List<Compte>> lireComptes() {
@@ -491,10 +555,64 @@ class FirebaseService {
       return Stream.value([]); // Retourne un stream vide si pas d'utilisateur
     }
     return comptesRef
-        .where('userId', isEqualTo: user.uid) // Ne lit que les comptes de l'utilisateur
+        .where(
+          'userId',
+          isEqualTo: user.uid,
+        ) // Ne lit que les comptes de l'utilisateur
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Compte.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) =>
+                    Compte.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+              )
+              .toList(),
+        );
+  }
+
+  Future<void> _mettreAJourDetteDepuisCompte(
+    String compteId,
+    double nouveauSolde,
+  ) async {
+    try {
+      // Rechercher la dette associée à ce compte
+      final CollectionReference dettesRef = FirebaseFirestore.instance
+          .collection('dettes');
+
+      final dettesQuery = await dettesRef
+          .where('compteAssocie', isEqualTo: compteId)
+          .where('archive', isEqualTo: false)
+          .get();
+
+      if (dettesQuery.docs.isEmpty) {
+        // Aucune dette trouvée pour ce compte
+        return;
+      }
+
+      final detteDoc = dettesQuery.docs.first;
+      final detteData = detteDoc.data() as Map<String, dynamic>;
+      final detteId = detteDoc.id;
+
+      // Calculer le nouveau solde de la dette (valeur absolue du solde du compte)
+      final nouveauSoldeDette = nouveauSolde.abs();
+
+      // Mettre à jour la dette
+      await dettesRef.doc(detteId).update({'solde': nouveauSoldeDette});
+
+      print(
+        'DEBUG: Dette mise à jour - ID: $detteId, Nouveau solde: $nouveauSoldeDette',
+      );
+
+      // Si le solde est 0, archiver la dette
+      if (nouveauSoldeDette == 0) {
+        await dettesRef.doc(detteId).update({
+          'archive': true,
+          'dateArchivage': DateTime.now().toIso8601String(),
+        });
+        print('DEBUG: Dette archivée automatiquement - ID: $detteId');
+      }
+    } catch (e) {
+      print('Erreur lors de la mise à jour de la dette depuis le compte: $e');
+    }
   }
 }

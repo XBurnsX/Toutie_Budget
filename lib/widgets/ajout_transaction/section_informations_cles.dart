@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/transaction_model.dart';
+import '../../controllers/ajout_transaction_controller.dart';
 import 'champ_tiers.dart';
 import 'champ_compte.dart';
 import 'champ_enveloppe.dart';
@@ -24,6 +25,7 @@ class SectionInformationsCles extends StatelessWidget {
   final Function(String?) onMarqueurChanged;
   final TextEditingController noteController;
   final Function(TypeMouvementFinancier) onTypeMouvementChanged;
+  final AjoutTransactionController ajoutController;
 
   const SectionInformationsCles({
     super.key,
@@ -46,6 +48,7 @@ class SectionInformationsCles extends StatelessWidget {
     required this.onMarqueurChanged,
     required this.noteController,
     required this.onTypeMouvementChanged,
+    required this.ajoutController,
   });
 
   @override
@@ -79,7 +82,9 @@ class SectionInformationsCles extends StatelessWidget {
               icone: Icons.person_outline,
               libelle:
                   typeMouvementSelectionne ==
-                      TypeMouvementFinancier.detteContractee
+                          TypeMouvementFinancier.detteContractee ||
+                      typeMouvementSelectionne ==
+                          TypeMouvementFinancier.remboursementEffectue
                   ? 'Prêteur'
                   : 'Tiers',
               widgetContenu: ChampTiers(
@@ -87,6 +92,7 @@ class SectionInformationsCles extends StatelessWidget {
                 typeMouvementSelectionne: typeMouvementSelectionne,
                 listeTiersConnus: listeTiersConnus,
                 onTiersAjoute: onTiersAjoute,
+                ajoutController: ajoutController,
               ),
             ),
             _buildSeparateurDansCarte(),
@@ -138,11 +144,9 @@ class SectionInformationsCles extends StatelessWidget {
             ),
             _buildSeparateurDansCarte(),
 
-            // Champ Enveloppe (conditionnel)
+            // Champ Enveloppe (conditionnel - seulement pour les dépenses)
             if (typeMouvementSelectionne ==
-                    TypeMouvementFinancier.depenseNormale ||
-                typeMouvementSelectionne ==
-                    TypeMouvementFinancier.revenuNormal) ...[
+                TypeMouvementFinancier.depenseNormale) ...[
               _buildChampDetail(
                 icone: Icons.label_outline,
                 libelle: 'Enveloppe',

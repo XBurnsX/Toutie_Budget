@@ -90,15 +90,9 @@ class AjoutTransactionController extends ChangeNotifier {
 
     // Validation pour les transactions normales
     if (!_estFractionnee &&
-        !(_typeMouvementSelectionne == TypeMouvementFinancier.pretAccorde ||
-            _typeMouvementSelectionne ==
-                TypeMouvementFinancier.remboursementRecu ||
-            _typeMouvementSelectionne ==
-                TypeMouvementFinancier.detteContractee ||
-            _typeMouvementSelectionne ==
-                TypeMouvementFinancier.remboursementEffectue) &&
+        _typeMouvementSelectionne == TypeMouvementFinancier.depenseNormale &&
         (_enveloppeSelectionnee == null || _enveloppeSelectionnee!.isEmpty)) {
-      print('DEBUG: Validation - ÉCHEC: enveloppe manquante');
+      print('DEBUG: Validation - ÉCHEC: enveloppe manquante pour dépense');
       return false;
     }
 
@@ -201,14 +195,40 @@ class AjoutTransactionController extends ChangeNotifier {
         .toList();
   }
 
+  // Fonction utilitaire pour normaliser les chaînes de caractères
+  String normaliserChaine(String chaine) {
+    return chaine
+        .toLowerCase()
+        .trim()
+        .replaceAll(
+          RegExp(r'\s+'),
+          ' ',
+        ) // Remplacer les espaces multiples par un seul
+        .replaceAll('à', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('ä', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('è', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('ë', 'e')
+        .replaceAll('ï', 'i')
+        .replaceAll('î', 'i')
+        .replaceAll('ô', 'o')
+        .replaceAll('ö', 'o')
+        .replaceAll('ù', 'u')
+        .replaceAll('û', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ÿ', 'y')
+        .replaceAll('ç', 'c');
+  }
+
   // Ajout de nouveaux tiers
   Future<void> ajouterNouveauTiers(String nomTiers) async {
-    if (!_listeTiersConnus.any(
-      (t) => t.toLowerCase() == nomTiers.toLowerCase(),
-    )) {
+    final nomNormalise = normaliserChaine(nomTiers);
+    if (!_listeTiersConnus.any((t) => normaliserChaine(t) == nomNormalise)) {
       _listeTiersConnus.add(nomTiers);
       _listeTiersConnus.sort(
-        (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
+        (a, b) => normaliserChaine(a).compareTo(normaliserChaine(b)),
       );
       await FirebaseService().ajouterTiers(nomTiers);
       notifyListeners();
@@ -216,8 +236,8 @@ class AjoutTransactionController extends ChangeNotifier {
   }
 
   // Sauvegarde de la transaction
-  Future<bool> sauvegarderTransaction() async {
-    if (!estValide) return false;
+  Future<Map<String, dynamic>?> sauvegarderTransaction() async {
+    if (!estValide) return null;
 
     try {
       // Nettoyer le montant du symbole $ et des espaces
@@ -237,6 +257,8 @@ class AjoutTransactionController extends ChangeNotifier {
       final detteService = DetteService();
       final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
 
+      Map<String, dynamic>? infoFinalisation;
+
       // Gérer les dettes/prêts
       if (_typeMouvementSelectionne == TypeMouvementFinancier.detteContractee ||
           _typeMouvementSelectionne == TypeMouvementFinancier.pretAccorde) {
@@ -253,13 +275,18 @@ class AjoutTransactionController extends ChangeNotifier {
               TypeMouvementFinancier.remboursementRecu ||
           _typeMouvementSelectionne ==
               TypeMouvementFinancier.remboursementEffectue) {
-        await _traiterRemboursementViaDettesService(
+        infoFinalisation = await _traiterRemboursementViaDettesService(
           tiersTexte,
           montant,
           _typeMouvementSelectionne,
           transactionId,
           detteService,
         );
+      }
+
+      // Gérer les revenus normaux - augmenter automatiquement le prêt à placer et le solde
+      if (_typeMouvementSelectionne == TypeMouvementFinancier.revenuNormal) {
+        await _traiterRevenuNormal(compte, montant, firebaseService);
       }
 
       // Créer la transaction
@@ -285,10 +312,13 @@ class AjoutTransactionController extends ChangeNotifier {
       );
 
       await firebaseService.ajouterTransaction(transaction);
-      return true;
+
+      // Retourner l'information de finalisation si applicable
+      return infoFinalisation;
     } catch (e) {
       print('Erreur lors de la sauvegarde: $e');
-      return false;
+      // Relancer l'exception pour qu'elle soit capturée par la page
+      rethrow;
     }
   }
 
@@ -303,7 +333,9 @@ class AjoutTransactionController extends ChangeNotifier {
       final user = FirebaseService().auth.currentUser;
       if (user == null) return;
 
-      final String detteId = DateTime.now().millisecondsSinceEpoch.toString();
+      print(
+        'DEBUG: Création de dette - nomTiers: $nomTiers, montant: $montant, typeMouvement: $typeMouvement',
+      );
 
       // Déterminer le type de dette selon le mouvement
       String typeDette;
@@ -314,6 +346,45 @@ class AjoutTransactionController extends ChangeNotifier {
       } else {
         return; // Pour les remboursements, on ne crée pas de nouvelle dette
       }
+
+      // Vérifier s'il existe déjà une dette active pour ce tiers
+      final dettesActives = await detteService.dettesActives().first;
+      final dettesExistantes = dettesActives
+          .where(
+            (d) =>
+                normaliserChaine(d.nomTiers) == normaliserChaine(nomTiers) &&
+                d.type == typeDette,
+          )
+          .toList();
+
+      // Si une dette existe déjà, ajouter le montant à cette dette
+      if (dettesExistantes.isNotEmpty) {
+        final detteExistante =
+            dettesExistantes.first; // Prendre la première trouvée
+
+        print('DEBUG: Dette existante trouvée: ${detteExistante.id}');
+
+        // Créer un mouvement pour ajouter le montant à la dette existante
+        final mouvement = MouvementDette(
+          id: '${DateTime.now().millisecondsSinceEpoch}_ajout',
+          type: typeDette,
+          montant: typeDette == 'dette' ? montant : -montant,
+          date: DateTime.now(),
+          note: 'Ajout via transaction',
+        );
+
+        // Ajouter le mouvement à la dette existante
+        await detteService.ajouterMouvement(detteExistante.id, mouvement);
+        print(
+          'DEBUG: Montant ajouté à la dette existante: ${detteExistante.id}',
+        );
+        return;
+      }
+
+      // Si aucune dette existante, créer une nouvelle dette
+      final String detteId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      print('DEBUG: Type de dette déterminé: $typeDette, ID: $detteId');
 
       // Créer la dette
       final nouvelleDette = Dette(
@@ -341,13 +412,25 @@ class AjoutTransactionController extends ChangeNotifier {
         userId: user.uid,
       );
 
-      await detteService.creerDette(nouvelleDette);
+      print(
+        'DEBUG: Appel de detteService.creerDette pour la dette: ${nouvelleDette.id}',
+      );
+      await detteService.creerDette(
+        nouvelleDette,
+        creerCompteAutomatique: false,
+      );
+      print('DEBUG: Dette créée avec succès: ${nouvelleDette.id}');
+
+      // Créer le compte de dette automatiquement après avoir créé la dette
+      if (typeDette == 'dette') {
+        await _creerCompteDetteAutomatique(nouvelleDette);
+      }
     } catch (e) {
       print('Erreur lors de la création de la dette: $e');
     }
   }
 
-  Future<void> _traiterRemboursementViaDettesService(
+  Future<Map<String, dynamic>?> _traiterRemboursementViaDettesService(
     String nomTiers,
     double montant,
     TypeMouvementFinancier typeMouvement,
@@ -356,7 +439,7 @@ class AjoutTransactionController extends ChangeNotifier {
   ) async {
     try {
       final user = FirebaseService().auth.currentUser;
-      if (user == null) return;
+      if (user == null) return null;
 
       // Déterminer le type de remboursement
       String typeRemboursement;
@@ -377,7 +460,7 @@ class AjoutTransactionController extends ChangeNotifier {
       var dettesATiers = dettesActives
           .where(
             (d) =>
-                d.nomTiers.toLowerCase() == nomTiers.toLowerCase() &&
+                normaliserChaine(d.nomTiers) == normaliserChaine(nomTiers) &&
                 d.type == typeDetteRecherche,
           )
           .toList();
@@ -387,10 +470,12 @@ class AjoutTransactionController extends ChangeNotifier {
         dettesATiers = dettesActives
             .where(
               (d) =>
-                  (d.nomTiers.toLowerCase().contains(nomTiers.toLowerCase()) ||
-                      nomTiers.toLowerCase().contains(
-                        d.nomTiers.toLowerCase(),
-                      )) &&
+                  (normaliserChaine(
+                        d.nomTiers,
+                      ).contains(normaliserChaine(nomTiers)) ||
+                      normaliserChaine(
+                        nomTiers,
+                      ).contains(normaliserChaine(d.nomTiers))) &&
                   d.type == typeDetteRecherche,
             )
             .toList();
@@ -400,13 +485,30 @@ class AjoutTransactionController extends ChangeNotifier {
         print(
           'Aucune dette trouvée pour "$nomTiers" de type "$typeDetteRecherche"',
         );
-        return;
+        return null;
       }
 
       // Trier par date de création (plus ancien en premier)
       dettesATiers.sort((a, b) => a.dateCreation.compareTo(b.dateCreation));
 
+      // Calculer le total du solde restant de toutes les dettes
+      double totalSoldeRestant = dettesATiers.fold(
+        0.0,
+        (sum, dette) => sum + dette.solde,
+      );
+
+      // Vérifier si le montant du remboursement ne dépasse pas le solde restant
+      if (montant > totalSoldeRestant) {
+        final message =
+            typeMouvement == TypeMouvementFinancier.remboursementEffectue
+            ? 'Seulement ${totalSoldeRestant.toStringAsFixed(2)} dollars sont nécessaires pour rembourser votre dette à $nomTiers'
+            : 'Seulement ${totalSoldeRestant.toStringAsFixed(2)} dollars peuvent être remboursés par $nomTiers';
+
+        throw Exception(message);
+      }
+
       double montantRestant = montant;
+      bool detteFinalisee = false;
 
       // Traitement en cascade pour rembourser les dettes dans l'ordre
       for (final dette in dettesATiers) {
@@ -415,6 +517,11 @@ class AjoutTransactionController extends ChangeNotifier {
         final montantAPayer = montantRestant >= dette.solde
             ? dette.solde
             : montantRestant;
+
+        // Vérifier si cette dette sera finalisée
+        if (montantAPayer >= dette.solde) {
+          detteFinalisee = true;
+        }
 
         // Créer le mouvement de remboursement
         final mouvement = MouvementDette(
@@ -430,8 +537,72 @@ class AjoutTransactionController extends ChangeNotifier {
 
         montantRestant -= montantAPayer;
       }
+
+      // Retourner l'information sur la finalisation de la dette
+      if (detteFinalisee) {
+        return {
+          'finalisee': true,
+          'typeMouvement': typeMouvement,
+          'nomTiers': nomTiers,
+        };
+      }
+
+      return null;
     } catch (e) {
       print('Erreur lors du traitement du remboursement: $e');
+      rethrow; // Relancer l'exception pour qu'elle soit capturée par la fonction appelante
+    }
+  }
+
+  Future<void> _traiterRevenuNormal(
+    Compte compte,
+    double montant,
+    FirebaseService firebaseService,
+  ) async {
+    try {
+      final user = FirebaseService().auth.currentUser;
+      if (user == null) return;
+
+      // Pour les revenus normaux, seul le prêt à placer doit être augmenté
+      // Le solde est déjà mis à jour automatiquement par FirebaseService.ajouterTransaction
+      final nouveauPretAPlacer = compte.pretAPlacer + montant;
+
+      // Mettre à jour seulement le prêt à placer
+      await firebaseService.updateCompte(compte.id, {
+        'pretAPlacer': nouveauPretAPlacer,
+      });
+    } catch (e) {
+      print('Erreur lors du traitement du revenu normal: $e');
+    }
+  }
+
+  Future<void> _creerCompteDetteAutomatique(Dette dette) async {
+    try {
+      final user = FirebaseService().auth.currentUser;
+      if (user == null) return;
+
+      print('DEBUG: Création du compte de dette automatique');
+
+      // Générer un ID unique pour le compte
+      final compteId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      final nouveauCompte = Compte(
+        id: compteId,
+        nom: "Prêt : ${dette.nomTiers}",
+        type: 'Dette',
+        solde: -dette.montantInitial, // Négatif car c'est une dette
+        couleur: 0xFFE53935, // Rouge pour les dettes
+        pretAPlacer: 0.0, // Pas applicable pour les dettes
+        dateCreation: dette.dateCreation,
+        estArchive: false,
+        userId: user.uid,
+        detteAssocieeId: dette.id, // Lier le compte à la dette
+      );
+
+      await FirebaseService().ajouterCompte(nouveauCompte);
+      print('DEBUG: Compte de dette créé avec succès: $compteId');
+    } catch (e) {
+      print('Erreur lors de la création du compte de dette: $e');
     }
   }
 

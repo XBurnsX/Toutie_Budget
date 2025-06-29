@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/transaction_model.dart';
+import '../../controllers/ajout_transaction_controller.dart';
 
 class ChampTiers extends StatelessWidget {
   final TextEditingController controller;
   final TypeMouvementFinancier typeMouvementSelectionne;
   final List<String> listeTiersConnus;
   final Function(String) onTiersAjoute;
+  final AjoutTransactionController ajoutController;
 
   const ChampTiers({
     super.key,
@@ -13,11 +15,13 @@ class ChampTiers extends StatelessWidget {
     required this.typeMouvementSelectionne,
     required this.listeTiersConnus,
     required this.onTiersAjoute,
+    required this.ajoutController,
   });
 
   @override
   Widget build(BuildContext context) {
     return Autocomplete<String>(
+      key: ValueKey(typeMouvementSelectionne),
       optionsBuilder: (TextEditingValue textEditingValue) {
         final String texteSaisi = textEditingValue.text;
 
@@ -26,12 +30,16 @@ class ChampTiers extends StatelessWidget {
         }
 
         final suggestionsStandard = listeTiersConnus.where((String option) {
-          return option.toLowerCase().contains(texteSaisi.toLowerCase());
+          return ajoutController
+              .normaliserChaine(option)
+              .contains(ajoutController.normaliserChaine(texteSaisi));
         });
 
         // Vérifier si le texte saisi existe déjà exactement
         bool existeDeja = listeTiersConnus.any(
-          (String option) => option.toLowerCase() == texteSaisi.toLowerCase(),
+          (String option) =>
+              ajoutController.normaliserChaine(option) ==
+              ajoutController.normaliserChaine(texteSaisi),
         );
 
         // Si le texte saisi n'est pas vide ET n'existe pas déjà, ajouter l'option "Ajouter"
@@ -71,7 +79,9 @@ class ChampTiers extends StatelessWidget {
               decoration: InputDecoration(
                 hintText:
                     typeMouvementSelectionne ==
-                        TypeMouvementFinancier.detteContractee
+                            TypeMouvementFinancier.detteContractee ||
+                        typeMouvementSelectionne ==
+                            TypeMouvementFinancier.remboursementEffectue
                     ? 'Nom du prêteur'
                     : 'Payé à / Reçu de',
                 border: InputBorder.none,

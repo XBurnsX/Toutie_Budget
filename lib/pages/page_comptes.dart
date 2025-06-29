@@ -270,7 +270,7 @@ class PageComptes extends StatelessWidget {
                             : Colors.red[700],
                       ),
                     ),
-                    if (isCheque && compte.pretAPlacer > 0)
+                    if (isCheque)
                       Container(
                         margin: const EdgeInsets.only(top: 4),
                         padding: const EdgeInsets.symmetric(

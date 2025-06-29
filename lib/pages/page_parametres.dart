@@ -369,7 +369,33 @@ class _PageParametresState extends State<PageParametres> {
 
     final firebaseService = FirebaseService();
 
-    // Supprimer les comptes
+    // Supprimer tous les prêts personnels (dettes) de l'utilisateur
+    final dettesQuery = await FirebaseFirestore.instance
+        .collection('dettes')
+        .where('userId', isEqualTo: user.uid)
+        .get();
+
+    // Collecter les IDs des dettes pour supprimer les comptes associés
+    final List<String> detteIds = [];
+    for (final doc in dettesQuery.docs) {
+      detteIds.add(doc.id);
+      await doc.reference.delete();
+    }
+
+    // Supprimer les comptes de dette associés aux dettes supprimées
+    if (detteIds.isNotEmpty) {
+      final comptesDetteQuery = await FirebaseFirestore.instance
+          .collection('comptes')
+          .where('userId', isEqualTo: user.uid)
+          .where('detteAssocieeId', whereIn: detteIds)
+          .get();
+
+      for (final doc in comptesDetteQuery.docs) {
+        await doc.reference.delete();
+      }
+    }
+
+    // Supprimer les autres comptes (non-dette)
     final comptes = await firebaseService.lireComptes().first;
     for (final compte in comptes) {
       await firebaseService.supprimerDocument('comptes', compte.id);
@@ -379,16 +405,6 @@ class _PageParametresState extends State<PageParametres> {
     final categories = await firebaseService.lireCategories().first;
     for (final categorie in categories) {
       await firebaseService.supprimerDocument('categories', categorie.id);
-    }
-
-    // Supprimer tous les prêts personnels (dettes) de l'utilisateur
-    final dettesQuery = await FirebaseFirestore.instance
-        .collection('dettes')
-        .where('userId', isEqualTo: user.uid)
-        .get();
-
-    for (final doc in dettesQuery.docs) {
-      await doc.reference.delete();
     }
 
     // Supprimer toutes les transactions de l'utilisateur

@@ -122,27 +122,78 @@ class _EcranAjoutTransactionRefactoredState
     setState(() => _isLoading = true);
 
     try {
-      final success = await _controller.sauvegarderTransaction();
+      final result = await _controller.sauvegarderTransaction();
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transaction sauvegardée avec succès !'),
-          ),
-        );
+      // Si result n'est pas null, la transaction a réussi
+      // Si result est null mais qu'aucune exception n'a été levée, la transaction a aussi réussi
+      if (mounted) {
+        final tiersTexte = _controller.payeController.text.trim();
+        String message = '';
+
+        switch (_controller.typeMouvementSelectionne) {
+          case TypeMouvementFinancier.depenseNormale:
+            message = 'Transaction chez $tiersTexte ajoutée';
+            break;
+          case TypeMouvementFinancier.revenuNormal:
+            message = 'Votre solde a été mis à jour avec succès';
+            break;
+          case TypeMouvementFinancier.pretAccorde:
+            message = 'Prêt à $tiersTexte a été créé avec succès';
+            break;
+          case TypeMouvementFinancier.detteContractee:
+            message = 'Votre dette à $tiersTexte a été créée avec succès';
+            break;
+          case TypeMouvementFinancier.remboursementRecu:
+            message = 'Le solde du prêt à $tiersTexte a été mis à jour';
+            break;
+          case TypeMouvementFinancier.remboursementEffectue:
+            message = 'Votre prêt à $tiersTexte a été mis à jour';
+            break;
+        }
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+
+        // Afficher le message de finalisation si applicable
+        if (result != null && result['finalisee'] == true) {
+          await Future.delayed(
+            const Duration(milliseconds: 500),
+          ); // Petit délai pour séparer les messages
+
+          String messageFinalisation = '';
+          if (result['typeMouvement'] ==
+              TypeMouvementFinancier.remboursementRecu) {
+            messageFinalisation = '${result['nomTiers']} a finalisé son prêt !';
+          } else if (result['typeMouvement'] ==
+              TypeMouvementFinancier.remboursementEffectue) {
+            messageFinalisation = 'Félicitations, votre prêt est terminé !';
+          }
+
+          if (mounted && messageFinalisation.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(messageFinalisation),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+
         widget.onTransactionSaved?.call();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors de la sauvegarde de la transaction.'),
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erreur: ${e.toString()}')));
+        // Afficher le message d'erreur spécifique pour la validation du remboursement
+        final errorMessage = e.toString().replaceAll('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -245,6 +296,7 @@ class _EcranAjoutTransactionRefactoredState
                           onMarqueurChanged: controller.setMarqueurSelectionne,
                           noteController: controller.noteController,
                           onTypeMouvementChanged: controller.setTypeMouvement,
+                          ajoutController: controller,
                         ),
 
                         const SizedBox(height: 20),
