@@ -126,40 +126,43 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_montreSimulateur) ...[
-                _buildSimulateur(),
-                const Divider(height: 32),
-              ],
-              _buildFormulaire(),
-              const SizedBox(height: 16),
-              _buildCalculsAutomatiques(),
-              const SizedBox(height: 24),
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _sauvegarder,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Sauvegarder'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+      body: _montreSimulateur
+          ? Center(
+              child: Transform.translate(
+                offset: const Offset(0, -150),
+                child: SingleChildScrollView(child: _buildSimulateur()),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFormulaire(),
+                    const SizedBox(height: 16),
+                    _buildCalculsAutomatiques(),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _sauvegarder,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Sauvegarder'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 16,
+                          ),
+                          textStyle: const TextStyle(fontSize: 18),
+                        ),
+                      ),
                     ),
-                    textStyle: const TextStyle(fontSize: 18),
-                  ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
@@ -187,10 +190,12 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   child: TextFormField(
                     controller: _simulateurPrincipalController,
                     decoration: const InputDecoration(
-                      labelText: 'Prix d\'achat (\$)',
+                      labelText: 'Prix d\'achat (\$4)',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    onTap: () =>
+                        _ouvrirClavierNumerique(_simulateurPrincipalController),
                     onChanged: _calculerSimulateur,
                   ),
                 ),
@@ -202,7 +207,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       labelText: 'Durée (mois)',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    onTap: () => _ouvrirClavierNumerique(
+                      _simulateurDureeController,
+                      showDecimal: false,
+                    ),
                     onChanged: _calculerSimulateur,
                   ),
                 ),
@@ -210,28 +219,20 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             ),
             const SizedBox(height: 8),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
+                SizedBox(
+                  width: 220,
                   child: TextFormField(
                     controller: _simulateurTauxController,
                     decoration: const InputDecoration(
                       labelText: 'Taux APR (%)',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    onTap: () =>
+                        _ouvrirClavierNumerique(_simulateurTauxController),
                     onChanged: _calculerPaiement,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: _simulateurPaiementController,
-                    decoration: const InputDecoration(
-                      labelText: 'Paiement mensuel (\$)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: _calculerSimulateur,
                   ),
                 ),
               ],
@@ -240,50 +241,52 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             if (_tauxCalcule != null ||
                 _paiementCalcule != null ||
                 _erreurSimulateur != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _erreurSimulateur != null
-                        ? Colors.red
-                        : Theme.of(context).colorScheme.primary,
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _erreurSimulateur != null
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_erreurSimulateur != null)
-                      Text(
-                        _erreurSimulateur!,
-                        style: TextStyle(color: Colors.red.shade700),
-                      ),
-                    if (_paiementCalcule != null)
-                      Text(
-                        'Paiement mensuel: \$${_paiementCalcule!.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_erreurSimulateur != null)
+                        Text(
+                          _erreurSimulateur!,
+                          style: TextStyle(color: Colors.red.shade700),
                         ),
-                      ),
-                    if (_coutTotalCalcule != null)
-                      Text(
-                        'Coût total: \$${_coutTotalCalcule!.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      if (_paiementCalcule != null)
+                        Text(
+                          'Paiement mensuel: \$4${_paiementCalcule!.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    if (_soldeRestantCalcule != null)
-                      Text(
-                        'Solde restant: \$${_soldeRestantCalcule!.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      if (_coutTotalCalcule != null)
+                        Text(
+                          'Coût total: \$4${_coutTotalCalcule!.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                  ],
+                      if (_soldeRestantCalcule != null)
+                        Text(
+                          'Solde restant: \$4${_soldeRestantCalcule!.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -377,7 +380,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           border: OutlineInputBorder(),
                           suffixText: '%',
                         ),
-                        keyboardType: TextInputType.number,
+                        readOnly: true,
+                        onTap: () => _ouvrirClavierNumerique(_tauxController),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Veuillez entrer un taux d\'intérêt';
@@ -404,7 +408,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           border: OutlineInputBorder(),
                           suffixText: '\$24',
                         ),
-                        keyboardType: TextInputType.number,
+                        readOnly: true,
+                        onTap: () =>
+                            _ouvrirClavierNumerique(_prixAchatController),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Veuillez entrer un prix d\'achat';
@@ -431,7 +437,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           border: OutlineInputBorder(),
                           suffixText: 'mois',
                         ),
-                        keyboardType: TextInputType.number,
+                        readOnly: true,
+                        onTap: () => _ouvrirClavierNumerique(
+                          _nombrePaiementsController,
+                          showDecimal: false,
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Veuillez entrer la durée du prêt';
@@ -458,7 +468,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           border: OutlineInputBorder(),
                           suffixText: '\$24',
                         ),
-                        keyboardType: TextInputType.number,
+                        readOnly: true,
+                        onTap: () =>
+                            _ouvrirClavierNumerique(_montantMensuelController),
                       ),
                     ),
                   ],
@@ -519,7 +531,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           labelText: 'Paiements effectués',
                           border: OutlineInputBorder(),
                         ),
-                        keyboardType: TextInputType.number,
+                        readOnly: true,
+                        onTap: () => _ouvrirClavierNumerique(
+                          _paiementsEffectuesController,
+                          showDecimal: false,
+                        ),
                       ),
                     ),
                   ],
@@ -649,7 +665,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Text(
-                  'DEBUG: prixAchat= ${prixAchat.toStringAsFixed(2)}, tauxInteret= ${tauxInteret.toStringAsFixed(2)}, paiementMensuel= ${paiementMensuelSaisi?.toStringAsFixed(2) ?? '-'}, paiementsEffectues= ${paiementsEffectues ?? '-'}',
+                  'DEBUG: prixAchat=$prixAchat, tauxInteret=$tauxInteret, paiementMensuel=$paiementMensuelSaisi, paiementsEffectues=$paiementsEffectues',
                   style: const TextStyle(fontSize: 12, color: Colors.orange),
                 ),
               ),
@@ -768,5 +784,27 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _simulateurPrincipalController.dispose();
     _simulateurDureeController.dispose();
     super.dispose();
+  }
+
+  // Ajout d'une fonction utilitaire pour ouvrir le clavier numérique personnalisé
+  void _ouvrirClavierNumerique(
+    TextEditingController controller, {
+    bool showDecimal = true,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: NumericKeyboard(
+            controller: controller,
+            showDecimal: showDecimal,
+          ),
+        );
+      },
+    );
   }
 }
