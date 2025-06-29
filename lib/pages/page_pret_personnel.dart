@@ -75,14 +75,11 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
             final dette = dettes[index];
             String typeLabel = '';
             if (archive) {
-              // Ajouter le type pour les dettes archivées
               if (dette.type == 'pret') {
                 typeLabel = ' (Prêt accordé)';
-              } else {
-                // Pour les dettes de type 'dette', vérifier si elle a été créée manuellement
-                // Si compteAutoCreated est false ou null, c'est une dette manuelle
-                final estDetteManuelle = dette.compteAutoCreated != true;
-                typeLabel = estDetteManuelle ? '' : ' (Emprunt)';
+              } else if (dette.type == 'dette') {
+                // Pour les dettes contractées, afficher "(Emprunt)" seulement si pas manuelle
+                typeLabel = dette.estManuelle ? '' : ' (Emprunt)';
               }
             }
 

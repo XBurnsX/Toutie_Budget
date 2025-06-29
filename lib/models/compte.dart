@@ -10,7 +10,6 @@ class Compte {
   final DateTime dateCreation;
   final bool estArchive;
   final DateTime? dateSuppression; // Date d'archivage/suppression
-  final String? detteAssocieeId; // ID de la dette associée pour les comptes automatiques
 
   Compte({
     required this.id,
@@ -23,7 +22,6 @@ class Compte {
     required this.dateCreation,
     required this.estArchive,
     this.dateSuppression,
-    this.detteAssocieeId, // Nouveau champ optionnel
   });
 
   Map<String, dynamic> toMap() {
@@ -37,7 +35,6 @@ class Compte {
       'dateCreation': dateCreation.toIso8601String(),
       'estArchive': estArchive,
       'dateSuppression': dateSuppression?.toIso8601String(),
-      'detteAssocieeId': detteAssocieeId, // Inclure dans la sérialisation
     };
   }
 
@@ -50,10 +47,13 @@ class Compte {
       solde: (map['solde'] ?? 0).toDouble(),
       couleur: map['couleur'] ?? 0xFF2196F3,
       pretAPlacer: (map['pretAPlacer'] ?? 0).toDouble(),
-      dateCreation: map['dateCreation'] != null ? DateTime.parse(map['dateCreation']) : DateTime.now(),
+      dateCreation: map['dateCreation'] != null
+          ? DateTime.parse(map['dateCreation'])
+          : DateTime.now(),
       estArchive: map['estArchive'] ?? false,
-      dateSuppression: map['dateSuppression'] != null ? DateTime.parse(map['dateSuppression']) : null,
-      detteAssocieeId: map['detteAssocieeId'], // Lire le nouveau champ
+      dateSuppression: map['dateSuppression'] != null
+          ? DateTime.parse(map['dateSuppression'])
+          : null,
     );
   }
 
@@ -71,8 +71,8 @@ class Compte {
           pretAPlacer == other.pretAPlacer &&
           dateCreation == other.dateCreation &&
           estArchive == other.estArchive &&
-          dateSuppression == other.dateSuppression &&
-          detteAssocieeId == other.detteAssocieeId;
+          (dateSuppression?.hashCode ?? 0) ==
+              (other.dateSuppression?.hashCode ?? 0);
 
   @override
   int get hashCode =>
@@ -85,6 +85,5 @@ class Compte {
       pretAPlacer.hashCode ^
       dateCreation.hashCode ^
       estArchive.hashCode ^
-      (dateSuppression?.hashCode ?? 0) ^
-      (detteAssocieeId?.hashCode ?? 0);
+      (dateSuppression?.hashCode ?? 0);
 }

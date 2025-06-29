@@ -49,29 +49,10 @@ class FirebaseService {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
 
-    // Si c'est un compte de type "Dette", nettoyer le nom en enlevant "emprunt"
-    String nomCompteNettoye = compte.nom;
-    if (compte.type == 'Dette') {
-      // Enlever le mot "emprunt" (insensible à la casse)
-      nomCompteNettoye = nomCompteNettoye
-          .replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '')
-          .trim();
-      // Nettoyer les espaces multiples
-      nomCompteNettoye = nomCompteNettoye
-          .replaceAll(RegExp(r'\s+'), ' ')
-          .trim();
-
-      // Si après nettoyage le nom est vide, garder le nom original
-      if (nomCompteNettoye.isEmpty) {
-        nomCompteNettoye = compte.nom;
-      }
-    }
-
-    // Assure que le compte est bien associé à l'utilisateur actuel
     final compteAvecUser = Compte(
       id: compte.id,
-      userId: user.uid, // On force l'ID de l'utilisateur connecté
-      nom: nomCompteNettoye, // Utiliser le nom nettoyé
+      userId: user.uid,
+      nom: compte.nom,
       type: compte.type,
       solde: compte.solde,
       couleur: compte.couleur,
@@ -80,103 +61,7 @@ class FirebaseService {
       estArchive: compte.estArchive,
     );
 
-    // Créer le compte dans Firestore
     await comptesRef.doc(compte.id).set(compteAvecUser.toMap());
-
-    // Si c'est un compte de type "Dette", créer automatiquement une dette dans la collection dettes
-    if (compte.type == 'Dette' && compte.detteAssocieeId == null) {
-      await _creerDetteDepuisCompte(compteAvecUser);
-    }
-  }
-
-  Future<void> _creerDetteDepuisCompte(Compte compte) async {
-    try {
-      // Importer le service dette et les modèles nécessaires
-      final CollectionReference dettesRef = FirebaseFirestore.instance
-          .collection('dettes');
-
-      // Extraire le nom du tiers depuis le nom du compte (logique améliorée)
-      String nomTiers;
-
-      if (compte.nom.contains(':')) {
-        // Format attendu: "Prêt : NomTiers" ou "Dette : NomTiers"
-        final parts = compte.nom.split(':');
-        if (parts.length > 1) {
-          nomTiers = parts[1].trim();
-          // Enlever le mot "emprunt" s'il est présent (insensible à la casse)
-          nomTiers = nomTiers
-              .replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '')
-              .trim();
-          // Nettoyer les espaces multiples
-          nomTiers = nomTiers.replaceAll(RegExp(r'\s+'), ' ').trim();
-        } else {
-          // Si il y a ":" mais rien après, utiliser le nom complet nettoyé
-          nomTiers = compte.nom.replaceAll(RegExp(r'[:\s]*$'), '').trim();
-        }
-      } else {
-        // Pas de ":", utiliser le nom complet du compte en nettoyant
-        nomTiers = compte.nom;
-        // Enlever les mots "prêt", "dette", "emprunt" (insensible à la casse)
-        nomTiers = nomTiers
-            .replaceAll(
-              RegExp(r'\b(prêt|dette|emprunt)\b', caseSensitive: false),
-              '',
-            )
-            .trim();
-        // Nettoyer les espaces multiples
-        nomTiers = nomTiers.replaceAll(RegExp(r'\s+'), ' ').trim();
-      }
-
-      // Si après nettoyage le nom est vide, utiliser le nom complet du compte
-      if (nomTiers.isEmpty) {
-        nomTiers = compte.nom;
-      }
-
-      // Générer un ID unique pour la dette
-      final String detteId = DateTime.now().millisecondsSinceEpoch.toString();
-
-      // Calculer le montant initial (valeur absolue du solde du compte)
-      final double montantInitial = compte.solde.abs();
-
-      // Créer le mouvement initial
-      final mouvementInitial = MouvementDette(
-        id: '${detteId}_initial',
-        date: compte.dateCreation,
-        montant: montantInitial,
-        type: 'dette',
-        note: 'Dette créée depuis le compte manuel: ${compte.nom}',
-      );
-
-      // Créer l'objet Dette avec le modèle correct
-      final nouvelleDette = Dette(
-        id: detteId,
-        nomTiers: nomTiers,
-        montantInitial: montantInitial,
-        solde: montantInitial,
-        type:
-            'dette', // C'est toujours une dette contractée quand créée depuis un compte Dette
-        historique: [mouvementInitial],
-        archive: false,
-        dateCreation: compte.dateCreation,
-        dateArchivage: null,
-        userId: compte.userId!,
-        compteAssocie: compte.id, // Lier à ce compte
-      );
-
-      // Sauvegarder la dette dans Firestore en utilisant le modèle
-      await dettesRef.doc(detteId).set(nouvelleDette.toMap());
-
-      // Ajouter le champ compteAutoCreated séparément car il n'est pas dans le modèle
-      await dettesRef.doc(detteId).update({
-        'compteAutoCreated': false, // Marqué comme créé manuellement
-      });
-
-      print('Dette créée automatiquement depuis le compte: ${compte.nom}');
-      print('Dette ID: $detteId, Tiers: $nomTiers, Montant: $montantInitial');
-    } catch (e) {
-      print('Erreur lors de la création de la dette depuis le compte: $e');
-      // Ne pas bloquer la création du compte si la création de la dette échoue
-    }
   }
 
   Future<void> ajouterCategorie(Categorie categorie) async {
@@ -345,9 +230,6 @@ class FirebaseService {
           'solde': nouveauSolde,
           'pretAPlacer': nouveauPretAPlacer,
         });
-
-        // Si c'est un compte de dette, mettre à jour la dette correspondante
-        await _mettreAJourDetteDepuisCompte(compteId, nouveauSolde);
       }
     });
   }
@@ -568,51 +450,5 @@ class FirebaseService {
               )
               .toList(),
         );
-  }
-
-  Future<void> _mettreAJourDetteDepuisCompte(
-    String compteId,
-    double nouveauSolde,
-  ) async {
-    try {
-      // Rechercher la dette associée à ce compte
-      final CollectionReference dettesRef = FirebaseFirestore.instance
-          .collection('dettes');
-
-      final dettesQuery = await dettesRef
-          .where('compteAssocie', isEqualTo: compteId)
-          .where('archive', isEqualTo: false)
-          .get();
-
-      if (dettesQuery.docs.isEmpty) {
-        // Aucune dette trouvée pour ce compte
-        return;
-      }
-
-      final detteDoc = dettesQuery.docs.first;
-      final detteData = detteDoc.data() as Map<String, dynamic>;
-      final detteId = detteDoc.id;
-
-      // Calculer le nouveau solde de la dette (valeur absolue du solde du compte)
-      final nouveauSoldeDette = nouveauSolde.abs();
-
-      // Mettre à jour la dette
-      await dettesRef.doc(detteId).update({'solde': nouveauSoldeDette});
-
-      print(
-        'DEBUG: Dette mise à jour - ID: $detteId, Nouveau solde: $nouveauSoldeDette',
-      );
-
-      // Si le solde est 0, archiver la dette
-      if (nouveauSoldeDette == 0) {
-        await dettesRef.doc(detteId).update({
-          'archive': true,
-          'dateArchivage': DateTime.now().toIso8601String(),
-        });
-        print('DEBUG: Dette archivée automatiquement - ID: $detteId');
-      }
-    } catch (e) {
-      print('Erreur lors de la mise à jour de la dette depuis le compte: $e');
-    }
   }
 }

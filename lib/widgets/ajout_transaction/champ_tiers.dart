@@ -57,19 +57,19 @@ class ChampTiers extends StatelessWidget {
             VoidCallback onFieldSubmitted,
           ) {
             // Synchronisation avec le controller principal
-            if (controller.text.isNotEmpty &&
-                fieldTextEditingController.text != controller.text) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (context.mounted) {
-                  fieldTextEditingController.text = controller.text;
-                }
-              });
-            }
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted &&
+                  controller.text != fieldTextEditingController.text) {
+                fieldTextEditingController.text = controller.text;
+              }
+            });
 
             fieldTextEditingController.addListener(() {
               if (context.mounted &&
                   controller.text != fieldTextEditingController.text) {
                 controller.text = fieldTextEditingController.text;
+                // Forcer la validation du contrôleur
+                ajoutController.notifyListeners();
               }
             });
 
@@ -91,6 +91,13 @@ class ChampTiers extends StatelessWidget {
                   horizontal: 10.0,
                 ),
               ),
+              onChanged: (value) {
+                // Synchronisation immédiate lors de la saisie
+                if (controller.text != value) {
+                  controller.text = value;
+                  ajoutController.notifyListeners();
+                }
+              },
               onSubmitted: (_) => onFieldSubmitted(),
             );
           },
@@ -103,6 +110,8 @@ class ChampTiers extends StatelessWidget {
         } else {
           controller.text = selection;
         }
+        // Forcer la validation du contrôleur après la sélection
+        ajoutController.notifyListeners();
         FocusScope.of(context).unfocus();
       },
       optionsViewBuilder: (context, onSelected, options) {

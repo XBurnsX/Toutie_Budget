@@ -421,10 +421,8 @@ class AjoutTransactionController extends ChangeNotifier {
       );
       print('DEBUG: Dette créée avec succès: ${nouvelleDette.id}');
 
-      // Créer le compte de dette automatiquement après avoir créé la dette
-      if (typeDette == 'dette') {
-        await _creerCompteDetteAutomatique(nouvelleDette);
-      }
+      // Plus besoin de créer un compte de dette automatique
+      // Les dettes sont maintenant affichées directement dans la page comptes
     } catch (e) {
       print('Erreur lors de la création de la dette: $e');
     }
@@ -501,8 +499,8 @@ class AjoutTransactionController extends ChangeNotifier {
       if (montant > totalSoldeRestant) {
         final message =
             typeMouvement == TypeMouvementFinancier.remboursementEffectue
-            ? 'Seulement ${totalSoldeRestant.toStringAsFixed(2)} dollars sont nécessaires pour rembourser votre dette à $nomTiers'
-            : 'Seulement ${totalSoldeRestant.toStringAsFixed(2)} dollars peuvent être remboursés par $nomTiers';
+            ? 'Seulement ${totalSoldeRestant.abs().toStringAsFixed(2)} dollars sont nécessaires pour rembourser votre dette à $nomTiers'
+            : 'Seulement ${totalSoldeRestant.abs().toStringAsFixed(2)} dollars peuvent être remboursés par $nomTiers';
 
         throw Exception(message);
       }
@@ -573,36 +571,6 @@ class AjoutTransactionController extends ChangeNotifier {
       });
     } catch (e) {
       print('Erreur lors du traitement du revenu normal: $e');
-    }
-  }
-
-  Future<void> _creerCompteDetteAutomatique(Dette dette) async {
-    try {
-      final user = FirebaseService().auth.currentUser;
-      if (user == null) return;
-
-      print('DEBUG: Création du compte de dette automatique');
-
-      // Générer un ID unique pour le compte
-      final compteId = DateTime.now().millisecondsSinceEpoch.toString();
-
-      final nouveauCompte = Compte(
-        id: compteId,
-        nom: "Prêt : ${dette.nomTiers}",
-        type: 'Dette',
-        solde: -dette.montantInitial, // Négatif car c'est une dette
-        couleur: 0xFFE53935, // Rouge pour les dettes
-        pretAPlacer: 0.0, // Pas applicable pour les dettes
-        dateCreation: dette.dateCreation,
-        estArchive: false,
-        userId: user.uid,
-        detteAssocieeId: dette.id, // Lier le compte à la dette
-      );
-
-      await FirebaseService().ajouterCompte(nouveauCompte);
-      print('DEBUG: Compte de dette créé avec succès: $compteId');
-    } catch (e) {
-      print('Erreur lors de la création du compte de dette: $e');
     }
   }
 

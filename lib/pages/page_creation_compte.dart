@@ -3,7 +3,9 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/compte.dart';
+import '../models/dette.dart';
 import '../services/firebase_service.dart';
+import '../services/dette_service.dart';
 import '../widgets/numeric_keyboard.dart';
 
 /// Page de création d'un nouveau compte bancaire, carte de crédit ou investissement
@@ -33,7 +35,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Créer un compte'),
+        title: Text(_type == 'Dette' ? 'Créer une dette' : 'Créer un compte'),
         actions: [
           IconButton(
             icon: const Icon(Icons.check),
@@ -43,21 +45,44 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                 return;
               }
               _formKey.currentState!.save();
-              final id = FirebaseFirestore.instance
-                  .collection('comptes')
-                  .doc()
-                  .id;
-              final compte = Compte(
-                id: id,
-                nom: _nom,
-                type: _type,
-                solde: _solde,
-                couleur: _couleur.value,
-                pretAPlacer: _solde,
-                dateCreation: DateTime.now(),
-                estArchive: false,
-              );
-              await FirebaseService().ajouterCompte(compte);
+
+              if (_type == 'Dette') {
+                // Créer une dette au lieu d'un compte
+                final id = FirebaseFirestore.instance
+                    .collection('dettes')
+                    .doc()
+                    .id;
+                final dette = Dette(
+                  id: id,
+                  nomTiers: _nom,
+                  montantInitial: _solde.abs(),
+                  solde: _solde.abs(),
+                  type: 'dette',
+                  historique: [],
+                  archive: false,
+                  dateCreation: DateTime.now(),
+                  estManuelle: true,
+                  userId: '', // Sera défini par le service
+                );
+                await DetteService().ajouterDette(dette);
+              } else {
+                // Créer un compte normal
+                final id = FirebaseFirestore.instance
+                    .collection('comptes')
+                    .doc()
+                    .id;
+                final compte = Compte(
+                  id: id,
+                  nom: _nom,
+                  type: _type,
+                  solde: _solde,
+                  couleur: _couleur.value,
+                  pretAPlacer: _solde,
+                  dateCreation: DateTime.now(),
+                  estArchive: false,
+                );
+                await FirebaseService().ajouterCompte(compte);
+              }
               Navigator.of(context).pop();
             },
           ),
@@ -73,8 +98,10 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                 height: 50,
               ), // Espacement entre le titre et le premier champ
               TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Nom du compte',
+                decoration: InputDecoration(
+                  labelText: _type == 'Dette'
+                      ? 'Nom du tiers'
+                      : 'Nom du compte',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) => value == null || value.isEmpty
@@ -120,8 +147,10 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Solde initial',
+                            Text(
+                              _type == 'Dette'
+                                  ? 'Montant de la dette'
+                                  : 'Solde initial',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -130,8 +159,10 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                             const SizedBox(height: 4),
                             Text(
                               _soldeController.text.isEmpty
-                                  ? '0.00'
-                                  : _soldeController.text,
+                                  ? (_type == 'Dette' ? '-0.00' : '0.00')
+                                  : (_type == 'Dette'
+                                        ? '-${_soldeController.text}'
+                                        : _soldeController.text),
                               style: const TextStyle(fontSize: 16),
                             ),
                           ],
@@ -143,66 +174,96 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Text('Couleur du compte :'),
-                  const SizedBox(width: 16),
-                  GestureDetector(
-                    onTap: () async {
-                      final color = await showDialog<Color>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Choisir une couleur'),
-                          content: SingleChildScrollView(
-                            child: BlockPicker(
-                              pickerColor: _couleur,
-                              onColorChanged: (color) =>
-                                  Navigator.of(context).pop(color),
+              // Afficher le sélecteur de couleur seulement si ce n'est pas une dette
+              if (_type != 'Dette') ...[
+                Row(
+                  children: [
+                    const Text('Couleur du compte :'),
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: () async {
+                        final color = await showDialog<Color>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Choisir une couleur'),
+                            content: SingleChildScrollView(
+                              child: BlockPicker(
+                                pickerColor: _couleur,
+                                onColorChanged: (color) =>
+                                    Navigator.of(context).pop(color),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                      if (color != null) {
-                        setState(() {
-                          _couleur = color;
-                        });
-                      }
-                    },
-                    child: CircleAvatar(backgroundColor: _couleur, radius: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
+                        );
+                        if (color != null) {
+                          setState(() {
+                            _couleur = color;
+                          });
+                        }
+                      },
+                      child: CircleAvatar(
+                        backgroundColor: _couleur,
+                        radius: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
               ElevatedButton(
                 onPressed: () async {
                   if (!_formKey.currentState!.validate()) {
                     return;
                   }
                   _formKey.currentState!.save();
-                  // Générer un id unique pour le compte
-                  final id = FirebaseFirestore.instance
-                      .collection('comptes')
-                      .doc()
-                      .id;
-                  final compte = Compte(
-                    id: id,
-                    nom: _nom,
-                    type: _type,
-                    solde: _solde,
-                    couleur: _couleur.value,
-                    pretAPlacer:
-                        _solde, // Prêt à placer = solde initial à la création
-                    dateCreation: DateTime.now(),
-                    estArchive: false,
-                  );
-                  await FirebaseService().ajouterCompte(compte);
+
+                  if (_type == 'Dette') {
+                    // Créer une dette au lieu d'un compte
+                    final id = FirebaseFirestore.instance
+                        .collection('dettes')
+                        .doc()
+                        .id;
+                    final dette = Dette(
+                      id: id,
+                      nomTiers: _nom,
+                      montantInitial: _solde.abs(),
+                      solde: _solde.abs(),
+                      type: 'dette',
+                      historique: [],
+                      archive: false,
+                      dateCreation: DateTime.now(),
+                      estManuelle: true,
+                      userId: '', // Sera défini par le service
+                    );
+                    await DetteService().ajouterDette(dette);
+                  } else {
+                    // Créer un compte normal
+                    final id = FirebaseFirestore.instance
+                        .collection('comptes')
+                        .doc()
+                        .id;
+                    final compte = Compte(
+                      id: id,
+                      nom: _nom,
+                      type: _type,
+                      solde: _solde,
+                      couleur: _couleur.value,
+                      pretAPlacer:
+                          _solde, // Prêt à placer = solde initial à la création
+                      dateCreation: DateTime.now(),
+                      estArchive: false,
+                    );
+                    await FirebaseService().ajouterCompte(compte);
+                  }
                   Navigator.of(context).pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 ),
-                child: const Text('Créer le compte'),
+                child: Text(
+                  _type == 'Dette' ? 'Créer la dette' : 'Créer le compte',
+                ),
               ),
             ],
           ),

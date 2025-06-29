@@ -36,60 +36,6 @@ class DetteService {
     // Créer la dette dans Firestore
     await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
     print('DEBUG: Dette sauvegardée dans Firestore: ${dette.id}');
-
-    // Si c'est une dette contractée (type 'dette') ET qu'on doit créer le compte automatiquement
-    if (dette.type == 'dette' && creerCompteAutomatique) {
-      print(
-        'DEBUG: Création automatique du compte pour dette contractée: ${dette.id}',
-      );
-      await _creerCompteDetteAutomatique(dette);
-    } else if (dette.type == 'dette' && !creerCompteAutomatique) {
-      print(
-        'DEBUG: Création automatique du compte désactivée pour dette: ${dette.id}',
-      );
-    }
-  }
-
-  Future<void> _creerCompteDetteAutomatique(Dette dette) async {
-    try {
-      // Générer un ID unique pour le compte
-      final compteId = FirebaseFirestore.instance
-          .collection('comptes')
-          .doc()
-          .id;
-
-      // Créer le compte dette avec un nom formaté
-      final nomCompte = "Prêt : ${dette.nomTiers}";
-
-      final compteDette = Compte(
-        id: compteId,
-        userId: FirebaseAuth.instance.currentUser?.uid,
-        nom: nomCompte,
-        type: 'Dette',
-        solde: -dette.montantInitial, // Négatif car c'est une dette
-        couleur: 0xFFE53935, // Rouge pour les dettes
-        pretAPlacer: 0.0, // Pas applicable pour les dettes
-        dateCreation: dette.dateCreation,
-        estArchive: false,
-        dateSuppression: null,
-        // Nouveau champ pour identifier les comptes liés aux prêts personnels
-        detteAssocieeId: dette.id, // Lier le compte à la dette
-      );
-
-      // Sauvegarder le compte via FirebaseService
-      await FirebaseService().ajouterCompte(compteDette);
-
-      // Lier la dette au compte en ajoutant l'ID du compte dans la dette
-      // ET marquer que ce compte a été créé automatiquement
-      await dettesRef.doc(dette.id).update({
-        'compteAssocie': compteId,
-        'compteAutoCreated':
-            true, // Marqueur pour identifier les comptes auto-créés
-      });
-    } catch (e) {
-      print('Erreur lors de la création du compte dette automatique: $e');
-      // Ne pas bloquer la création de la dette si la création du compte échoue
-    }
   }
 
   Future<void> ajouterMouvement(
@@ -105,9 +51,6 @@ class DetteService {
 
     // Recalculer et mettre à jour le solde automatiquement
     await _recalculerSolde(detteId);
-
-    // Ne plus synchroniser ici car c'est fait dans _recalculerSolde
-    // Cette ligne était redondante et pouvait causer des problèmes
   }
 
   Future<void> _recalculerSolde(String detteId) async {
@@ -140,120 +83,12 @@ class DetteService {
       // Mettre à jour le solde dans Firestore
       await doc.update({'solde': nouveauSolde});
 
-      // Toujours mettre à jour le compte associé, que le solde soit 0 ou non
-      await _mettreAJourCompteAssocie(detteId, nouveauSolde);
-
       // Si le solde est maintenant à 0, archiver automatiquement la dette
       if (nouveauSolde == 0) {
         await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
-
-        // Archiver le compte associé si la dette est soldée
-        await _archiverCompteAssocie(detteId);
       }
     } catch (e) {
       print('Erreur lors du recalcul du solde: $e');
-    }
-  }
-
-  Future<void> _mettreAJourCompteAssocie(
-    String detteId,
-    double nouveauSolde,
-  ) async {
-    try {
-      // Chercher le compte qui a cette dette comme detteAssocieeId
-      final comptesQuery = await FirebaseFirestore.instance
-          .collection('comptes')
-          .where('detteAssocieeId', isEqualTo: detteId)
-          .get();
-
-      if (comptesQuery.docs.isNotEmpty) {
-        final compteDoc = comptesQuery.docs.first;
-        final compteAssocieId = compteDoc.id;
-
-        // Mettre à jour le solde du compte à la valeur exacte
-        await FirebaseService().updateCompte(compteAssocieId, {
-          'solde': -nouveauSolde, // Négatif car c'est une dette
-        });
-
-        print(
-          'DEBUG: Compte de dette $compteAssocieId mis à jour avec solde: ${-nouveauSolde}',
-        );
-      } else {
-        print('DEBUG: Aucun compte trouvé avec detteAssocieeId: $detteId');
-      }
-    } catch (e) {
-      print('Erreur lors de la mise à jour du compte associé: $e');
-    }
-  }
-
-  Future<void> _supprimerCompteAssocie(String detteId) async {
-    try {
-      // Chercher le compte qui a cette dette comme detteAssocieeId
-      final comptesQuery = await FirebaseFirestore.instance
-          .collection('comptes')
-          .where('detteAssocieeId', isEqualTo: detteId)
-          .get();
-
-      if (comptesQuery.docs.isNotEmpty) {
-        final compteDoc = comptesQuery.docs.first;
-        final compteAssocieId = compteDoc.id;
-        final compteData = compteDoc.data() as Map<String, dynamic>;
-        final compteAutoCreated =
-            compteData['compteAutoCreated'] as bool? ??
-            true; // Par défaut true pour les comptes créés automatiquement
-
-        if (compteAutoCreated) {
-          // Supprimer complètement les comptes créés automatiquement
-          await FirebaseService().supprimerDocument('comptes', compteAssocieId);
-          print(
-            'DEBUG: Compte de dette automatique $compteAssocieId supprimé (dette soldée)',
-          );
-        } else {
-          // Pour les comptes créés manuellement, mettre le solde à 0 et nettoyer le nom
-          await _archiverCompteManuelAvecNettoyage(compteAssocieId);
-          print(
-            'DEBUG: Compte de dette manuel $compteAssocieId mis à jour (solde = 0, compte conservé)',
-          );
-        }
-      } else {
-        print('DEBUG: Aucun compte trouvé avec detteAssocieeId: $detteId');
-      }
-    } catch (e) {
-      print('Erreur lors de la gestion du compte associé: $e');
-    }
-  }
-
-  Future<void> _archiverCompteManuelAvecNettoyage(String compteId) async {
-    try {
-      // Récupérer les informations du compte
-      final compteDoc = await FirebaseFirestore.instance
-          .collection('comptes')
-          .doc(compteId)
-          .get();
-      if (!compteDoc.exists) return;
-
-      final compteData = compteDoc.data() as Map<String, dynamic>;
-      final nomActuel = compteData['nom'] as String? ?? '';
-
-      // Nettoyer le nom en enlevant le mot "emprunt"
-      String nomNettoye = nomActuel;
-      nomNettoye = nomNettoye
-          .replaceAll(RegExp(r'\bemprunt\b', caseSensitive: false), '')
-          .trim();
-      // Nettoyer les espaces multiples
-      nomNettoye = nomNettoye.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-      // Mettre à jour le compte avec le solde à 0 et le nom nettoyé
-      await FirebaseService().updateCompte(compteId, {
-        'solde': 0.0,
-        'nom': nomNettoye,
-      });
-
-      print(
-        'Compte manuel mis à jour: "$nomActuel" → "$nomNettoye" (solde = 0)',
-      );
-    } catch (e) {
-      print('Erreur lors du nettoyage du nom du compte manuel: $e');
     }
   }
 
@@ -262,28 +97,6 @@ class DetteService {
 
     // Archiver la dette
     await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
-
-    // Archiver le compte associé aussi
-    await _archiverCompteAssocie(detteId);
-  }
-
-  Future<void> _archiverCompteAssocie(String detteId) async {
-    try {
-      final detteDoc = await dettesRef.doc(detteId).get();
-      if (!detteDoc.exists) return;
-
-      final detteData = detteDoc.data() as Map<String, dynamic>;
-      final compteAssocieId = detteData['compteAssocie'] as String?;
-
-      if (compteAssocieId != null) {
-        await FirebaseService().updateCompte(compteAssocieId, {
-          'estArchive': true,
-          'dateSuppression': DateTime.now().toIso8601String(),
-        });
-      }
-    } catch (e) {
-      print('Erreur lors de l\'archivage du compte associé: $e');
-    }
   }
 
   Future<Dette?> getDette(String detteId) async {
@@ -552,13 +365,34 @@ class DetteService {
         'archive': true,
         'dateArchivage': Timestamp.now(),
       });
-
-      // Supprimer automatiquement le compte associé quand la dette est soldée
-      await _supprimerCompteAssocie(detteId);
     } else {
       await doc.update({'solde': nouveauSolde});
-      // Mettre à jour le solde du compte associé
-      await _mettreAJourCompteAssocie(detteId, nouveauSolde);
     }
+  }
+
+  Future<void> ajouterDette(Dette dette) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur connecté");
+
+    print(
+      'DEBUG: DetteService.ajouterDette appelé pour dette ID: ${dette.id}, nomTiers: ${dette.nomTiers}, type: ${dette.type}',
+    );
+
+    final detteAvecUser = Dette(
+      id: dette.id,
+      nomTiers: dette.nomTiers,
+      montantInitial: dette.montantInitial,
+      solde: dette.solde,
+      type: dette.type,
+      historique: dette.historique,
+      archive: dette.archive,
+      dateCreation: dette.dateCreation,
+      dateArchivage: dette.dateArchivage,
+      userId: user.uid,
+    );
+
+    // Créer la dette dans Firestore
+    await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
+    print('DEBUG: Dette sauvegardée dans Firestore: ${dette.id}');
   }
 }

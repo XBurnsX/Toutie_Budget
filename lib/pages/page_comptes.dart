@@ -3,8 +3,10 @@ import 'package:toutie_budget/pages/page_creation_compte.dart';
 import 'package:toutie_budget/pages/page_transactions_compte.dart';
 import 'package:toutie_budget/pages/page_modification_compte.dart';
 import 'package:toutie_budget/pages/page_reconciliation.dart';
-import 'package:toutie_budget/pages/page_pret_personnel.dart'; // Ajouter l'import pour la page prêt personnel
+import 'package:toutie_budget/pages/page_pret_personnel.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/dette_service.dart';
+import 'package:toutie_budget/models/dette.dart';
 
 import '../models/compte.dart';
 
@@ -20,15 +22,19 @@ class PageComptes extends StatelessWidget {
         final comptes = (snapshot.data ?? [])
             .where((c) => c.estArchive == false)
             .toList();
+
         // Séparation par type
         final cheques = comptes.where((c) => c.type == 'Chèque').toList();
         final credits = comptes
             .where((c) => c.type == 'Carte de crédit')
             .toList();
-        final dettes = comptes.where((c) => c.type == 'Dette').toList();
+        final dettesManuelles = comptes
+            .where((c) => c.type == 'Dette')
+            .toList();
         final investissements = comptes
             .where((c) => c.type == 'Investissement')
             .toList();
+
         return Column(
           children: [
             SizedBox(height: 45),
@@ -108,27 +114,59 @@ class PageComptes extends StatelessWidget {
                     ),
                     SizedBox(height: 24),
                   ],
-                  if (dettes.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Text(
-                        'Dettes',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ),
-                    ...dettes.map(
-                      (compte) =>
-                          _buildCompteCard(compte, Colors.red, context, false),
-                    ),
-                    SizedBox(height: 24),
-                  ],
+                  // Section Dettes - combine les dettes manuelles et les dettes de la collection dettes
+                  StreamBuilder<List<Dette>>(
+                    stream: DetteService().dettesActives(),
+                    builder: (context, dettesSnapshot) {
+                      final dettesActives = dettesSnapshot.data ?? [];
+                      // Filtrer pour n'afficher que les dettes contractées (pas les prêts accordés)
+                      final dettesContractees = dettesActives
+                          .where((d) => d.type == 'dette')
+                          .toList();
+                      final dettesAfficher = [
+                        ...dettesManuelles,
+                        ...dettesContractees,
+                      ];
+
+                      if (dettesAfficher.isNotEmpty) {
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8.0,
+                              ),
+                              child: Text(
+                                'Dettes',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                            ...dettesAfficher.map((item) {
+                              if (item is Compte) {
+                                // Dette manuelle (compte)
+                                return _buildCompteCard(
+                                  item,
+                                  Colors.red,
+                                  context,
+                                  false,
+                                );
+                              } else if (item is Dette) {
+                                // Dette de la collection dettes
+                                return _buildDetteCard(item, context);
+                              }
+                              return SizedBox.shrink();
+                            }),
+                            SizedBox(height: 24),
+                          ],
+                        );
+                      }
+                      return SizedBox.shrink();
+                    },
+                  ),
                   if (investissements.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -153,7 +191,7 @@ class PageComptes extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (comptes.isEmpty)
+                  if (comptes.isEmpty && (snapshot.data ?? []).isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(32.0),
                       child: Center(
@@ -179,10 +217,6 @@ class PageComptes extends StatelessWidget {
     bool isCheque,
   ) {
     final color = Color(compte.couleur);
-    // Détecter les comptes automatiques par leur nom et par detteAssocieeId
-    final isDetteAutomatique =
-        compte.type == 'Dette' &&
-        (compte.detteAssocieeId != null || compte.nom.startsWith("Prêt : "));
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -193,28 +227,16 @@ class PageComptes extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // Navigation différentielle selon le type de compte de dette
-            if (isDetteAutomatique) {
-              // Compte de dette automatique (créé via prêt personnel) -> Page prêt personnel
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PagePretPersonnel(),
-                ),
-              );
-            } else {
-              // Tous les autres comptes (y compris dettes manuelles) -> Page transactions du compte
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PageTransactionsCompte(compte: compte),
-                ),
-              );
-            }
+            // Navigation vers la page transactions du compte
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => PageTransactionsCompte(compte: compte),
+              ),
+            );
           },
           onLongPress: () {
-            // Menu CRUD pour tous les comptes (sauf dettes automatiques)
-            if (!isDetteAutomatique) {
-              _showCompteMenu(context, compte, isCheque);
-            }
+            // Menu CRUD pour tous les comptes
+            _showCompteMenu(context, compte, isCheque);
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -245,15 +267,6 @@ class PageComptes extends StatelessWidget {
                         compte.type,
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
-                      if (isDetteAutomatique)
-                        Text(
-                          'Géré via Prêts Personnels',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.orange[700],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -293,12 +306,7 @@ class PageComptes extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 8),
-                Icon(
-                  isDetteAutomatique
-                      ? Icons.account_balance
-                      : Icons.chevron_right,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.chevron_right, color: Colors.grey[400]),
               ],
             ),
           ),
@@ -406,6 +414,123 @@ class PageComptes extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildDetteCard(Dette dette, BuildContext context) {
+    final color = Colors.red; // Couleur rouge pour les dettes
+    final isDetteAutomatique =
+        true; // Toutes les dettes de la collection sont automatiques
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: 2,
+        color: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            // Navigation vers la page prêt personnel pour les dettes automatiques
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const PagePretPersonnel(),
+              ),
+            );
+          },
+          onLongPress: () {
+            // Pas de menu pour les dettes automatiques
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dette.type == 'dette'
+                            ? 'Dette à ${dette.nomTiers}'
+                            : 'Prêt à ${dette.nomTiers}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dette.type == 'dette'
+                            ? 'Dette contractée'
+                            : 'Prêt accordé',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      if (isDetteAutomatique)
+                        Text(
+                          'Géré via Prêts Personnels',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.orange[700],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      (dette.type == 'dette'
+                          ? '-${dette.solde.abs().toStringAsFixed(2)} \$'
+                          : '+${dette.solde.abs().toStringAsFixed(2)} \$'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: dette.type == 'dette'
+                            ? Colors.red[700]
+                            : Colors.green[700],
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Initial: '
+                        '${dette.type == 'dette' ? '-' : '+'}'
+                        '${dette.montantInitial.abs().toStringAsFixed(2)} \$',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.account_balance, color: Colors.grey[400]),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
