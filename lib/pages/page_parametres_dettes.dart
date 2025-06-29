@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:math' as math;
 import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
@@ -190,7 +189,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   child: TextFormField(
                     controller: _simulateurPrincipalController,
                     decoration: const InputDecoration(
-                      labelText: 'Prix d\'achat (\$4)',
+                      labelText: 'Prix d\'achat (\$)',
                       border: OutlineInputBorder(),
                     ),
                     readOnly: true,
@@ -268,7 +267,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         ),
                       if (_paiementCalcule != null)
                         Text(
-                          'Paiement mensuel: \$4${_paiementCalcule!.toStringAsFixed(2)}',
+                          'Paiement mensuel: \$${_paiementCalcule!.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -276,7 +275,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         ),
                       if (_coutTotalCalcule != null)
                         Text(
-                          'Coût total: \$4${_coutTotalCalcule!.toStringAsFixed(2)}',
+                          'Coût total: \$${_coutTotalCalcule!.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -284,7 +283,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         ),
                       if (_soldeRestantCalcule != null)
                         Text(
-                          'Solde restant: \$4${_soldeRestantCalcule!.toStringAsFixed(2)}',
+                          'Solde restant: \$${_soldeRestantCalcule!.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -412,9 +411,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       child: TextFormField(
                         controller: _prixAchatController,
                         decoration: const InputDecoration(
-                          labelText: 'Prix d\'achat',
+                          labelText: 'Prix d\'achat (\$)',
                           border: OutlineInputBorder(),
-                          suffixText: '\$24',
+                          suffixText: '\$ ',
                         ),
                         readOnly: true,
                         onTap: () => _ouvrirClavierNumerique(
@@ -477,7 +476,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         decoration: const InputDecoration(
                           labelText: 'Paiement mensuel',
                           border: OutlineInputBorder(),
-                          suffixText: '\$24',
+                          suffixText: '\$',
                         ),
                         readOnly: true,
                         onTap: () => _ouvrirClavierNumerique(
@@ -563,7 +562,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   Widget _buildCalculsAutomatiques() {
-    print('DEBUG: _buildCalculsAutomatiques appelée');
     final prixAchat = double.tryParse(_prixAchatController.text);
     final tauxInteret = double.tryParse(_tauxController.text);
     final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
@@ -571,9 +569,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     final paiementMensuelSaisi = double.tryParse(
       _montantMensuelController.text,
     );
-    print(
-      'DEBUG: prixAchat=$prixAchat, tauxInteret=$tauxInteret, nombrePaiements=$nombrePaiements, paiementsEffectues=$paiementsEffectues, paiementMensuelSaisi=$paiementMensuelSaisi, _afficherResultatsCalcul=$_afficherResultatsCalcul',
-    );
+
     double? montantMensuel;
     double? coutTotal;
     double? soldeRestant;
@@ -583,7 +579,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         prixAchat != null &&
         tauxInteret != null &&
         nombrePaiements != null) {
-      print('DEBUG: Bloc principal exécuté');
       montantMensuel = CalculPretService.calculerPaiementMensuel(
         principal: prixAchat,
         tauxAnnuel: tauxInteret,
@@ -594,18 +589,13 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         dureeMois: nombrePaiements,
       );
       if (paiementsEffectues != null && paiementMensuelSaisi != null) {
-        print('DEBUG: Bloc soldeRestant contrat exécuté');
         final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
         soldeRestant =
             coutTotal! - (paiementMensuelEffectif * paiementsEffectues);
-        print(
-          'DEBUG SOLDE CONTRAT: coutTotal=$coutTotal, paiementMensuel=$paiementMensuelEffectif, paiementsEffectues=$paiementsEffectues, soldeRestant=$soldeRestant',
-        );
         final totalPaye = paiementMensuelEffectif * paiementsEffectues;
         final capitalRembourse = prixAchat - (soldeRestant ?? 0);
         interetsPayes = totalPaye - capitalRembourse;
       } else if (paiementsEffectues != null) {
-        print('DEBUG: Bloc else if exécuté');
         soldeRestant = CalculPretService.calculerSoldeRestant(
           principal: prixAchat,
           tauxAnnuel: tauxInteret,
@@ -678,10 +668,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                 nombrePaiements != null) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
-                child: Text(
-                  'DEBUG: prixAchat=$prixAchat, tauxInteret=$tauxInteret, paiementMensuel=$paiementMensuelSaisi, paiementsEffectues=$paiementsEffectues',
-                  style: const TextStyle(fontSize: 12, color: Colors.orange),
-                ),
+                child: SizedBox.shrink(),
               ),
               if (paiementMensuelSaisi != null)
                 _buildResultatCalcul(
