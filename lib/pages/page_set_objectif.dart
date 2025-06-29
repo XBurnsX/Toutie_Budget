@@ -61,6 +61,11 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
             _controller.text = '';
           });
         },
+        onValueChanged: (value) {
+          setState(() {
+            // Mettre à jour l'affichage en temps réel
+          });
+        },
         showDecimal: true,
       ),
     );

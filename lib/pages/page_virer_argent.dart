@@ -177,7 +177,10 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
     if (montant.isEmpty || source == null || destination == null) return false;
     if (source == destination) return false;
     final double montantDouble =
-        double.tryParse(montant.replaceAll(',', '.')) ?? 0;
+        double.tryParse(
+          montant.replaceAll('\$', '').replaceAll(' ', '').replaceAll(',', '.'),
+        ) ??
+        0;
     if (montantDouble <= 0) return false;
     if (source is Compte) {
       return source.pretAPlacer >= montantDouble;
@@ -460,6 +463,13 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                       child: NumericKeyboard(
                         controller: TextEditingController(text: montant),
                         onClear: effacerTout,
+                        onValueChanged: (value) {
+                          setState(() {
+                            montant = value
+                                .replaceAll('\$', '')
+                                .replaceAll(' ', '');
+                          });
+                        },
                         showDecimal: true,
                       ),
                     ),
@@ -496,7 +506,10 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                               final argentService = ArgentService();
                               final double montantDouble =
                                   double.tryParse(
-                                    montant.replaceAll(',', '.'),
+                                    montant
+                                        .replaceAll('\$', '')
+                                        .replaceAll(' ', '')
+                                        .replaceAll(',', '.'),
                                   ) ??
                                   0;
 

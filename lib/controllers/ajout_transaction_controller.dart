@@ -48,23 +48,14 @@ class AjoutTransactionController extends ChangeNotifier {
   bool get estValide {
     // Améliorer le parsing du montant pour accepter différents formats
     String montantTexte = montantController.text.trim();
-    print(
-      'DEBUG: Validation - montantController.text: "${montantController.text}"',
-    );
-    print('DEBUG: Validation - montantTexte initial: "$montantTexte"');
-
     if (montantTexte.isEmpty ||
         montantTexte == '0.00' ||
         montantTexte == '0.00 \$') {
       montantTexte = '0';
-      print(
-        'DEBUG: Validation - montantTexte après condition: "$montantTexte"',
-      );
     }
 
     // Nettoyer le symbole $ et les espaces
     montantTexte = montantTexte.replaceAll('\$', '').replaceAll(' ', '');
-    print('DEBUG: Validation - montantTexte après nettoyage: "$montantTexte"');
 
     // Remplacer les virgules par des points et nettoyer le texte
     montantTexte = montantTexte.replaceAll(',', '.');
@@ -229,9 +220,15 @@ class AjoutTransactionController extends ChangeNotifier {
     if (!estValide) return false;
 
     try {
-      final montant =
-          double.tryParse(montantController.text.replaceAll(',', '.')) ?? 0.0;
+      // Nettoyer le montant du symbole $ et des espaces
+      String montantTexte = montantController.text.trim();
+      montantTexte = montantTexte.replaceAll('\$', '').replaceAll(' ', '');
+      final montant = double.tryParse(montantTexte.replaceAll(',', '.')) ?? 0.0;
+
       final tiersTexte = payeController.text.trim();
+      print('DEBUG: Validation - tiersTexte: "$tiersTexte"');
+      print('DEBUG: Validation - _compteSelectionne: $_compteSelectionne');
+
       final compte = _comptesFirebase.firstWhere(
         (c) => c.id == _compteSelectionne,
       );

@@ -384,10 +384,16 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
 
   // --- MÉTHODES POUR LE FRACTIONNEMENT ---
   void _ouvrirModaleFractionnement() async {
-    final double montant =
-        double.tryParse(_montantController.text.replaceAll(',', '.')) ?? 0.0;
+    final double montantDouble =
+        double.tryParse(
+          _montantController.text
+              .replaceAll('\$', '')
+              .replaceAll(' ', '')
+              .replaceAll(',', '.'),
+        ) ??
+        0.0;
 
-    if (montant <= 0) {
+    if (montantDouble <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez d\'abord entrer un montant valide.'),
@@ -415,7 +421,9 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
       }
     }
 
-    print('DEBUG: showModalBottomSheet - montant = ' + montant.toString());
+    print(
+      'DEBUG: showModalBottomSheet - montant = ' + montantDouble.toString(),
+    );
     print(
       'DEBUG: showModalBottomSheet - enveloppes = ' +
           toutesEnveloppes.length.toString(),
@@ -429,7 +437,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
         return SizedBox(
           height: MediaQuery.of(context).size.height * 0.8,
           child: ModaleFractionnement(
-            montantTotal: montant,
+            montantTotal: montantDouble,
             enveloppes: toutesEnveloppes,
             onConfirmer: (TransactionFractionnee transactionFractionnee) {
               print('DEBUG: onConfirmer appelé dans ModaleFractionnement');
@@ -659,6 +667,11 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
         controller: _montantController,
         onClear: () {
           setState(() => _montantController.text = '0.00');
+        },
+        onValueChanged: (value) {
+          setState(() {
+            // Mettre à jour l'affichage en temps réel
+          });
         },
         showDecimal: true,
       ),
@@ -1278,13 +1291,16 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                               _enveloppeSelectionnee!.isEmpty)))
                   ? null // Désactive le bouton si la condition n'est pas remplie
                   : () async {
-                      final double montant =
+                      final double montantDouble =
                           double.tryParse(
-                            _montantController.text.replaceAll(',', '.'),
+                            _montantController.text
+                                .replaceAll('\$', '')
+                                .replaceAll(' ', '')
+                                .replaceAll(',', '.'),
                           ) ??
                           0.0;
                       final String tiersTexte = _payeController.text.trim();
-                      if (montant <= 0) {
+                      if (montantDouble <= 0) {
                         if (mounted)
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -1361,7 +1377,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                             userId: user?.uid ?? '',
                             type: _typeSelectionne,
                             typeMouvement: _typeMouvementSelectionne,
-                            montant: montant,
+                            montant: montantDouble,
                             tiers: tiersTexte,
                             compteId: compte.id,
                             compteDePassifAssocie: null,
@@ -1414,7 +1430,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                                       .pretAccorde) {
                             await _creerDetteViaDettesService(
                               tiersTexte,
-                              montant,
+                              montantDouble,
                               _typeMouvementSelectionne,
                             );
                           }
@@ -1430,7 +1446,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                                       .remboursementEffectue) {
                             await _traiterRemboursementViaDettesService(
                               tiersTexte,
-                              montant,
+                              montantDouble,
                               _typeMouvementSelectionne,
                               transactionId,
                             );
@@ -1441,7 +1457,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                             userId: user?.uid ?? '',
                             type: _typeSelectionne,
                             typeMouvement: _typeMouvementSelectionne,
-                            montant: montant,
+                            montant: montantDouble,
                             tiers: tiersTexte,
                             compteId: compte.id,
                             compteDePassifAssocie:

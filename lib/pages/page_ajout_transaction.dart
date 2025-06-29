@@ -63,11 +63,12 @@ class _EcranAjoutTransactionRefactoredState
   }
 
   void _ouvrirModaleFractionnement() async {
+    // Nettoyer le montant du symbole $ et des espaces
+    String montantTexte = _controller.montantController.text.trim();
+    montantTexte = montantTexte.replaceAll('\$', '').replaceAll(' ', '');
+
     final double montant =
-        double.tryParse(
-          _controller.montantController.text.replaceAll(',', '.'),
-        ) ??
-        0.0;
+        double.tryParse(montantTexte.replaceAll(',', '.')) ?? 0.0;
 
     if (montant <= 0) {
       if (mounted) {
@@ -189,78 +190,109 @@ class _EcranAjoutTransactionRefactoredState
         appBar: AppBar(title: const Text('Ajouter Transaction')),
         body: Consumer<AjoutTransactionController>(
           builder: (context, controller, child) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: <Widget>[
-                  // Sélecteur de type de transaction
-                  SelecteurTypeTransaction(
-                    typeSelectionne: controller.typeSelectionne,
-                    typeMouvementSelectionne:
-                        controller.typeMouvementSelectionne,
-                    onTypeChanged: (type, typeMouvement) {
-                      controller.setTypeTransaction(type);
-                      controller.setTypeMouvement(typeMouvement);
-                    },
+            return Column(
+              children: <Widget>[
+                // Contenu principal avec scroll
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: <Widget>[
+                        // Sélecteur de type de transaction
+                        SelecteurTypeTransaction(
+                          typeSelectionne: controller.typeSelectionne,
+                          typeMouvementSelectionne:
+                              controller.typeMouvementSelectionne,
+                          onTypeChanged: (type, typeMouvement) {
+                            controller.setTypeTransaction(type);
+                            controller.setTypeMouvement(typeMouvement);
+                          },
+                        ),
+
+                        // Champ montant
+                        ChampMontant(
+                          controller: controller.montantController,
+                          estFractionnee: controller.estFractionnee,
+                          onFractionnementSupprime: () =>
+                              controller.setFractionnement(null),
+                          onMontantChange: () {
+                            // Déclencher la validation du contrôleur
+                            controller.notifyListeners();
+                          },
+                        ),
+
+                        // Section informations clés
+                        SectionInformationsCles(
+                          typeMouvementSelectionne:
+                              controller.typeMouvementSelectionne,
+                          payeController: controller.payeController,
+                          listeTiersConnus: controller.listeTiersConnus,
+                          onTiersAjoute: controller.ajouterNouveauTiers,
+                          compteSelectionne: controller.compteSelectionne,
+                          listeComptesAffichables:
+                              controller.listeComptesAffichables,
+                          onCompteChanged: controller.setCompteSelectionne,
+                          enveloppeSelectionnee:
+                              controller.enveloppeSelectionnee,
+                          categoriesFirebase: controller.categoriesFirebase,
+                          comptesFirebase: controller.listeComptesAffichables,
+                          typeSelectionne: controller.typeSelectionne,
+                          onEnveloppeChanged:
+                              controller.setEnveloppeSelectionnee,
+                          getCouleurCompteEnveloppe: _getCouleurCompteEnveloppe,
+                          dateSelectionnee: controller.dateSelectionnee,
+                          onDateChanged: controller.setDateSelectionnee,
+                          marqueurSelectionne: controller.marqueurSelectionne,
+                          onMarqueurChanged: controller.setMarqueurSelectionne,
+                          noteController: controller.noteController,
+                          onTypeMouvementChanged: controller.setTypeMouvement,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Section fractionnement (affichage seulement)
+                        if (controller.estFractionnee)
+                          SectionFractionnement(
+                            estFractionnee: controller.estFractionnee,
+                            transactionFractionnee:
+                                controller.transactionFractionnee,
+                            onSupprimerFractionnement: () =>
+                                controller.setFractionnement(null),
+                            onOuvrirModaleFractionnement:
+                                _ouvrirModaleFractionnement,
+                          ),
+
+                        // Espace en bas pour éviter que le contenu soit caché par le bouton
+                        const SizedBox(height: 60),
+                      ],
+                    ),
                   ),
+                ),
 
-                  // Champ montant
-                  ChampMontant(
-                    controller: controller.montantController,
-                    estFractionnee: controller.estFractionnee,
-                    onFractionnementSupprime: () =>
-                        controller.setFractionnement(null),
-                    onMontantChange: () {
-                      // Déclencher la validation du contrôleur
-                      controller.notifyListeners();
-                    },
+                // Bouton sauvegarder fixe en bas
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
                   ),
-
-                  // Section informations clés
-                  SectionInformationsCles(
-                    typeMouvementSelectionne:
-                        controller.typeMouvementSelectionne,
-                    payeController: controller.payeController,
-                    listeTiersConnus: controller.listeTiersConnus,
-                    onTiersAjoute: controller.ajouterNouveauTiers,
-                    compteSelectionne: controller.compteSelectionne,
-                    listeComptesAffichables: controller.listeComptesAffichables,
-                    onCompteChanged: controller.setCompteSelectionne,
-                    enveloppeSelectionnee: controller.enveloppeSelectionnee,
-                    categoriesFirebase: controller.categoriesFirebase,
-                    comptesFirebase: controller.listeComptesAffichables,
-                    typeSelectionne: controller.typeSelectionne,
-                    onEnveloppeChanged: controller.setEnveloppeSelectionnee,
-                    getCouleurCompteEnveloppe: _getCouleurCompteEnveloppe,
-                    dateSelectionnee: controller.dateSelectionnee,
-                    onDateChanged: controller.setDateSelectionnee,
-                    marqueurSelectionne: controller.marqueurSelectionne,
-                    onMarqueurChanged: controller.setMarqueurSelectionne,
-                    noteController: controller.noteController,
-                    onTypeMouvementChanged: controller.setTypeMouvement,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Section fractionnement
-                  SectionFractionnement(
-                    estFractionnee: controller.estFractionnee,
-                    transactionFractionnee: controller.transactionFractionnee,
-                    onSupprimerFractionnement: () =>
-                        controller.setFractionnement(null),
-                    onOuvrirModaleFractionnement: _ouvrirModaleFractionnement,
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  // Bouton sauvegarder
-                  BoutonSauvegarder(
+                  child: BoutonSauvegarder(
                     estValide: controller.estValide,
                     onSauvegarder: _sauvegarderTransaction,
                     isLoading: _isLoading,
+                    onFractionner: controller.estFractionnee
+                        ? null
+                        : _ouvrirModaleFractionnement,
+                    estFractionnee: controller.estFractionnee,
                   ),
-                ],
-              ),
+                ),
+              ],
             );
           },
         ),

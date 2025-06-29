@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/compte.dart';
 import '../models/transaction_model.dart' as app_model;
 import '../services/firebase_service.dart';
+import '../widgets/numeric_keyboard.dart';
 
 /// Page de réconciliation bancaire
 class PageReconciliation extends StatefulWidget {
@@ -36,15 +37,52 @@ class _PageReconciliationState extends State<PageReconciliation> {
     }
   }
 
+  void _ouvrirClavierNumerique() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => NumericKeyboard(
+        controller: _soldeReelController,
+        onClear: () {
+          setState(() {
+            _soldeReelController.text = '';
+            _soldeReel = null;
+            _showEcart = false;
+          });
+        },
+        onValueChanged: (value) {
+          setState(() {
+            _soldeReel = double.tryParse(
+              value.replaceAll('\$', '').replaceAll(' ', ''),
+            );
+            if (_soldeReel != null) {
+              _calculerEcart();
+            } else {
+              _showEcart = false;
+            }
+          });
+        },
+        showDecimal: true,
+      ),
+    );
+  }
+
   Future<void> _creerTransactionAjustement() async {
     if (_ecart == null || _ecart == 0) return;
 
-    final transactionId = FirebaseService().firestore.collection('transactions').doc().id;
+    final transactionId = FirebaseService().firestore
+        .collection('transactions')
+        .doc()
+        .id;
     final transaction = app_model.Transaction(
       id: transactionId,
       userId: '', // Sera rempli par FirebaseService
-      type: _ecart! > 0 ? app_model.TypeTransaction.revenu : app_model.TypeTransaction.depense,
-      typeMouvement: _ecart! > 0 ? app_model.TypeMouvementFinancier.revenuNormal : app_model.TypeMouvementFinancier.depenseNormale,
+      type: _ecart! > 0
+          ? app_model.TypeTransaction.revenu
+          : app_model.TypeTransaction.depense,
+      typeMouvement: _ecart! > 0
+          ? app_model.TypeMouvementFinancier.revenuNormal
+          : app_model.TypeMouvementFinancier.depenseNormale,
       montant: _ecart!.abs(),
       compteId: widget.compte.id,
       date: DateTime.now(),
@@ -52,7 +90,8 @@ class _PageReconciliationState extends State<PageReconciliation> {
       compteDePassifAssocie: '',
       enveloppeId: '',
       marqueur: '',
-      note: 'Ajustement automatique lors de la réconciliation du ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+      note:
+          'Ajustement automatique lors de la réconciliation du ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
     );
 
     await FirebaseService().ajouterTransaction(transaction);
@@ -69,7 +108,9 @@ class _PageReconciliationState extends State<PageReconciliation> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Réconciliation terminée. Transaction d\'ajustement créée.'),
+          content: Text(
+            'Réconciliation terminée. Transaction d\'ajustement créée.',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -80,9 +121,7 @@ class _PageReconciliationState extends State<PageReconciliation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Réconciliation'),
-      ),
+      appBar: AppBar(title: const Text('Réconciliation')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -104,7 +143,10 @@ class _PageReconciliationState extends State<PageReconciliation> {
                         children: [
                           Text(
                             'Compte : ${widget.compte.nom}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -119,30 +161,44 @@ class _PageReconciliationState extends State<PageReconciliation> {
                   const SizedBox(height: 24),
 
                   // Solde réel
-                  TextFormField(
-                    controller: _soldeReelController,
-                    decoration: const InputDecoration(
-                      labelText: 'Solde réel sur le relevé bancaire',
-                      border: OutlineInputBorder(),
-                      suffixText: '\$',
-                      helperText: 'Saisissez le solde tel qu\'il apparaît sur votre relevé',
+                  GestureDetector(
+                    onTap: () => _ouvrirClavierNumerique(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Solde réel sur le relevé bancaire',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _soldeReelController.text.isEmpty
+                                      ? '0.00'
+                                      : _soldeReelController.text,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Text('\$', style: TextStyle(fontSize: 16)),
+                        ],
+                      ),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return 'Veuillez entrer le solde réel';
-                      if (double.tryParse(value) == null) return 'Veuillez entrer un nombre valide';
-                      return null;
-                    },
-                    onChanged: (value) {
-                      _soldeReel = double.tryParse(value);
-                      if (_soldeReel != null) {
-                        _calculerEcart();
-                      } else {
-                        setState(() {
-                          _showEcart = false;
-                        });
-                      }
-                    },
                   ),
 
                   const SizedBox(height: 24),
@@ -150,18 +206,24 @@ class _PageReconciliationState extends State<PageReconciliation> {
                   // Affichage de l'écart
                   if (_showEcart) ...[
                     Card(
-                      color: _ecart == 0 ? Colors.green.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
+                      color: _ecart == 0
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : Colors.orange.withValues(alpha: 0.2),
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _ecart == 0 ? '✅ Comptes réconciliés' : '⚠️ Écart détecté',
+                              _ecart == 0
+                                  ? '✅ Comptes réconciliés'
+                                  : '⚠️ Écart détecté',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: _ecart == 0 ? Colors.green : Colors.orange,
+                                color: _ecart == 0
+                                    ? Colors.green
+                                    : Colors.orange,
                               ),
                             ),
                             if (_ecart != 0) ...[
@@ -172,9 +234,12 @@ class _PageReconciliationState extends State<PageReconciliation> {
                               ),
                               Text(
                                 _ecart! > 0
-                                  ? 'La réconciliation montre un solde supérieur'
-                                  : 'La réconciliation montre un solde inférieur',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                    ? 'La réconciliation montre un solde supérieur'
+                                    : 'La réconciliation montre un solde inférieur',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[400],
+                                ),
                               ),
                             ],
                           ],
@@ -190,9 +255,22 @@ class _PageReconciliationState extends State<PageReconciliation> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
+                            if (_soldeReel == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Veuillez saisir le solde réel',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Réconciliation terminée. Aucun ajustement nécessaire.'),
+                                content: Text(
+                                  'Réconciliation terminée. Aucun ajustement nécessaire.',
+                                ),
                                 backgroundColor: Colors.green,
                               ),
                             );
@@ -210,10 +288,23 @@ class _PageReconciliationState extends State<PageReconciliation> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () async {
+                            if (_soldeReel == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Veuillez saisir le solde réel',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (context) => AlertDialog(
-                                title: const Text('Créer une transaction d\'ajustement'),
+                                title: const Text(
+                                  'Créer une transaction d\'ajustement',
+                                ),
                                 content: Text(
                                   'Une transaction d\'ajustement de ${_ecart!.toStringAsFixed(2)} \$ '
                                   'sera créée pour réconcilier les comptes.\n\n'
@@ -221,11 +312,13 @@ class _PageReconciliationState extends State<PageReconciliation> {
                                 ),
                                 actions: [
                                   TextButton(
-                                    onPressed: () => Navigator.pop(context, false),
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
                                     child: const Text('Annuler'),
                                   ),
                                   ElevatedButton(
-                                    onPressed: () => Navigator.pop(context, true),
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
                                     child: const Text('Confirmer'),
                                   ),
                                 ],
@@ -240,7 +333,9 @@ class _PageReconciliationState extends State<PageReconciliation> {
                             backgroundColor: Colors.orange,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
-                          child: const Text('Créer une transaction d\'ajustement'),
+                          child: const Text(
+                            'Créer une transaction d\'ajustement',
+                          ),
                         ),
                       ),
                   ],

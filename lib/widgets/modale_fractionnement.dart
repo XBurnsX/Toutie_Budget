@@ -107,9 +107,11 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   }
 
   void _mettreAJourMontantInput(int index, String value) {
+    // Nettoyer le montant du symbole $ et des espaces
+    String montantTexte = value.replaceAll('\$', '').replaceAll(' ', '');
+    final montant = double.tryParse(montantTexte.replaceAll(',', '.')) ?? 0.0;
     setState(() {
       _montantInputs[index] = value;
-      final montant = double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
       _mettreAJourSousItem(index, montant: montant);
     });
   }
@@ -214,7 +216,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                     onTap: () => _ouvrirClavierNumerique(index),
                     child: InputDecorator(
                       decoration: const InputDecoration(
-                        labelText: 'Montant (\$)',
+                        labelText: 'Montant (\$)',
                         border: OutlineInputBorder(),
                         isDense: true,
                         contentPadding: EdgeInsets.symmetric(
@@ -226,7 +228,10 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                         montantInput.isEmpty
                             ? '0.00'
                             : double.tryParse(
-                                    montantInput.replaceAll(',', '.'),
+                                    montantInput
+                                        .replaceAll('\$', '')
+                                        .replaceAll(' ', '')
+                                        .replaceAll(',', '.'),
                                   )?.toStringAsFixed(2) ??
                                   montantInput,
                         style: const TextStyle(

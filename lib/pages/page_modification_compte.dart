@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../models/compte.dart';
 import '../services/firebase_service.dart';
+import '../widgets/numeric_keyboard.dart';
 
 /// Page de modification d'un compte existant
 class PageModificationCompte extends StatefulWidget {
   final Compte compte;
 
-  const PageModificationCompte({Key? key, required this.compte}) : super(key: key);
+  const PageModificationCompte({Key? key, required this.compte})
+    : super(key: key);
 
   @override
   State<PageModificationCompte> createState() => _PageModificationCompteState();
@@ -20,6 +22,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
   late double _solde;
   late double _pretAPlacer;
   late Color _couleur;
+  final _soldeController = TextEditingController();
 
   final List<String> _types = [
     'Chèque',
@@ -36,11 +39,44 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
     _solde = widget.compte.solde;
     _pretAPlacer = widget.compte.pretAPlacer;
     _couleur = Color(widget.compte.couleur);
+    _soldeController.text = _solde.toStringAsFixed(2);
   }
 
   void _calculerPretAPlacer() {
     // Calcul automatique : nouveau prêt à placer = ancien prêt à placer + (nouveau solde - ancien solde)
     _pretAPlacer = widget.compte.pretAPlacer + (_solde - widget.compte.solde);
+  }
+
+  void _ouvrirClavierNumerique() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => NumericKeyboard(
+        controller: _soldeController,
+        onClear: () {
+          setState(() {
+            _soldeController.text = '';
+            _solde = 0.0;
+          });
+        },
+        onValueChanged: (value) {
+          setState(() {
+            _solde =
+                double.tryParse(
+                  value.replaceAll('\$', '').replaceAll(' ', ''),
+                ) ??
+                0.0;
+          });
+        },
+        showDecimal: true,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _soldeController.dispose();
+    super.dispose();
   }
 
   @override
@@ -53,18 +89,24 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
             icon: const Icon(Icons.check),
             tooltip: 'Valider',
             onPressed: () async {
-              if (_formKey.currentState!.validate()) {
-                _formKey.currentState!.save();
-                _calculerPretAPlacer(); // Calcul automatique avant sauvegarde
-                await FirebaseService().updateCompte(widget.compte.id, {
-                  'nom': _nom,
-                  'type': _type,
-                  'solde': _solde,
-                  'pretAPlacer': _pretAPlacer,
-                  'couleur': _couleur.value,
-                });
-                Navigator.of(context).pop();
+              if (_nom.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Veuillez entrer un nom'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
               }
+              _calculerPretAPlacer(); // Calcul automatique avant sauvegarde
+              await FirebaseService().updateCompte(widget.compte.id, {
+                'nom': _nom,
+                'type': _type,
+                'solde': _solde,
+                'pretAPlacer': _pretAPlacer,
+                'couleur': _couleur.value,
+              });
+              Navigator.of(context).pop();
             },
           ),
         ],
@@ -82,7 +124,9 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                   labelText: 'Nom du compte',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Veuillez entrer un nom' : null,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Veuillez entrer un nom'
+                    : null,
                 onSaved: (value) => _nom = value ?? '',
               ),
               const SizedBox(height: 16),
@@ -92,10 +136,12 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                   labelText: 'Type de compte',
                   border: OutlineInputBorder(),
                 ),
-                items: _types.map((type) => DropdownMenuItem(
-                  value: type,
-                  child: Text(type),
-                )).toList(),
+                items: _types
+                    .map(
+                      (type) =>
+                          DropdownMenuItem(value: type, child: Text(type)),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   setState(() {
                     _type = value ?? 'Chèque';
@@ -103,20 +149,44 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                initialValue: _solde.toString(),
-                decoration: const InputDecoration(
-                  labelText: 'Solde',
-                  border: OutlineInputBorder(),
-                  suffixText: '\$',
+              GestureDetector(
+                onTap: () => _ouvrirClavierNumerique(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Solde',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _soldeController.text.isEmpty
+                                  ? '0.00'
+                                  : _soldeController.text,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Text('\$', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Veuillez entrer un solde';
-                  if (double.tryParse(value) == null) return 'Veuillez entrer un nombre valide';
-                  return null;
-                },
-                onSaved: (value) => _solde = double.tryParse(value ?? '0') ?? 0,
               ),
               const SizedBox(height: 16),
               // Section "Prêt à placer" supprimée - plus affichée dans l'interface
@@ -129,7 +199,10 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Couleur du compte', style: TextStyle(fontSize: 16)),
+                    const Text(
+                      'Couleur du compte',
+                      style: TextStyle(fontSize: 16),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -152,7 +225,8 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                                 content: SingleChildScrollView(
                                   child: ColorPicker(
                                     pickerColor: _couleur,
-                                    onColorChanged: (color) => setState(() => _couleur = color),
+                                    onColorChanged: (color) =>
+                                        setState(() => _couleur = color),
                                   ),
                                 ),
                                 actions: [
