@@ -5,6 +5,7 @@ class NumericKeyboard extends StatefulWidget {
   final VoidCallback? onClear;
   final bool showDecimal;
   final Function(String)? onValueChanged;
+  final VoidCallback? onDone;
 
   const NumericKeyboard({
     super.key,
@@ -12,6 +13,7 @@ class NumericKeyboard extends StatefulWidget {
     this.onClear,
     this.showDecimal = true,
     this.onValueChanged,
+    this.onDone,
   });
 
   @override
@@ -21,13 +23,9 @@ class NumericKeyboard extends StatefulWidget {
 class _NumericKeyboardState extends State<NumericKeyboard> {
   void _onKeyTap(String key) {
     String currentText = widget.controller.text;
-    // Nettoyer le symbole $ et les espaces du texte actuel, sauf si c'est exactement "0.00 $"
     if (currentText != '0.00 \$') {
       currentText = currentText.replaceAll('\$', '').replaceAll(' ', '');
     }
-    print('DEBUG: _onKeyTap - key: $key, currentText: $currentText');
-
-    // Si c'est le premier chiffre ou si on est à 0.00
     if (currentText == '0.00' ||
         currentText == '0.00 \$' ||
         currentText.isEmpty) {
@@ -36,105 +34,122 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
       } else {
         widget.controller.text = '0.0$key \$';
       }
-      print('DEBUG: Premier chiffre - result: ${widget.controller.text}');
     } else if (key == '-') {
-      // Gérer le signe moins
       if (currentText.startsWith('-')) {
-        // Si déjà négatif, enlever le signe moins
-        widget.controller.text = currentText.substring(1) + ' \$';
+        widget.controller.text = '${currentText.substring(1)} \$';
       } else {
-        // Si positif, ajouter le signe moins
         widget.controller.text = '-$currentText \$';
       }
-      print('DEBUG: Signe moins - result: ${widget.controller.text}');
     } else {
-      // Logique de calculatrice : décaler vers la gauche
       bool isNegative = currentText.startsWith('-');
-      String positiveText = isNegative ? currentText.substring(1) : currentText;
+      String positiveText =
+          (isNegative ? currentText.substring(1) : currentText).replaceAll(
+            '.',
+            '',
+          );
 
-      if (positiveText.contains('.')) {
-        List<String> parts = positiveText.split('.');
-        if (parts.length == 2) {
-          // Décaler tous les chiffres vers la gauche
-          String newText = parts[0] + parts[1] + key;
+      String newText = positiveText + key;
 
-          // Si on a 3 chiffres ou plus, insérer le point décimal avant les 2 derniers
-          if (newText.length >= 3) {
-            String partieEntiere = newText.substring(0, newText.length - 2);
-            String partieDecimale = newText.substring(newText.length - 2);
-            // Supprimer les zéros en tête
-            while (partieEntiere.startsWith('0') && partieEntiere.length > 1) {
-              partieEntiere = partieEntiere.substring(1);
-            }
-            String result = '$partieEntiere.$partieDecimale \$';
-            widget.controller.text = isNegative ? '-$result' : result;
-          } else {
-            // Moins de 3 chiffres, ajouter 0. devant
-            String result = '0.$newText \$';
-            widget.controller.text = isNegative ? '-$result' : result;
-          }
-        }
-      } else {
-        // Pas de point décimal, ajouter le chiffre
-        String newText = positiveText + key;
-        if (newText.length >= 3) {
-          String partieEntiere = newText.substring(0, newText.length - 2);
-          String partieDecimale = newText.substring(newText.length - 2);
-          // Supprimer les zéros en tête
-          while (partieEntiere.startsWith('0') && partieEntiere.length > 1) {
-            partieEntiere = partieEntiere.substring(1);
-          }
-          String result = '$partieEntiere.$partieDecimale \$';
-          widget.controller.text = isNegative ? '-$result' : result;
-        } else {
-          String result = '0.$newText \$';
-          widget.controller.text = isNegative ? '-$result' : result;
-        }
+      while (newText.length > 1 && newText.startsWith('0')) {
+        newText = newText.substring(1);
       }
-      print(
-        'DEBUG: Décalage vers la gauche - result: ${widget.controller.text}',
-      );
-    }
 
+      if (newText.length < 3) {
+        newText = newText.padLeft(3, '0');
+      }
+
+      String partieEntiere = newText.substring(0, newText.length - 2);
+      String partieDecimale = newText.substring(newText.length - 2);
+
+      String result = '$partieEntiere.$partieDecimale \$';
+      widget.controller.text = isNegative ? '-$result' : result;
+    }
     widget.controller.selection = TextSelection.fromPosition(
       TextPosition(offset: widget.controller.text.length),
     );
-
-    // Appeler le callback si fourni
     widget.onValueChanged?.call(widget.controller.text);
   }
 
+  // AMÉLIORATION: Gestion plus robuste du backspace
   void _onBackspace() {
-    final text = widget.controller.text;
-    if (text.length > 1) {
-      widget.controller.text = text.substring(0, text.length - 1);
+    String currentText = widget.controller.text
+        .replaceAll('\$', '')
+        .replaceAll(' ', '');
+
+    bool isNegative = currentText.startsWith('-');
+    String positiveText = (isNegative ? currentText.substring(1) : currentText)
+        .replaceAll('.', '');
+
+    if (positiveText.length > 1) {
+      positiveText = positiveText.substring(0, positiveText.length - 1);
     } else {
-      widget.controller.text = '0.00';
+      positiveText = '0';
+    }
+
+    // On reformate comme pour _onKeyTap
+    if (positiveText.length < 3) {
+      positiveText = positiveText.padLeft(3, '0');
+    }
+
+    String partieEntiere = positiveText.substring(0, positiveText.length - 2);
+    String partieDecimale = positiveText.substring(positiveText.length - 2);
+    String result = '$partieEntiere.$partieDecimale \$';
+
+    // On ne remet le signe négatif que si la valeur n'est pas "0.00"
+    if (isNegative && result != '0.00 \$') {
+      widget.controller.text = '-$result';
+    } else {
+      widget.controller.text = result;
     }
 
     widget.controller.selection = TextSelection.fromPosition(
       TextPosition(offset: widget.controller.text.length),
     );
+    widget.onValueChanged?.call(widget.controller.text);
   }
 
-  void _onClear() {
-    widget.controller.text = '0.00 \$';
-    widget.onClear?.call();
-  }
-
-  Widget _buildKey(String label, {VoidCallback? onTap}) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(4.0),
+  Widget _buildOvalButton(
+    String label, {
+    VoidCallback? onTap,
+    Color? color,
+    Color? textColor,
+    IconData? icon,
+    bool filled = true,
+    bool zeroPadding = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 2.0),
+      child: SizedBox(
+        width: 85,
+        height: 44,
         child: ElevatedButton(
           onPressed: onTap ?? () => _onKeyTap(label),
           style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            backgroundColor: filled
+                ? (color ?? Theme.of(context).colorScheme.primary)
+                : Colors.transparent,
+            foregroundColor:
+                textColor ?? Theme.of(context).colorScheme.onPrimary,
+            elevation: filled ? 2 : 0,
+            shape: const StadiumBorder(),
+            textStyle: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
             ),
+            padding: zeroPadding ? EdgeInsets.zero : null,
           ),
-          child: Text(label, style: const TextStyle(fontSize: 22)),
+          child: icon != null
+              ? Icon(
+                  icon,
+                  size: 22,
+                  color: textColor ?? Theme.of(context).colorScheme.onPrimary,
+                )
+              : Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor ?? Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
         ),
       ),
     );
@@ -142,57 +157,173 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(children: [_buildKey('1'), _buildKey('2'), _buildKey('3')]),
-        Row(children: [_buildKey('4'), _buildKey('5'), _buildKey('6')]),
-        Row(children: [_buildKey('7'), _buildKey('8'), _buildKey('9')]),
-        Row(
+    final montant = widget.controller.text.isEmpty
+        ? '0.00 \$'
+        : widget.controller.text;
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 8),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            widget.showDecimal ? _buildKey('-') : const Spacer(),
-            _buildKey('0'),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: ElevatedButton(
-                  onPressed: _onBackspace,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // VOS MODIFICATIONS ICI: La largeur est ajustée pour inclure le padding des boutons
+                // (largeur bouton + padding) * 2 + espacement
+                // (85 + 4) * 2 + 35  ->  89 * 2 + 35 = 213.
+                // En fait, plus simple: (largeur bouton1) + (espace) + (largeur bouton2)
+                // 89 + 35 + 89 = 213
+                SizedBox(
+                  width: 213,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        montant,
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        textAlign: TextAlign.left,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        height: 2,
+                        // VOS MODIFICATIONS ICI: La ligne a aussi la nouvelle largeur
+                        width: 213,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.backspace_outlined),
                 ),
-              ),
-            ),
-          ],
-        ),
-        if (widget.onClear != null)
-          Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: ElevatedButton(
-                    onPressed: _onClear,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                const SizedBox(width: 35),
+                // VOS MODIFICATIONS ICI: Le bouton est maintenant dans un Padding, comme les autres
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 6.0,
+                    horizontal: 2.0,
+                  ),
+                  child: SizedBox(
+                    width: 85,
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed:
+                          widget.onDone ??
+                          () => Navigator.of(context).maybePop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.secondaryContainer,
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        elevation: 2,
+                        shape: const StadiumBorder(),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        size: 22,
+                        color: Colors.black,
                       ),
                     ),
-                    child: const Text(
-                      'Effacer',
-                      style: TextStyle(fontSize: 16),
-                    ),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildOvalButton('1'),
+                const SizedBox(width: 35),
+                _buildOvalButton('2'),
+                const SizedBox(width: 35),
+                _buildOvalButton('3'),
+              ],
+            ),
+            // ... reste du code inchangé ...
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildOvalButton('4'),
+                const SizedBox(width: 35),
+                _buildOvalButton('5'),
+                const SizedBox(width: 35),
+                _buildOvalButton('6'),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildOvalButton('7'),
+                const SizedBox(width: 35),
+                _buildOvalButton('8'),
+                const SizedBox(width: 35),
+                _buildOvalButton('9'),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildOvalButton(widget.showDecimal ? '-' : ''),
+                const SizedBox(width: 35),
+                _buildOvalButton('0'),
+                const SizedBox(width: 35),
+                _buildOvalButton(
+                  '',
+                  onTap: _onBackspace,
+                  color: Colors.grey.shade200,
+                  textColor: Colors.black,
+                  icon: Icons.backspace_outlined,
+                  filled: true,
+                  zeroPadding: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (widget.onClear != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: widget.onClear,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade100,
+                        foregroundColor: Colors.red.shade700,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text('Effacer'),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-      ],
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 }
