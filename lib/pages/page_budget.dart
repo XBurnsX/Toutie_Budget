@@ -59,11 +59,9 @@ class _PageBudgetState extends State<PageBudget> {
   ) {
     double total = 0.0;
 
-    // Comptes avec prêt à placer négatif
+    // Comptes chèques avec prêt à placer négatif
     for (var compte in comptes) {
-      if (compte.pretAPlacer < 0 &&
-          compte.type != 'Dette' &&
-          compte.type != 'Investissement') {
+      if (compte.pretAPlacer < 0 && compte.type == 'Chèque') {
         total += compte.pretAPlacer.abs();
       }
     }
@@ -82,12 +80,9 @@ class _PageBudgetState extends State<PageBudget> {
 
   /// Vérifie s'il y a des situations d'urgence
   bool _aSituationsUrgence(List<Compte> comptes, List<Categorie> categories) {
-    // Vérifier les comptes négatifs
+    // Vérifier les comptes négatifs (seulement comptes chèques)
     final comptesNegatifs = comptes.any(
-      (compte) =>
-          compte.pretAPlacer < 0 &&
-          compte.type != 'Dette' &&
-          compte.type != 'Investissement',
+      (compte) => compte.pretAPlacer < 0 && compte.type == 'Chèque',
     );
 
     // Vérifier les enveloppes négatives
@@ -263,13 +258,18 @@ class _PageBudgetState extends State<PageBudget> {
                 children: [
                   const SizedBox(height: 20),
                   ...comptes
-                      .where((compte) => compte.type == 'Chèque')
+                      .where(
+                        (compte) =>
+                            compte.type == 'Chèque' && compte.pretAPlacer != 0,
+                      )
                       .map(
                         (compte) => Container(
                           width: MediaQuery.of(context).size.width * 0.92,
                           margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
-                            color: Color(compte.couleur),
+                            color: compte.pretAPlacer < 0
+                                ? Colors.red[700]
+                                : Color(compte.couleur),
                             borderRadius: const BorderRadius.all(
                               Radius.circular(32),
                             ),
@@ -280,14 +280,16 @@ class _PageBudgetState extends State<PageBudget> {
                                 offset: const Offset(0, 6),
                               ),
                             ],
-                            gradient: LinearGradient(
-                              colors: [
-                                Color(compte.couleur),
-                                Color(compte.couleur).withAlpha(217),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            gradient: compte.pretAPlacer < 0
+                                ? null
+                                : LinearGradient(
+                                    colors: [
+                                      Color(compte.couleur),
+                                      Color(compte.couleur).withAlpha(217),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -298,8 +300,10 @@ class _PageBudgetState extends State<PageBudget> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(
-                                    Icons.account_balance_wallet,
+                                  Icon(
+                                    compte.pretAPlacer < 0
+                                        ? Icons.warning
+                                        : Icons.account_balance_wallet,
                                     color: Colors.white,
                                     size: 24,
                                   ),
@@ -328,10 +332,12 @@ class _PageBudgetState extends State<PageBudget> {
                                   const SizedBox(height: 2),
                                   Text(
                                     '${compte.pretAPlacer.toStringAsFixed(2)} \$',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: compte.pretAPlacer < 0
+                                          ? Colors.red[100]
+                                          : Colors.white,
                                     ),
                                   ),
                                 ],

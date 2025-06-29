@@ -39,15 +39,10 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
             icon: const Icon(Icons.check),
             tooltip: 'Valider',
             onPressed: () async {
-              if (_nom.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Veuillez entrer un nom'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+              if (!_formKey.currentState!.validate()) {
                 return;
               }
+              _formKey.currentState!.save();
               final id = FirebaseFirestore.instance
                   .collection('comptes')
                   .doc()
@@ -85,6 +80,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                 validator: (value) => value == null || value.isEmpty
                     ? 'Veuillez entrer un nom'
                     : null,
+                onChanged: (value) => setState(() => _nom = value),
                 onSaved: (value) => _nom = value ?? '',
               ),
               const SizedBox(height: 16),
@@ -179,15 +175,10 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () async {
-                  if (_nom.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Veuillez entrer un nom'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                  if (!_formKey.currentState!.validate()) {
                     return;
                   }
+                  _formKey.currentState!.save();
                   // Générer un id unique pour le compte
                   final id = FirebaseFirestore.instance
                       .collection('comptes')

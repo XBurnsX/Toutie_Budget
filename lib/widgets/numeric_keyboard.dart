@@ -31,22 +31,29 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
     if (currentText == '0.00' ||
         currentText == '0.00 \$' ||
         currentText.isEmpty) {
-      if (key == '.') {
-        widget.controller.text = '0.';
+      if (key == '-') {
+        widget.controller.text = '-0.00 \$';
       } else {
         widget.controller.text = '0.0$key \$';
       }
       print('DEBUG: Premier chiffre - result: ${widget.controller.text}');
-    } else if (key == '.') {
-      // Gérer le point décimal manuel
-      if (!currentText.contains('.')) {
-        widget.controller.text = '$currentText.';
+    } else if (key == '-') {
+      // Gérer le signe moins
+      if (currentText.startsWith('-')) {
+        // Si déjà négatif, enlever le signe moins
+        widget.controller.text = currentText.substring(1) + ' \$';
+      } else {
+        // Si positif, ajouter le signe moins
+        widget.controller.text = '-$currentText \$';
       }
-      print('DEBUG: Point décimal - result: ${widget.controller.text}');
+      print('DEBUG: Signe moins - result: ${widget.controller.text}');
     } else {
       // Logique de calculatrice : décaler vers la gauche
-      if (currentText.contains('.')) {
-        List<String> parts = currentText.split('.');
+      bool isNegative = currentText.startsWith('-');
+      String positiveText = isNegative ? currentText.substring(1) : currentText;
+
+      if (positiveText.contains('.')) {
+        List<String> parts = positiveText.split('.');
         if (parts.length == 2) {
           // Décaler tous les chiffres vers la gauche
           String newText = parts[0] + parts[1] + key;
@@ -59,15 +66,17 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
             while (partieEntiere.startsWith('0') && partieEntiere.length > 1) {
               partieEntiere = partieEntiere.substring(1);
             }
-            widget.controller.text = '$partieEntiere.$partieDecimale \$';
+            String result = '$partieEntiere.$partieDecimale \$';
+            widget.controller.text = isNegative ? '-$result' : result;
           } else {
             // Moins de 3 chiffres, ajouter 0. devant
-            widget.controller.text = '0.$newText \$';
+            String result = '0.$newText \$';
+            widget.controller.text = isNegative ? '-$result' : result;
           }
         }
       } else {
         // Pas de point décimal, ajouter le chiffre
-        String newText = currentText + key;
+        String newText = positiveText + key;
         if (newText.length >= 3) {
           String partieEntiere = newText.substring(0, newText.length - 2);
           String partieDecimale = newText.substring(newText.length - 2);
@@ -75,9 +84,11 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
           while (partieEntiere.startsWith('0') && partieEntiere.length > 1) {
             partieEntiere = partieEntiere.substring(1);
           }
-          widget.controller.text = '$partieEntiere.$partieDecimale \$';
+          String result = '$partieEntiere.$partieDecimale \$';
+          widget.controller.text = isNegative ? '-$result' : result;
         } else {
-          widget.controller.text = '0.$newText \$';
+          String result = '0.$newText \$';
+          widget.controller.text = isNegative ? '-$result' : result;
         }
       }
       print(
@@ -139,7 +150,7 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
         Row(children: [_buildKey('7'), _buildKey('8'), _buildKey('9')]),
         Row(
           children: [
-            widget.showDecimal ? _buildKey('.') : const Spacer(),
+            widget.showDecimal ? _buildKey('-') : const Spacer(),
             _buildKey('0'),
             Expanded(
               child: Padding(

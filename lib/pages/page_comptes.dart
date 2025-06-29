@@ -188,6 +188,7 @@ class PageComptes extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
         elevation: 2,
+        color: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
