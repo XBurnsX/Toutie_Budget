@@ -63,7 +63,10 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
           setState(() {
             _solde =
                 double.tryParse(
-                  value.replaceAll('\$', '').replaceAll(' ', ''),
+                  value
+                      .replaceAll('\$', '')
+                      .replaceAll(' ', '')
+                      .replaceAll(',', '.'),
                 ) ??
                 0.0;
           });

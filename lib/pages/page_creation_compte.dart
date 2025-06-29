@@ -236,7 +236,10 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
           setState(() {
             _solde =
                 double.tryParse(
-                  value.replaceAll('\$', '').replaceAll(' ', ''),
+                  value
+                      .replaceAll('\$', '')
+                      .replaceAll(' ', '')
+                      .replaceAll(',', '.'),
                 ) ??
                 0.0;
           });

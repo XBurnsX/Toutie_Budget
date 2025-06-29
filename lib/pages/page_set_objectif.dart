@@ -72,7 +72,11 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   }
 
   void _valider() async {
-    final value = double.tryParse(_controller.text.replaceAll(',', '.'));
+    // Nettoyer le montant du symbole $ et des espaces
+    String montantTexte = _controller.text.trim();
+    montantTexte = montantTexte.replaceAll('\$', '').replaceAll(' ', '');
+    final value = double.tryParse(montantTexte.replaceAll(',', '.'));
+
     if (value == null || value <= 0) {
       setState(() {
         _errorText = 'Veuillez entrer un montant valide (> 0)';

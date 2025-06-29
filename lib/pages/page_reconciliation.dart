@@ -53,7 +53,10 @@ class _PageReconciliationState extends State<PageReconciliation> {
         onValueChanged: (value) {
           setState(() {
             _soldeReel = double.tryParse(
-              value.replaceAll('\$', '').replaceAll(' ', ''),
+              value
+                  .replaceAll('\$', '')
+                  .replaceAll(' ', '')
+                  .replaceAll(',', '.'),
             );
             if (_soldeReel != null) {
               _calculerEcart();
