@@ -48,39 +48,62 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   void _chargerDonnees() {
+    print('=== Chargement des données de la dette ===');
+    print('Dette reçue: ${widget.dette.toString()}');
+
     if (widget.dette.tauxInteret != null) {
       _tauxController.text = widget.dette.tauxInteret!.toStringAsFixed(2);
+      print('Taux d\'intérêt chargé: ${_tauxController.text}');
+    } else {
+      print('Aucun taux d\'intérêt fourni');
     }
 
     // Date de début (par défaut aujourd'hui)
     final dateDebut = widget.dette.dateDebut ?? DateTime.now();
     _dateDebutController.text = _formaterDate(dateDebut);
+    print('Date de début: ${_dateDebutController.text}');
 
     if (widget.dette.dateFin != null) {
       _dateFinController.text = _formaterDate(widget.dette.dateFin!);
+      print('Date de fin: ${_dateFinController.text}');
     }
 
     if (widget.dette.montantMensuel != null) {
       _montantMensuelController.text = widget.dette.montantMensuel!
           .toStringAsFixed(2);
+      print('Montant mensuel chargé: ${_montantMensuelController.text}');
+    } else {
+      print('Aucun montant mensuel fourni');
     }
 
     if (widget.dette.prixAchat != null) {
       _prixAchatController.text = widget.dette.prixAchat!.toStringAsFixed(2);
+      print('Prix d\'achat chargé: ${_prixAchatController.text}');
+    } else {
+      print('Aucun prix d\'achat fourni');
     }
 
     if (widget.dette.nombrePaiements != null) {
       _nombrePaiementsController.text = widget.dette.nombrePaiements!
           .toString();
+      print('Nombre de paiements chargé: ${_nombrePaiementsController.text}');
+    } else {
+      print('Aucun nombre de paiements fourni');
     }
 
     if (widget.dette.paiementsEffectues != null) {
       _paiementsEffectuesController.text = widget.dette.paiementsEffectues!
           .toString();
+      print(
+        'Paiements effectués chargé: ${_paiementsEffectuesController.text}',
+      );
     } else {
+      print('Calcul automatique des paiements effectués');
       // Calculer automatiquement les paiements effectués
       _calculerPaiementsEffectues();
     }
+
+    print('=== Fin du chargement des données ===');
   }
 
   void _calculerPaiementsEffectues() {
@@ -310,10 +333,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     });
 
     try {
-      final principal = double.tryParse(_simulateurPrincipalController.text);
+      final principal = _toDouble(_simulateurPrincipalController.text);
       final duree = int.tryParse(_simulateurDureeController.text);
       final taux = double.tryParse(_simulateurTauxController.text);
-      final paiement = double.tryParse(_simulateurPaiementController.text);
+      final paiement = _toDouble(_simulateurPaiementController.text);
 
       if (principal != null && duree != null && duree > 0) {
         if (taux != null) {
@@ -424,7 +447,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           if (value == null || value.isEmpty) {
                             return 'Veuillez entrer un prix d\'achat';
                           }
-                          final prix = double.tryParse(value);
+                          final prix = _toDouble(value);
                           if (prix == null || prix <= 0) {
                             return 'Veuillez entrer un prix valide';
                           }
@@ -562,13 +585,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   Widget _buildCalculsAutomatiques() {
-    final prixAchat = double.tryParse(_prixAchatController.text);
-    final tauxInteret = double.tryParse(_tauxController.text);
+    final prixAchat = _toDouble(_prixAchatController.text);
+    final tauxInteret = _toDouble(_tauxController.text);
     final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
     final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
-    final paiementMensuelSaisi = double.tryParse(
-      _montantMensuelController.text,
-    );
+    final paiementMensuelSaisi = _toDouble(_montantMensuelController.text);
 
     double? montantMensuel;
     double? coutTotal;
@@ -584,26 +605,26 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         tauxAnnuel: tauxInteret,
         dureeMois: nombrePaiements,
       );
+
+      // Utiliser le paiement mensuel saisi s'il existe, sinon utiliser le calculé
+      final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
+
       coutTotal = CalculPretService.calculerCoutTotal(
-        paiementMensuel: paiementMensuelSaisi ?? montantMensuel,
+        paiementMensuel: paiementMensuelEffectif,
         dureeMois: nombrePaiements,
       );
-      if (paiementsEffectues != null && paiementMensuelSaisi != null) {
-        final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
-        soldeRestant =
-            coutTotal! - (paiementMensuelEffectif * paiementsEffectues);
+
+      if (paiementsEffectues != null) {
+        // Nouveau calcul simplifié demandé :
+        // 1) paiement total effectué = paiementsEffectues * paiementMensuelEffectif
+        // 2) solde restant = coût total - paiement total effectué
         final totalPaye = paiementMensuelEffectif * paiementsEffectues;
-        final capitalRembourse = prixAchat - (soldeRestant ?? 0);
-        interetsPayes = totalPaye - capitalRembourse;
-      } else if (paiementsEffectues != null) {
-        soldeRestant = CalculPretService.calculerSoldeRestant(
-          principal: prixAchat,
-          tauxAnnuel: tauxInteret,
-          dureeMois: nombrePaiements,
-          paiementsEffectues: paiementsEffectues,
-        );
-        final totalPaye = montantMensuel * paiementsEffectues;
-        final capitalRembourse = prixAchat - (soldeRestant ?? 0);
+        soldeRestant = coutTotal - totalPaye;
+
+        if (soldeRestant < 0) soldeRestant = 0;
+
+        // Calcul des intérêts payés
+        final capitalRembourse = prixAchat - soldeRestant;
         interetsPayes = totalPaye - capitalRembourse;
       }
     }
@@ -627,30 +648,76 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
+                print('Bouton "Calculer le montant mensuel" cliqué');
+
+                // Vérifier d'abord si les champs sont remplis
+                print('Contenu des contrôleurs:');
+                print('  Prix d\'achat: "${_prixAchatController.text}"');
+                print('  Taux intérêt: "${_tauxController.text}"');
+                print(
+                  '  Nombre paiements: "${_nombrePaiementsController.text}"',
+                );
+                print('  Montant mensuel: "${_montantMensuelController.text}"');
+
                 setState(() {
                   _afficherResultatsCalcul = true;
+
                   // Calcul du montant mensuel et remplissage automatique du champ si vide
-                  final prixAchat = double.tryParse(_prixAchatController.text);
-                  final tauxInteret = double.tryParse(_tauxController.text);
+                  final prixAchat = _toDouble(_prixAchatController.text);
+                  final tauxInteret = _toDouble(_tauxController.text);
                   final nombrePaiements = int.tryParse(
                     _nombrePaiementsController.text,
                   );
+
+                  print('Valeurs parsées:');
+                  print('  prixAchat: $prixAchat');
+                  print('  tauxInteret: $tauxInteret');
+                  print('  nombrePaiements: $nombrePaiements');
+
                   if (prixAchat != null &&
                       tauxInteret != null &&
-                      nombrePaiements != null) {
-                    final montantMensuel =
-                        CalculPretService.calculerPaiementMensuel(
-                          principal: prixAchat,
-                          tauxAnnuel: tauxInteret,
-                          dureeMois: nombrePaiements,
+                      nombrePaiements != null &&
+                      prixAchat > 0 &&
+                      tauxInteret >= 0 &&
+                      nombrePaiements > 0) {
+                    print('Tous les champs sont valides, calcul en cours...');
+                    try {
+                      final montantMensuel =
+                          CalculPretService.calculerPaiementMensuel(
+                            principal: prixAchat,
+                            tauxAnnuel: tauxInteret,
+                            dureeMois: nombrePaiements,
+                          );
+                      print('montantMensuel calculé: $montantMensuel');
+
+                      if ((_montantMensuelController.text.isEmpty ||
+                          _toDouble(_montantMensuelController.text) == null)) {
+                        print(
+                          'Remplissage automatique du champ montant mensuel',
                         );
-                    if ((_montantMensuelController.text.isEmpty ||
-                            double.tryParse(_montantMensuelController.text) ==
-                                null) &&
-                        montantMensuel != null) {
-                      _montantMensuelController.text = montantMensuel
-                          .toStringAsFixed(2);
+                        _montantMensuelController.text = montantMensuel
+                            .toStringAsFixed(2);
+                      }
+                    } catch (e) {
+                      print('Erreur lors du calcul: $e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erreur lors du calcul: $e')),
+                      );
                     }
+                  } else {
+                    print('Erreur: certains champs sont invalides ou vides');
+                    String message =
+                        'Veuillez remplir tous les champs obligatoires:\n';
+                    if (prixAchat == null || prixAchat <= 0)
+                      message += '- Prix d\'achat\n';
+                    if (tauxInteret == null || tauxInteret < 0)
+                      message += '- Taux d\'intérêt\n';
+                    if (nombrePaiements == null || nombrePaiements <= 0)
+                      message += '- Durée du prêt\n';
+
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(message.trim())));
                   }
                 });
               },
@@ -730,11 +797,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     try {
       final detteModifiee = widget.dette.copyWith(
-        tauxInteret: double.parse(_tauxController.text),
+        tauxInteret: _toDouble(_tauxController.text) ?? 0,
         dateDebut: _parseDate(_dateDebutController.text),
         dateFin: _parseDate(_dateFinController.text),
-        montantMensuel: double.parse(_montantMensuelController.text),
-        prixAchat: double.parse(_prixAchatController.text),
+        montantMensuel: _toDouble(_montantMensuelController.text) ?? 0,
+        prixAchat: _toDouble(_prixAchatController.text) ?? 0,
         nombrePaiements: int.parse(_nombrePaiementsController.text),
         paiementsEffectues: int.parse(_paiementsEffectuesController.text),
       );
@@ -769,6 +836,14 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       // Ignore parsing errors
     }
     return null;
+  }
+
+  // Nouvelle fonction : convertit un texte (ex. « 12.34 $ ») en double
+  double? _toDouble(String text) {
+    // Supprime tout caractère qui n'est pas chiffre, point ou signe moins
+    final sanitized = text.replaceAll(RegExp(r'[^0-9\.\-]'), '');
+    if (sanitized.isEmpty) return null;
+    return double.tryParse(sanitized);
   }
 
   @override
