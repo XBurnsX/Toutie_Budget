@@ -8,14 +8,13 @@ import '../services/firebase_service.dart';
 /// Page affichant la liste des transactions d'un compte chèque
 class PageTransactionsCompte extends StatelessWidget {
   final Compte compte;
-  const PageTransactionsCompte({Key? key, required this.compte}) : super(key: key);
+  const PageTransactionsCompte({Key? key, required this.compte})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Transactions - ${compte.nom}'),
-      ),
+      appBar: AppBar(title: Text('Transactions - ${compte.nom}')),
       body: FutureBuilder<List<Categorie>>(
         future: FirebaseService().lireCategories().first,
         builder: (context, catSnapshot) {
@@ -47,15 +46,21 @@ class PageTransactionsCompte extends StatelessWidget {
               // DEBUG : Afficher l'id du compte, les compteId/userId des transactions et le userId courant
               print('DEBUG: compte.id = \\${compte.id}');
               for (final t in transactions) {
-                print('DEBUG: transaction compteId = \\${t.compteId}, userId = \\${t.userId}');
+                print(
+                  'DEBUG: transaction compteId = \\${t.compteId}, userId = \\${t.userId}',
+                );
               }
               // Afficher le userId courant
-              print('DEBUG: userId courant = \\${FirebaseService().auth.currentUser?.uid}');
+              print(
+                'DEBUG: userId courant = \\${FirebaseService().auth.currentUser?.uid}',
+              );
 
               // Regrouper les transactions par date (formatée)
-              final Map<String, List<app_model.Transaction>> transactionsParDate = {};
+              final Map<String, List<app_model.Transaction>>
+              transactionsParDate = {};
               for (final t in transactions) {
-                final dateStr = '${t.date.day.toString().padLeft(2, '0')}/${t.date.month.toString().padLeft(2, '0')}/${t.date.year}';
+                final dateStr =
+                    '${t.date.day.toString().padLeft(2, '0')}/${t.date.month.toString().padLeft(2, '0')}/${t.date.year}';
                 transactionsParDate.putIfAbsent(dateStr, () => []).add(t);
               }
               final datesTriees = transactionsParDate.keys.toList()
@@ -67,7 +72,9 @@ class PageTransactionsCompte extends StatelessWidget {
                   for (final date in datesTriees) ...[
                     // Bandeau séparateur compact VISIBLE
                     Container(
-                      color: const Color(0xFFB71C1C).withAlpha(20), // Remplacement de withOpacity déprécié
+                      color: const Color(
+                        0xFFB71C1C,
+                      ).withAlpha(20), // Remplacement de withOpacity déprécié
                       height: 20, // Hauteur réduite
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -83,10 +90,14 @@ class PageTransactionsCompte extends StatelessWidget {
                     ),
                     ...transactionsParDate[date]!.map((t) {
                       final isDepense = t.type.estDepense;
-                      final montantColor = isDepense ? Colors.red : Colors.green;
+                      final montantColor = isDepense
+                          ? Colors.red
+                          : Colors.green;
                       String sousTitre = '';
                       // --- Ajout pour transaction fractionnée ---
-                      if (t.estFractionnee == true && t.sousItems != null && t.sousItems!.isNotEmpty) {
+                      if (t.estFractionnee == true &&
+                          t.sousItems != null &&
+                          t.sousItems!.isNotEmpty) {
                         // DEBUG: Afficher les données pour comprendre le problème
                         print('DEBUG Transaction fractionnée:');
                         print('  - tiers: ${t.tiers}');
@@ -95,23 +106,36 @@ class PageTransactionsCompte extends StatelessWidget {
 
                         // Afficher la liste des enveloppes et montants avec format demandé
                         final enveloppesFormatees = t.sousItems!.map((item) {
-                          final nomEnv = enveloppeIdToNom[item['enveloppeId']] ?? 'Enveloppe inconnue';
-                          final montant = (item['montant'] as num?)?.toDouble() ?? 0.0;
-                          print('  - Enveloppe: ${item['enveloppeId']} -> $nomEnv, Montant: $montant');
+                          final nomEnv =
+                              enveloppeIdToNom[item['enveloppeId']] ??
+                              'Enveloppe inconnue';
+                          final montant =
+                              (item['montant'] as num?)?.toDouble() ?? 0.0;
+                          print(
+                            '  - Enveloppe: ${item['enveloppeId']} -> $nomEnv, Montant: $montant',
+                          );
                           return '$nomEnv - ${montant.toStringAsFixed(0)}\$';
                         }).toList();
                         sousTitre = enveloppesFormatees.join(', ');
-                      } else if (t.typeMouvement == app_model.TypeMouvementFinancier.pretAccorde) {
+                      } else if (t.typeMouvement ==
+                          app_model.TypeMouvementFinancier.pretAccorde) {
                         sousTitre = 'Prêt accordé';
-                      } else if (t.typeMouvement == app_model.TypeMouvementFinancier.detteContractee) {
+                      } else if (t.typeMouvement ==
+                          app_model.TypeMouvementFinancier.detteContractee) {
                         sousTitre = 'Dette contractée';
-                      } else if (t.typeMouvement == app_model.TypeMouvementFinancier.remboursementRecu) {
+                      } else if (t.typeMouvement ==
+                          app_model.TypeMouvementFinancier.remboursementRecu) {
                         sousTitre = 'Remboursement reçu';
-                      } else if (t.typeMouvement == app_model.TypeMouvementFinancier.remboursementEffectue) {
+                      } else if (t.typeMouvement ==
+                          app_model
+                              .TypeMouvementFinancier
+                              .remboursementEffectue) {
                         sousTitre = 'Remboursement effectué';
-                      } else if (t.enveloppeId != null && t.enveloppeId!.startsWith('pret_')) {
+                      } else if (t.enveloppeId != null &&
+                          t.enveloppeId!.startsWith('pret_')) {
                         sousTitre = '${compte.nom} - prêt à placer';
-                      } else if (t.enveloppeId != null && t.enveloppeId!.isNotEmpty) {
+                      } else if (t.enveloppeId != null &&
+                          t.enveloppeId!.isNotEmpty) {
                         sousTitre = enveloppeIdToNom[t.enveloppeId!] ?? '-';
                       } else {
                         sousTitre = '-';
@@ -120,21 +144,30 @@ class PageTransactionsCompte extends StatelessWidget {
                         onTap: () async {
                           await Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) => EcranAjoutTransaction(
-                                comptesExistants: const [],
-                                transactionExistante: t,
-                                modeModification: true,
-                              ),
+                              builder: (context) =>
+                                  EcranAjoutTransactionRefactored(
+                                    comptesExistants: const [],
+                                    transactionExistante: t,
+                                    modeModification: true,
+                                  ),
                             ),
                           );
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           margin: const EdgeInsets.only(bottom: 2),
                           decoration: BoxDecoration(
-                            color: Colors.blueGrey.withAlpha((0.08 * 255).toInt()),
+                            color: Colors.blueGrey.withAlpha(
+                              (0.08 * 255).toInt(),
+                            ),
                             border: Border(
-                              bottom: BorderSide(color: Colors.grey.shade300, width: 0.7),
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 0.7,
+                              ),
                             ),
                           ),
                           child: Row(
@@ -145,13 +178,23 @@ class PageTransactionsCompte extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      t.tiers != null && t.tiers!.isNotEmpty ? t.tiers! : '-',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1.1),
+                                      t.tiers != null && t.tiers!.isNotEmpty
+                                          ? t.tiers!
+                                          : '-',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        height: 1.1,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
                                       sousTitre,
-                                      style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.1),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                        height: 1.1,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ],

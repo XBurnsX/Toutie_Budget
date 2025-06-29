@@ -14,7 +14,6 @@ import 'pages/page_ajout_transaction.dart';
 import 'pages/page_pret_personnel.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -60,7 +59,9 @@ class MyApp extends StatelessWidget {
         stream: FirebaseService().authStateChanges,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           }
           if (snapshot.hasData) {
             return const MyHomePage();
@@ -69,10 +70,7 @@ class MyApp extends StatelessWidget {
         },
       ),
       locale: const Locale('fr', 'CA'),
-      supportedLocales: const [
-        Locale('fr', 'CA'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('fr', 'CA'), Locale('en', 'US')],
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -84,7 +82,8 @@ class MyApp extends StatelessWidget {
           final enveloppe = args['enveloppe'] as Enveloppe;
           final categorie = args['categorie'] as Categorie;
           return MaterialPageRoute(
-            builder: (context) => PageSetObjectif(enveloppe: enveloppe, categorie: categorie),
+            builder: (context) =>
+                PageSetObjectif(enveloppe: enveloppe, categorie: categorie),
           );
         }
         return null;
@@ -125,7 +124,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final List<Widget> _pages = <Widget>[
       _pageBudget,
       _pageComptes,
-      EcranAjoutTransaction(
+      EcranAjoutTransactionRefactored(
         comptesExistants: comptesExistants,
         onTransactionSaved: () {
           setState(() {
@@ -159,10 +158,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 'assets/icons/budget.svg',
                 width: _selectedIndex == 0 ? 36 : 32,
                 height: _selectedIndex == 0 ? 36 : 32,
-                colorFilter: ColorFilter.mode(
-                  Colors.red,
-                  BlendMode.srcIn,
-                ),
+                colorFilter: ColorFilter.mode(Colors.red, BlendMode.srcIn),
               ),
             ),
             label: '',
@@ -174,10 +170,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 'assets/icons/compte.svg',
                 width: _selectedIndex == 1 ? 36 : 32,
                 height: _selectedIndex == 1 ? 36 : 32,
-                colorFilter: ColorFilter.mode(
-                  Colors.red,
-                  BlendMode.srcIn,
-                ),
+                colorFilter: ColorFilter.mode(Colors.red, BlendMode.srcIn),
               ),
             ),
             label: '',
@@ -189,10 +182,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 'assets/icons/ajout_transaction.svg',
                 width: _selectedIndex == 2 ? 36 : 32,
                 height: _selectedIndex == 2 ? 36 : 32,
-                colorFilter: ColorFilter.mode(
-                  Colors.red,
-                  BlendMode.srcIn,
-                ),
+                colorFilter: ColorFilter.mode(Colors.red, BlendMode.srcIn),
               ),
             ),
             label: '',
