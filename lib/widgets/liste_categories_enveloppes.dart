@@ -148,9 +148,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 } else if (estNegative) {
                   bulleColor = Colors.red; // Rouge pour les montants négatifs
                 } else if (compteId.isNotEmpty) {
-                  final compte = comptes.cast<Map<String, Object>>().firstWhere(
+                  final compte = comptes.firstWhere(
                     (c) => c['id'].toString() == compteId.toString(),
-                    orElse: () => <String, Object>{},
+                    orElse: () => <String, dynamic>{},
                   );
                   log(
                     '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
@@ -178,7 +178,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 }
                 return Card(
                   color: estNegative
-                      ? Theme.of(context).colorScheme.error.withOpacity(0.15)
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.15)
                       : const Color(0xFF232526),
                   child: Stack(
                     children: [
@@ -266,69 +268,65 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                 ],
                               ),
                             ] else ...[
-                              Container(
-                                // Remplacement de la bulle par le camembert avec légende
-                                child: Builder(
-                                  builder: (context) {
-                                    final List<dynamic> provenances =
-                                        enveloppe['provenances'] ?? [];
-                                    if (provenances.isEmpty) {
-                                      // Si pas de provenance, bulle classique
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 3,
+                              // Remplacement de la bulle par le camembert avec légende
+                              Builder(
+                                builder: (context) {
+                                  final List<dynamic> provenances =
+                                      enveloppe['provenances'] ?? [];
+                                  if (provenances.isEmpty) {
+                                    // Si pas de provenance, bulle classique
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: bulleColor,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${solde.toStringAsFixed(2)} \$',
+                                        style: TextStyle(
+                                          color: estNegative
+                                              ? Colors.white
+                                              : (solde == 0
+                                                    ? Colors.white70
+                                                    : Colors.black),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: bulleColor,
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '${solde.toStringAsFixed(2)} \$',
-                                          style: TextStyle(
-                                            color: estNegative
-                                                ? Colors.white
-                                                : (solde == 0
-                                                      ? Colors.white70
-                                                      : Colors.black),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    // Construction des contributions pour le camembert
-                                    final List<Contribution> contributions =
-                                        provenances.map<Contribution>((prov) {
-                                          final compte = comptes.firstWhere(
-                                            (c) =>
-                                                c['id'].toString() ==
-                                                prov['compte_id'].toString(),
-                                            orElse: () => <String, dynamic>{},
-                                          );
-                                          final couleur =
-                                              (compte['couleur'] != null &&
-                                                  compte['couleur'] is int)
-                                              ? Color(compte['couleur'] as int)
-                                              : Colors.amber;
-                                          final nom = compte['nom'] ?? 'Compte';
-                                          return Contribution(
-                                            compte: nom.toString(),
-                                            couleur: couleur,
-                                            montant:
-                                                (prov['montant'] as num?)
-                                                    ?.toDouble() ??
-                                                0.0,
-                                          );
-                                        }).toList();
-                                    return PieChartWithLegend(
-                                      contributions: contributions,
-                                      size: 40,
+                                      ),
                                     );
-                                  },
-                                ),
+                                  }
+                                  // Construction des contributions pour le camembert
+                                  final List<Contribution> contributions =
+                                      provenances.map<Contribution>((prov) {
+                                        final compte = comptes.firstWhere(
+                                          (c) =>
+                                              c['id'].toString() ==
+                                              prov['compte_id'].toString(),
+                                          orElse: () => <String, dynamic>{},
+                                        );
+                                        final couleur =
+                                            (compte['couleur'] != null &&
+                                                compte['couleur'] is int)
+                                            ? Color(compte['couleur'] as int)
+                                            : Colors.amber;
+                                        final nom = compte['nom'] ?? 'Compte';
+                                        return Contribution(
+                                          compte: nom.toString(),
+                                          couleur: couleur,
+                                          montant:
+                                              (prov['montant'] as num?)
+                                                  ?.toDouble() ??
+                                              0.0,
+                                        );
+                                      }).toList();
+                                  return PieChartWithLegend(
+                                    contributions: contributions,
+                                    size: 40,
+                                  );
+                                },
                               ),
                             ],
                           ],
@@ -363,9 +361,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               } else if (estNegative) {
                 bulleColor = Colors.red; // Rouge pour les montants négatifs
               } else if (compteId.isNotEmpty) {
-                final compte = comptes.cast<Map<String, Object>>().firstWhere(
+                final compte = comptes.firstWhere(
                   (c) => c['id'].toString() == compteId.toString(),
-                  orElse: () => <String, Object>{},
+                  orElse: () => <String, dynamic>{},
                 );
                 log(
                   '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
@@ -384,7 +382,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               }
               return Card(
                 color: estNegative
-                    ? Theme.of(context).colorScheme.error.withOpacity(0.15)
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.error.withValues(alpha: 0.15)
                     : const Color(0xFF232526),
                 child: Stack(
                   children: [
@@ -516,14 +516,10 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                     (dateCible.month -
                                                         dateReference.month) +
                                                     1;
-<<<<<<< HEAD
+
                                                 if (moisRestants < 1) {
                                                   moisRestants = 1;
                                                 }
-=======
-                                                if (moisRestants < 1)
-                                                  moisRestants = 1;
->>>>>>> 7fea5e12077e07f7ddc954ca137ce4e482403c37
 
                                                 // Le montant nécessaire chaque mois est fixe : objectif total / nombre total de mois
                                                 double objectifTotal =
@@ -539,17 +535,6 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                 // Si on est en retard, calculer le rattrapage
                                                 double soldeActuel =
                                                     solde; // Utiliser le solde du mois sélectionné
-                                                int moisEcoules =
-                                                    (dateReference.year -
-                                                            dateCreationObjectif
-                                                                .year) *
-                                                        12 +
-                                                    (dateReference.month -
-                                                        dateCreationObjectif
-                                                            .month) +
-                                                    1;
-                                                // Variable utilisée pour le calcul mais pas affichée directement
-                                                // double montantPrevu = montantNecessaire * moisEcoules;
 
                                                 // Pour les mois futurs, utiliser le solde actuel réel au lieu du solde projeté
                                                 if (isFutureMonth) {
