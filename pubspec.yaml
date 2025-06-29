@@ -38,7 +38,7 @@ dependencies:
   intl: ^0.20.2
   month_picker_dialog: ^6.2.3
   firebase_auth: ^5.0.0
-  google_sign_in: ^6.2.1
+  google_sign_in: 6.1.6
   url_launcher: ^6.3.1
   firebase_remote_config: ^5.4.5
   flutter_svg: ^2.0.10+1
@@ -54,7 +54,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
   mockito: any
   firebase_core_platform_interface: any
 

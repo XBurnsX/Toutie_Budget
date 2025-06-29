@@ -12,6 +12,7 @@ class FirebaseService {
   FirebaseService._internal();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Getter pour accéder à l'instance de Firestore
   FirebaseFirestore get firestore => FirebaseFirestore.instance;
@@ -30,7 +31,7 @@ class FirebaseService {
   FirebaseAuth get auth => _auth;
 
   Future<UserCredential> signInWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
     final GoogleSignInAuthentication? googleAuth =
         await googleUser?.authentication;
     final credential = GoogleAuthProvider.credential(
@@ -41,7 +42,7 @@ class FirebaseService {
   }
 
   Future<void> signOut() async {
-    await GoogleSignIn().signOut();
+    await _googleSignIn.signOut();
     await _auth.signOut();
   }
 

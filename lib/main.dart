@@ -51,6 +51,14 @@ class MyApp extends StatelessWidget {
                 secondary: themeService.primaryColor,
                 surface: const Color(0xFF232526),
               ),
+              cardTheme: CardThemeData(
+                color: const Color(0xFF232526),
+                elevation: 2,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+                margin: const EdgeInsets.all(8),
+              ),
               appBarTheme: AppBarTheme(
                 backgroundColor: const Color(0xFF18191A),
                 foregroundColor: Colors.white,
