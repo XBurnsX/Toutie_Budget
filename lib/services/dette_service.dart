@@ -200,6 +200,13 @@ class DetteService {
       // Ajouter le mouvement à la dette
       await ajouterMouvement(dette.id, mouvement);
 
+      // Si la dette est manuelle, incrémenter le nombre de paiements effectués
+      if (dette.estManuelle) {
+        await dettesRef.doc(dette.id).update({
+          'paiementsEffectues': FieldValue.increment(1),
+        });
+      }
+
       // Si la dette est terminée, l'archiver automatiquement
       if (detteTerminee) {
         await ajusterSoldeEtArchiver(dette.id, 0);
@@ -284,6 +291,7 @@ class DetteService {
     double montantRestant = montantTotal;
     final List<String> messagesArchivage = [];
     final DateTime maintenant = DateTime.now();
+    bool aDejaIncremente = false;
 
     for (final dette in dettesATiers) {
       if (montantRestant <= 0) break;
@@ -306,6 +314,14 @@ class DetteService {
 
       // Ajouter le mouvement à l'historique (sans modifier le solde automatiquement)
       await ajouterMouvement(dette.id, mouvement);
+
+      // Si la dette est manuelle, incrémenter le nombre de paiements une seule fois par transaction
+      if (dette.estManuelle && !aDejaIncremente) {
+        await dettesRef.doc(dette.id).update({
+          'paiementsEffectues': FieldValue.increment(1),
+        });
+        aDejaIncremente = true;
+      }
 
       // Calculer le nouveau solde selon le type
       double nouveauSolde;

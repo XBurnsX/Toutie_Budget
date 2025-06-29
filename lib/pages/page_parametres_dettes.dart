@@ -46,6 +46,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   void initState() {
     super.initState();
     _chargerDonnees();
+    _nombrePaiementsController.addListener(_onParametresChanges);
+    _dateDebutController.addListener(_onParametresChanges);
+    _tauxController.addListener(_onParametresChanges);
+    _prixAchatController.addListener(_onParametresChanges);
   }
 
   void _chargerDonnees() {
@@ -67,6 +71,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     if (widget.dette.dateFin != null) {
       _dateFinController.text = _formaterDate(widget.dette.dateFin!);
       print('Date de fin: ${_dateFinController.text}');
+    } else {
+      _calculerDateFinParDefaut();
     }
 
     if (widget.dette.montantMensuel != null) {
@@ -100,9 +106,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       );
     } else {
       print('Calcul automatique des paiements effectués');
-      // Calculer automatiquement les paiements effectués
       _calculerPaiementsEffectues();
     }
+
+    // Calculs initiaux après chargement
+    _onParametresChanges();
 
     print('=== Fin du chargement des données ===');
   }
@@ -116,6 +124,90 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           (maintenant.month - dateDebut.month);
       final paiementsEffectues = mois > 0 ? mois : 1;
       _paiementsEffectuesController.text = paiementsEffectues.toString();
+    }
+  }
+
+  void _onParametresChanges() {
+    // Fonction centrale qui recalcule tout ce qui doit l'être
+    _calculerDateFinParDefaut();
+    // Potentiellement d'autres calculs à l'avenir
+  }
+
+  void _calculerDateFinParDefaut() {
+    final dateDebut = _parseDate(_dateDebutController.text);
+    final dureeMois = int.tryParse(_nombrePaiementsController.text);
+
+    if (dateDebut != null && dureeMois != null && dureeMois > 0) {
+      final dateFin = DateTime(
+        dateDebut.year,
+        dateDebut.month + dureeMois - 1,
+        dateDebut.day,
+      );
+      if (_dateFinController.text != _formaterDate(dateFin)) {
+        setState(() {
+          _dateFinController.text = _formaterDate(dateFin);
+        });
+      }
+    }
+  }
+
+  void _recalculerPaiementMensuel() {
+    final prixAchat = _toDouble(_prixAchatController.text);
+    final tauxInteret = _toDouble(_tauxController.text);
+    final dateDebut = _parseDate(_dateDebutController.text);
+    final dateFin = _parseDate(_dateFinController.text);
+
+    if (prixAchat != null &&
+        tauxInteret != null &&
+        dateDebut != null &&
+        dateFin != null) {
+      final nouvelleDureeMois =
+          (dateFin.year - dateDebut.year) * 12 +
+          dateFin.month -
+          dateDebut.month +
+          1;
+
+      if (nouvelleDureeMois > 0) {
+        final nouveauPaiementMensuel =
+            CalculPretService.calculerPaiementMensuel(
+              principal: prixAchat,
+              tauxAnnuel: tauxInteret,
+              dureeMois: nouvelleDureeMois,
+            );
+        _montantMensuelController.text = nouveauPaiementMensuel.toStringAsFixed(
+          2,
+        );
+      }
+    }
+  }
+
+  Future<void> _selectionnerDateFin() async {
+    final dateDebut = _parseDate(_dateDebutController.text);
+    if (dateDebut == null) return;
+
+    final dureeMois = int.tryParse(_nombrePaiementsController.text);
+    if (dureeMois == null || dureeMois <= 0) return;
+
+    final dateFinMaximale = DateTime(
+      dateDebut.year,
+      dateDebut.month + dureeMois - 1,
+      dateDebut.day,
+    );
+
+    final nouvelleDateFin = await showDatePicker(
+      context: context,
+      initialDate: _parseDate(_dateFinController.text) ?? dateFinMaximale,
+      firstDate: dateDebut.add(const Duration(days: 1)),
+      lastDate: dateFinMaximale,
+    );
+
+    if (nouvelleDateFin != null) {
+      setState(() {
+        _dateFinController.text = _formaterDate(nouvelleDateFin);
+        _recalculerPaiementMensuel();
+        // Déclencher la mise à jour des calculs automatiques
+        _afficherResultatsCalcul = true;
+      });
     }
   }
 
@@ -548,11 +640,30 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                         if (date != null) {
                           setState(() {
                             _dateDebutController.text = _formaterDate(date);
-                            _calculerPaiementsEffectues();
                           });
                         }
                       },
                       child: Text(_dateDebutController.text),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Date de fin
+                Row(
+                  children: [
+                    const Icon(Icons.event_available),
+                    const SizedBox(width: 8),
+                    const Text('Date de fin :'),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _selectionnerDateFin,
+                      child: Text(
+                        _dateFinController.text,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -564,15 +675,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       child: TextFormField(
                         controller: _paiementsEffectuesController,
                         decoration: const InputDecoration(
-                          labelText: 'Paiements effectués',
+                          labelText: 'Paiements effectués (automatique)',
                           border: OutlineInputBorder(),
                         ),
                         readOnly: true,
-                        onTap: () => _ouvrirClavierNumerique(
-                          _paiementsEffectuesController,
-                          showDecimal: false,
-                          isMoney: false,
-                        ),
                       ),
                     ),
                   ],
@@ -625,29 +731,40 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   // Calcul du montant mensuel et remplissage automatique du champ si vide
                   final prixAchat = _toDouble(_prixAchatController.text);
                   final tauxInteret = _toDouble(_tauxController.text);
-                  final nombrePaiements = int.tryParse(
-                    _nombrePaiementsController.text,
-                  );
-                  final calculs = _calculerValeursPret();
-                  final montantMensuel = calculs['montantMensuel'];
+                  final dateDebut = _parseDate(_dateDebutController.text);
+                  final dateFin = _parseDate(_dateFinController.text);
 
                   print('Valeurs parsées:');
                   print('  prixAchat: $prixAchat');
                   print('  tauxInteret: $tauxInteret');
-                  print('  nombrePaiements: $nombrePaiements');
+                  print('  dateDebut: $dateDebut');
+                  print('  dateFin: $dateFin');
 
                   if (prixAchat != null &&
                       tauxInteret != null &&
-                      nombrePaiements != null &&
+                      dateDebut != null &&
+                      dateFin != null &&
                       prixAchat > 0 &&
                       tauxInteret >= 0 &&
-                      nombrePaiements > 0) {
+                      dateFin.isAfter(dateDebut)) {
                     print('Tous les champs sont valides, calcul en cours...');
                     try {
-                      if (montantMensuel != null &&
-                          (_montantMensuelController.text.isEmpty ||
-                              _toDouble(_montantMensuelController.text) ==
-                                  null)) {
+                      final dureeMois =
+                          (dateFin.year - dateDebut.year) * 12 +
+                          dateFin.month -
+                          dateDebut.month +
+                          1;
+
+                      final montantMensuel =
+                          CalculPretService.calculerPaiementMensuel(
+                            principal: prixAchat,
+                            tauxAnnuel: tauxInteret,
+                            dureeMois: dureeMois,
+                          );
+                      print('montantMensuel calculé: $montantMensuel');
+
+                      if ((_montantMensuelController.text.isEmpty ||
+                          _toDouble(_montantMensuelController.text) == null)) {
                         print(
                           'Remplissage automatique du champ montant mensuel',
                         );
@@ -668,8 +785,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       message += '- Prix d\'achat\n';
                     if (tauxInteret == null || tauxInteret < 0)
                       message += '- Taux d\'intérêt\n';
-                    if (nombrePaiements == null || nombrePaiements <= 0)
-                      message += '- Durée du prêt\n';
+                    if (dateFin == null ||
+                        dateDebut == null ||
+                        !dateFin.isAfter(dateDebut))
+                      message += '- Dates invalides\n';
 
                     ScaffoldMessenger.of(
                       context,
@@ -796,13 +915,23 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     print('--- NOUVEAU CALCUL DES VALEURS DU PRÊT ---');
     final prixAchat = _toDouble(_prixAchatController.text);
     final tauxInteret = _toDouble(_tauxController.text);
-    final nombrePaiements = int.tryParse(_nombrePaiementsController.text);
     final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
     final paiementMensuelSaisi = _toDouble(_montantMensuelController.text);
 
+    final dateDebut = _parseDate(_dateDebutController.text);
+    final dateFin = _parseDate(_dateFinController.text);
+    int? dureeMois;
+    if (dateDebut != null && dateFin != null && dateFin.isAfter(dateDebut)) {
+      dureeMois =
+          (dateFin.year - dateDebut.year) * 12 +
+          dateFin.month -
+          dateDebut.month +
+          1;
+    }
+
     print('  Prix Achat: $prixAchat');
     print('  Taux Intérêt: $tauxInteret');
-    print('  Nombre Paiements: $nombrePaiements');
+    print('  Durée (mois, depuis dates): $dureeMois');
     print('  Paiements Effectués: $paiementsEffectues');
     print('  Paiement Mensuel Saisi: $paiementMensuelSaisi');
 
@@ -813,12 +942,12 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     if (prixAchat != null &&
         tauxInteret != null &&
-        nombrePaiements != null &&
-        nombrePaiements > 0) {
+        dureeMois != null &&
+        dureeMois > 0) {
       montantMensuel = CalculPretService.calculerPaiementMensuel(
         principal: prixAchat,
         tauxAnnuel: tauxInteret,
-        dureeMois: nombrePaiements,
+        dureeMois: dureeMois,
       );
 
       final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
@@ -826,7 +955,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       if (paiementMensuelEffectif != null) {
         coutTotal = CalculPretService.calculerCoutTotal(
           paiementMensuel: paiementMensuelEffectif,
-          dureeMois: nombrePaiements,
+          dureeMois: dureeMois,
         );
 
         if (paiementsEffectues != null) {
@@ -843,9 +972,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         }
       }
     } else if (paiementMensuelSaisi != null &&
-        nombrePaiements != null &&
+        dureeMois != null &&
         paiementsEffectues != null) {
-      coutTotal = paiementMensuelSaisi * nombrePaiements;
+      coutTotal = paiementMensuelSaisi * dureeMois;
       final totalPaye = paiementMensuelSaisi * paiementsEffectues;
       soldeRestant = coutTotal - totalPaye;
       if (soldeRestant < 0) soldeRestant = 0;
@@ -901,6 +1030,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _simulateurPaiementController.dispose();
     _simulateurPrincipalController.dispose();
     _simulateurDureeController.dispose();
+    _nombrePaiementsController.removeListener(_onParametresChanges);
+    _dateDebutController.removeListener(_onParametresChanges);
+    _tauxController.removeListener(_onParametresChanges);
+    _prixAchatController.removeListener(_onParametresChanges);
     super.dispose();
   }
 

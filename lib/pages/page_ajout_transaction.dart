@@ -177,6 +177,9 @@ class _EcranAjoutTransactionRefactoredState
                 ? 'Votre prêt à $tiersTexte a été mis à jour'
                 : 'Votre prêt à $tiersTexte a été mis à jour';
             break;
+          case TypeMouvementFinancier.ajustement:
+            message = 'Ajustement de solde pour $tiersTexte enregistré';
+            break;
         }
 
         ScaffoldMessenger.of(
