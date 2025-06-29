@@ -477,20 +477,15 @@ class PageComptes extends StatelessWidget {
               'DEBUG: Navigation pour dette ${dette.nomTiers} - estManuelle: $isDetteManuelle, type: ${dette.type}',
             );
 
-            // TEMPORAIRE: Forcer la navigation vers PageParametresDettes pour toutes les dettes
-            if (dette.type == 'dette') {
-              print(
-                'DEBUG: Redirection vers PageParametresDettes (dette de type "dette")',
-              );
+            if (isDetteManuelle) {
+              // Dette manuelle → PageParametresDettes
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => PageParametresDettes(dette: dette),
                 ),
               );
             } else {
-              print(
-                'DEBUG: Redirection vers PagePretPersonnel (prêt de type "pret")',
-              );
+              // Dette automatique → PagePretPersonnel (section Prêts & Dettes)
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const PagePretPersonnel(),
