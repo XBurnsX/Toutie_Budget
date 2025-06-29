@@ -30,6 +30,9 @@ class AjoutTransactionController extends ChangeNotifier {
   bool _estFractionnee = false;
   TransactionFractionnee? _transactionFractionnee;
 
+  // Variable pour le mode modification
+  Transaction? _transactionExistante;
+
   // Getters
   TypeTransaction get typeSelectionne => _typeSelectionne;
   TypeMouvementFinancier get typeMouvementSelectionne =>
@@ -43,6 +46,7 @@ class AjoutTransactionController extends ChangeNotifier {
   List<Map<String, dynamic>> get categoriesFirebase => _categoriesFirebase;
   bool get estFractionnee => _estFractionnee;
   TransactionFractionnee? get transactionFractionnee => _transactionFractionnee;
+  Transaction? get transactionExistante => _transactionExistante;
 
   // Validation
   bool get estValide {
@@ -147,6 +151,11 @@ class AjoutTransactionController extends ChangeNotifier {
     _estFractionnee = fractionnement != null;
     _transactionFractionnee = fractionnement;
     notifyListeners();
+  }
+
+  // Méthode pour définir la transaction existante en mode modification
+  void setTransactionExistante(Transaction? transaction) {
+    _transactionExistante = transaction;
   }
 
   // Chargement des données
@@ -258,6 +267,31 @@ class AjoutTransactionController extends ChangeNotifier {
       final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
 
       Map<String, dynamic>? infoFinalisation;
+
+      // GESTION DU MODE MODIFICATION - Rollback de l'ancienne transaction
+      if (_transactionExistante != null) {
+        print(
+          'DEBUG: Mode modification - Rollback de la transaction existante: ${_transactionExistante!.id}',
+        );
+
+        try {
+          // 1. Rollback de l'effet de l'ancienne transaction sur les soldes
+          await firebaseService.rollbackTransaction(_transactionExistante!);
+
+          // 2. Supprimer l'ancienne transaction de Firestore
+          await firebaseService.supprimerDocument(
+            'transactions',
+            _transactionExistante!.id,
+          );
+
+          print(
+            'DEBUG: Rollback et suppression de l\'ancienne transaction réussis',
+          );
+        } catch (e) {
+          print('Erreur lors du rollback de l\'ancienne transaction: $e');
+          rethrow;
+        }
+      }
 
       // Gérer les dettes/prêts
       if (_typeMouvementSelectionne == TypeMouvementFinancier.detteContractee ||

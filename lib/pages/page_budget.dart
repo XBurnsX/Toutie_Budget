@@ -169,12 +169,6 @@ class _PageBudgetState extends State<PageBudget> {
                               builder: (context) => const PagePretPersonnel(),
                             ),
                           );
-                        } else if (value == 'nettoyage_provenances') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PagePretPersonnel(),
-                            ),
-                          );
                         }
                       },
                       itemBuilder: (context) => [
@@ -185,23 +179,6 @@ class _PageBudgetState extends State<PageBudget> {
                               Icon(Icons.account_balance_wallet, size: 20),
                               SizedBox(width: 8),
                               Text('Prêt personnel'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'nettoyage_provenances',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.cleaning_services,
-                                size: 20,
-                                color: Colors.orange,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                '🔧 Nettoyage provenances',
-                                style: TextStyle(color: Colors.orange),
-                              ),
                             ],
                           ),
                         ),

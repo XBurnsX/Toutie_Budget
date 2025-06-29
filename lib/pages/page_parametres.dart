@@ -7,7 +7,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/theme_service.dart';
+import 'package:toutie_budget/services/update_service.dart';
+import 'package:provider/provider.dart';
 import 'page_archivage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PageParametres extends StatefulWidget {
   const PageParametres({super.key});
@@ -25,306 +29,229 @@ class _PageParametresState extends State<PageParametres> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Paramètres')),
-      body: ListView(
-        children: [
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.notifications),
-            title: const Text('Notifications'),
-            subtitle: const Text('Recevoir des notifications importantes'),
-            trailing: Switch(
-              value: notifications,
-              onChanged: (val) => setState(() => notifications = val),
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.archive),
-            title: const Text('Archive'),
-            subtitle: const Text(
-              'Voir et restaurer les comptes ou enveloppes archivés',
-            ),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const PageArchivage()),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: const Text('Langue'),
-            subtitle: Text(langue == 'fr' ? 'Français' : 'Anglais'),
-            trailing: DropdownButton<String>(
-              value: langue,
-              items: const [
-                DropdownMenuItem(value: 'fr', child: Text('Français')),
-                DropdownMenuItem(value: 'en', child: Text('Anglais')),
-              ],
-              onChanged: (val) => setState(() => langue = val ?? 'fr'),
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.warning),
-            title: const Text('Alerte budget'),
-            subtitle: Text(
-              'Alerte si le budget dépasse ${budgetNotif.toInt()}%',
-            ),
-            trailing: SizedBox(
-              width: 120,
-              child: Slider(
-                value: budgetNotif,
-                min: 50,
-                max: 100,
-                divisions: 10,
-                label: '${budgetNotif.toInt()}%',
-                onChanged: (val) => setState(() => budgetNotif = val),
+      body: Consumer<ThemeService>(
+        builder: (context, themeService, child) {
+          return ListView(
+            children: [
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.notifications),
+                title: const Text('Notifications'),
+                subtitle: const Text('Recevoir des notifications importantes'),
+                trailing: Switch(
+                  value: notifications,
+                  onChanged: (val) => setState(() => notifications = val),
+                ),
               ),
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.update, color: Colors.blue),
-            title: const Text(
-              'Mise à jour',
-              style: TextStyle(color: Colors.blue),
-            ),
-            onTap: () async {
-              final info = await PackageInfo.fromPlatform();
-              final currentVersion = info.version;
-              final remoteConfig = FirebaseRemoteConfig.instance;
-              await remoteConfig.setConfigSettings(
-                RemoteConfigSettings(
-                  fetchTimeout: const Duration(seconds: 10),
-                  minimumFetchInterval: const Duration(seconds: 0),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.archive),
+                title: const Text('Archive'),
+                subtitle: const Text(
+                  'Voir et restaurer les comptes ou enveloppes archivés',
                 ),
-              );
-              await remoteConfig.fetchAndActivate();
-              final latestVersion = remoteConfig.getString('latest_version');
-              final apkUrl = remoteConfig.getString('apk_url');
-              if (latestVersion.isNotEmpty &&
-                  apkUrl.isNotEmpty &&
-                  latestVersion.compareTo(currentVersion) > 0) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Mise à jour disponible'),
-                    content: Text(
-                      'Vous avez la version $currentVersion. La version $latestVersion est disponible.',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PageArchivage(),
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Annuler'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () async {
-                          Navigator.of(context).pop();
-
-                          // Afficher un dialogue de progression
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (BuildContext context) {
-                              return StatefulBuilder(
-                                builder: (context, setState) {
-                                  double progress = 0.0;
-                                  String statusMessage =
-                                      'Préparation du téléchargement...';
-
-                                  return AlertDialog(
-                                    title: const Text(
-                                      'Téléchargement en cours',
-                                    ),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        LinearProgressIndicator(
-                                          value: progress,
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(statusMessage),
-                                        Text(
-                                          '${(progress * 100).toStringAsFixed(0)}%',
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-
-                          try {
-                            final tempDir = await getTemporaryDirectory();
-                            final savePath = "${tempDir.path}/mise_a_jour.apk";
-                            final dio = Dio();
-
-                            // Télécharger avec indicateur de progression
-                            await dio.download(
-                              apkUrl,
-                              savePath,
-                              onReceiveProgress: (received, total) {
-                                if (total != -1) {
-                                  final progress = received / total;
-                                  // Mettre à jour la progression (nécessiterait un StatefulWidget pour être parfait)
-                                  print(
-                                    'Progression: ${(progress * 100).toStringAsFixed(1)}%',
-                                  );
-                                }
-                              },
-                            );
-
-                            // Fermer le dialogue de progression
-                            Navigator.of(context).pop();
-
-                            // Afficher message de succès avec instructions
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Téléchargement terminé ! Ouverture de l\'installateur...',
-                                ),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-
-                            // Ouvrir le fichier APK pour installation
-                            final result = await OpenFile.open(savePath);
-
-                            // Analyser le résultat et donner des instructions à l'utilisateur
-                            if (result.type == ResultType.done) {
-                              // Installation lancée avec succès
-                              _showInstallationInstructions();
-                            } else if (result.type == ResultType.noAppToOpen) {
-                              _showInstallationError(
-                                'Aucune application trouvée pour installer le fichier APK. Vérifiez que l\'installation depuis des sources inconnues est autorisée.',
-                              );
-                            } else if (result.type ==
-                                ResultType.permissionDenied) {
-                              _showInstallationError(
-                                'Permission refusée. Allez dans Paramètres > Sécurité > Sources inconnues et autorisez l\'installation d\'applications.',
-                              );
-                            } else {
-                              _showInstallationError(
-                                'Erreur lors de l\'ouverture: ${result.message ?? "Erreur inconnue"}',
-                              );
-                            }
-                          } catch (e) {
-                            // Fermer le dialogue de progression s'il est encore ouvert
-                            Navigator.of(context).pop();
-
-                            String errorMessage = 'Erreur inconnue';
-                            if (e.toString().contains('SocketException')) {
-                              errorMessage = 'Erreur de connexion internet';
-                            } else if (e.toString().contains('HttpException')) {
-                              errorMessage =
-                                  'Erreur lors du téléchargement (serveur)';
-                            } else if (e.toString().contains(
-                              'PathAccessException',
-                            )) {
-                              errorMessage = 'Erreur d\'accès au stockage';
-                            } else {
-                              errorMessage = 'Erreur : ${e.toString()}';
-                            }
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(errorMessage),
-                                backgroundColor: Colors.red,
-                                duration: const Duration(seconds: 5),
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text('Télécharger'),
-                      ),
-                    ],
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Vous avez la version $currentVersion. Aucune mise à jour disponible.',
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            title: const Text('Réinitialiser votre compte'),
-            subtitle: const Text(
-              'Supprimer toutes vos données de la base de données',
-            ),
-            onTap: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Confirmer la réinitialisation'),
-                  content: const Text(
-                    'Toutes vos données (comptes, enveloppes, transactions, etc.) seront supprimées. Êtes-vous sûr ?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Annuler'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Oui, réinitialiser'),
-                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: const Text('Langue'),
+                subtitle: Text(langue == 'fr' ? 'Français' : 'Anglais'),
+                trailing: DropdownButton<String>(
+                  value: langue,
+                  items: const [
+                    DropdownMenuItem(value: 'fr', child: Text('Français')),
+                    DropdownMenuItem(value: 'en', child: Text('Anglais')),
                   ],
+                  onChanged: (val) => setState(() => langue = val ?? 'fr'),
                 ),
-              );
-              if (confirm == true) {
-                await _deleteAllUserData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Toutes vos données ont été supprimées.'),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.warning),
+                title: const Text('Alerte budget'),
+                subtitle: Text(
+                  'Alerte si le budget dépasse ${budgetNotif.toInt()}%',
+                ),
+                trailing: SizedBox(
+                  width: 120,
+                  child: Slider(
+                    value: budgetNotif,
+                    min: 50,
+                    max: 100,
+                    divisions: 10,
+                    label: '${budgetNotif.toInt()}%',
+                    onChanged: (val) => setState(() => budgetNotif = val),
                   ),
-                );
-                await FirebaseService().signOut();
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              }
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('À propos'),
-            subtitle: FutureBuilder<PackageInfo>(
-              future: PackageInfo.fromPlatform(),
-              builder: (context, snapshot) {
-                final version = snapshot.data?.version ?? '';
-                return Text('Toutie Budget v$version');
-              },
-            ),
-            onTap: () async {
-              final info = await PackageInfo.fromPlatform();
-              showAboutDialog(
-                context: context,
-                applicationName: 'Toutie Budget',
-                applicationVersion: info.version,
-                applicationLegalese: '© 2025 XBurnsX Inc',
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.black),
-            title: const Text('Déconnexion'),
-            onTap: () async {
-              await FirebaseService().signOut();
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-          ),
-          const Divider(),
-        ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.update, color: Colors.blue),
+                title: const Text(
+                  'Mise à jour',
+                  style: TextStyle(color: Colors.blue),
+                ),
+                onTap: () async {
+                  // Utiliser le nouveau service de mise à jour
+                  await UpdateService().checkAndProposeUpdate(context);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: Icon(Icons.palette, color: themeService.primaryColor),
+                title: const Text('Thème'),
+                subtitle: Text('Couleur principale de l\'application'),
+                trailing: Container(
+                  width: 150,
+                  child: DropdownButton<String>(
+                    value: themeService.currentTheme,
+                    isExpanded: true,
+                    underline: Container(),
+                    items: ThemeService.themeNames.entries.map((entry) {
+                      final themeName = entry.key;
+                      final displayName = entry.value;
+                      final themeColor = ThemeService.themeColors[themeName]!;
+
+                      return DropdownMenuItem<String>(
+                        value: themeName,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: themeColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.grey.shade300,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) async {
+                      if (newValue != null) {
+                        await themeService.setTheme(newValue);
+
+                        // Afficher un message de confirmation
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Thème ${ThemeService.themeNames[newValue]} appliqué !',
+                              ),
+                              backgroundColor:
+                                  ThemeService.themeColors[newValue],
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const Divider(),
+              // ListTile(
+              //   leading: Icon(Icons.speed, color: themeService.primaryColor),
+              //   title: const Text('Test barre de progression'),
+              //   subtitle: const Text('Tester la barre de téléchargement'),
+              //   onTap: () async {
+              //     await UpdateService().testDownloadProgress(context);
+              //   },
+              // ),
+              // const Divider(),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Réinitialiser votre compte'),
+                subtitle: const Text(
+                  'Supprimer toutes vos données de la base de données',
+                ),
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Confirmer la réinitialisation'),
+                      content: const Text(
+                        'Toutes vos données (comptes, enveloppes, transactions, etc.) seront supprimées. Êtes-vous sûr ?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Annuler'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Oui, réinitialiser'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await _deleteAllUserData();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Toutes vos données ont été supprimées.'),
+                      ),
+                    );
+                    await FirebaseService().signOut();
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('À propos'),
+                subtitle: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    final version = snapshot.data?.version ?? '';
+                    return Text('Toutie Budget v$version');
+                  },
+                ),
+                onTap: () async {
+                  final info = await PackageInfo.fromPlatform();
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Toutie Budget',
+                    applicationVersion: info.version,
+                    applicationLegalese: '© 2025 XBurnsX Inc',
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.black),
+                title: const Text('Déconnexion'),
+                onTap: () async {
+                  await FirebaseService().signOut();
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+              ),
+              const Divider(),
+            ],
+          );
+        },
       ),
     );
   }

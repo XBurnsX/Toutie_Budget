@@ -15,7 +15,6 @@ void main() {
         dateCreation: DateTime(2025, 1, 1),
         estArchive: false,
         dateSuppression: null,
-        detteAssocieeId: null,
       );
 
       expect(compte.id, 'compte_1');
@@ -40,7 +39,6 @@ void main() {
 
       expect(compte.userId, isNull);
       expect(compte.dateSuppression, isNull);
-      expect(compte.detteAssocieeId, isNull);
     });
 
     test('Compte with debt association', () {
@@ -53,10 +51,8 @@ void main() {
         pretAPlacer: 0.0,
         dateCreation: DateTime(2025, 1, 1),
         estArchive: false,
-        detteAssocieeId: 'dette_1',
       );
 
-      expect(compte.detteAssocieeId, 'dette_1');
       expect(compte.solde, -500.0);
     });
 
@@ -72,7 +68,6 @@ void main() {
         dateCreation: DateTime(2025, 1, 1),
         estArchive: false,
         dateSuppression: null,
-        detteAssocieeId: 'dette_1',
       );
 
       final map = compte.toMap();
@@ -83,7 +78,6 @@ void main() {
       expect(map['couleur'], 0xFF2196F3);
       expect(map['pretAPlacer'], 500.0);
       expect(map['estArchive'], false);
-      expect(map['detteAssocieeId'], 'dette_1');
     });
 
     test('Compte fromMap deserialization', () {
@@ -97,7 +91,6 @@ void main() {
         'dateCreation': '2025-01-01T00:00:00.000',
         'estArchive': false,
         'dateSuppression': null,
-        'detteAssocieeId': 'dette_1',
       };
 
       final compte = Compte.fromMap(map, 'compte_1');
@@ -109,7 +102,6 @@ void main() {
       expect(compte.couleur, 0xFF2196F3);
       expect(compte.pretAPlacer, 500.0);
       expect(compte.estArchive, false);
-      expect(compte.detteAssocieeId, 'dette_1');
     });
 
     test('Compte fromMap with missing fields', () {

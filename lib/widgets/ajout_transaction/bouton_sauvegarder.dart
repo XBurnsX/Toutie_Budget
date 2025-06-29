@@ -139,9 +139,11 @@ class BoutonSauvegarder extends StatelessWidget {
                               ),
                             ),
                           )
-                        : const Text(
-                            'Sauvegarder',
-                            style: TextStyle(
+                        : Text(
+                            controller.transactionExistante != null
+                                ? 'Modifier'
+                                : 'Sauvegarder',
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                             ),

@@ -409,14 +409,12 @@ void main() {
           pretAPlacer: 0.0,
           dateCreation: DateTime(2025, 1, 1),
           estArchive: false,
-          detteAssocieeId: 'dette_1',
         );
 
         expect(dette.montantInitial, 1000.0);
         expect(dette.solde, 1000.0);
         expect(compteDette.type, 'Dette');
         expect(compteDette.solde, -1000.0);
-        expect(compteDette.detteAssocieeId, 'dette_1');
       });
 
       test('Remboursement d\'un prêt', () {

@@ -45,6 +45,10 @@ class _EcranAjoutTransactionRefactoredState
   void _initialiserController() {
     if (widget.transactionExistante != null) {
       final t = widget.transactionExistante!;
+
+      // Définir la transaction existante dans le contrôleur pour le mode modification
+      _controller.setTransactionExistante(t);
+
       _controller.setTypeTransaction(t.type);
       _controller.setTypeMouvement(t.typeMouvement);
       _controller.montantController.text = t.montant.toStringAsFixed(2);
@@ -54,6 +58,14 @@ class _EcranAjoutTransactionRefactoredState
       _controller.setEnveloppeSelectionnee(t.enveloppeId);
       _controller.setMarqueurSelectionne(t.marqueur);
       _controller.noteController.text = t.note ?? '';
+
+      // Gérer le fractionnement si la transaction était fractionnée
+      if (t.estFractionnee == true && t.sousItems != null) {
+        // TODO: Implémenter la restauration du fractionnement
+        print(
+          'DEBUG: Transaction fractionnée détectée, fractionnement à restaurer',
+        );
+      }
     }
   }
 
@@ -130,24 +142,40 @@ class _EcranAjoutTransactionRefactoredState
         final tiersTexte = _controller.payeController.text.trim();
         String message = '';
 
+        // Différencier les messages selon le mode (ajout ou modification)
+        final estModification = widget.transactionExistante != null;
+        final prefix = estModification
+            ? 'Transaction modifiée'
+            : 'Transaction ajoutée';
+
         switch (_controller.typeMouvementSelectionne) {
           case TypeMouvementFinancier.depenseNormale:
-            message = 'Transaction chez $tiersTexte ajoutée';
+            message = '$prefix chez $tiersTexte';
             break;
           case TypeMouvementFinancier.revenuNormal:
-            message = 'Votre solde a été mis à jour avec succès';
+            message = estModification
+                ? 'Votre solde a été mis à jour avec succès'
+                : 'Votre solde a été mis à jour avec succès';
             break;
           case TypeMouvementFinancier.pretAccorde:
-            message = 'Prêt à $tiersTexte a été créé avec succès';
+            message = estModification
+                ? 'Prêt à $tiersTexte modifié avec succès'
+                : 'Prêt à $tiersTexte créé avec succès';
             break;
           case TypeMouvementFinancier.detteContractee:
-            message = 'Votre dette à $tiersTexte a été créée avec succès';
+            message = estModification
+                ? 'Votre dette à $tiersTexte modifiée avec succès'
+                : 'Votre dette à $tiersTexte créée avec succès';
             break;
           case TypeMouvementFinancier.remboursementRecu:
-            message = 'Le solde du prêt à $tiersTexte a été mis à jour';
+            message = estModification
+                ? 'Le solde du prêt à $tiersTexte a été mis à jour'
+                : 'Le solde du prêt à $tiersTexte a été mis à jour';
             break;
           case TypeMouvementFinancier.remboursementEffectue:
-            message = 'Votre prêt à $tiersTexte a été mis à jour';
+            message = estModification
+                ? 'Votre prêt à $tiersTexte a été mis à jour'
+                : 'Votre prêt à $tiersTexte a été mis à jour';
             break;
         }
 
@@ -241,7 +269,13 @@ class _EcranAjoutTransactionRefactoredState
     return ChangeNotifierProvider.value(
       value: _controller,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Ajouter Transaction')),
+        appBar: AppBar(
+          title: Text(
+            widget.transactionExistante != null
+                ? 'Modifier Transaction'
+                : 'Ajouter Transaction',
+          ),
+        ),
         body: Consumer<AjoutTransactionController>(
           builder: (context, controller, child) {
             return Column(
