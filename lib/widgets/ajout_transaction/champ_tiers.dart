@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/transaction_model.dart';
-import '../../services/firebase_service.dart';
 
 class ChampTiers extends StatelessWidget {
   final TextEditingController controller;
@@ -9,12 +8,12 @@ class ChampTiers extends StatelessWidget {
   final Function(String) onTiersAjoute;
 
   const ChampTiers({
-    Key? key,
+    super.key,
     required this.controller,
     required this.typeMouvementSelectionne,
     required this.listeTiersConnus,
     required this.onTiersAjoute,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +52,9 @@ class ChampTiers extends StatelessWidget {
             if (controller.text.isNotEmpty &&
                 fieldTextEditingController.text != controller.text) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (context.mounted)
+                if (context.mounted) {
                   fieldTextEditingController.text = controller.text;
+                }
               });
             }
 

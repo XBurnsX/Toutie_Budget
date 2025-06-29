@@ -7,12 +7,12 @@ class NumericKeyboard extends StatefulWidget {
   final Function(String)? onValueChanged;
 
   const NumericKeyboard({
-    Key? key,
+    super.key,
     required this.controller,
     this.onClear,
     this.showDecimal = true,
     this.onValueChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<NumericKeyboard> createState() => _NumericKeyboardState();
@@ -40,7 +40,7 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
     } else if (key == '.') {
       // Gérer le point décimal manuel
       if (!currentText.contains('.')) {
-        widget.controller.text = currentText + '.';
+        widget.controller.text = '$currentText.';
       }
       print('DEBUG: Point décimal - result: ${widget.controller.text}');
     } else {

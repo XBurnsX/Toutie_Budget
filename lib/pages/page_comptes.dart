@@ -10,19 +10,25 @@ import '../models/compte.dart';
 
 /// Page d'affichage des comptes bancaires et d'investissement
 class PageComptes extends StatelessWidget {
-  const PageComptes({Key? key}) : super(key: key);
+  const PageComptes({super.key});
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Compte>>(
       stream: FirebaseService().lireComptes(),
       builder: (context, snapshot) {
-        final comptes = (snapshot.data ?? []).where((c) => c.estArchive == false).toList();
+        final comptes = (snapshot.data ?? [])
+            .where((c) => c.estArchive == false)
+            .toList();
         // Séparation par type
         final cheques = comptes.where((c) => c.type == 'Chèque').toList();
-        final credits = comptes.where((c) => c.type == 'Carte de crédit').toList();
+        final credits = comptes
+            .where((c) => c.type == 'Carte de crédit')
+            .toList();
         final dettes = comptes.where((c) => c.type == 'Dette').toList();
-        final investissements = comptes.where((c) => c.type == 'Investissement').toList();
+        final investissements = comptes
+            .where((c) => c.type == 'Investissement')
+            .toList();
         return Column(
           children: [
             SizedBox(height: 45),
@@ -31,7 +37,10 @@ class PageComptes extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Mes comptes', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Mes comptes',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
                   ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).push(
@@ -55,39 +64,104 @@ class PageComptes extends StatelessWidget {
                 children: [
                   if (cheques.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Text('Comptes chèques', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Text(
+                        'Comptes chèques',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ),
-                    ...cheques.map((compte) => _buildCompteCard(compte, Colors.blue, context, true)),
+                    ...cheques.map(
+                      (compte) =>
+                          _buildCompteCard(compte, Colors.blue, context, true),
+                    ),
                     SizedBox(height: 24),
                   ],
                   if (credits.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Text('Cartes de crédit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Text(
+                        'Cartes de crédit',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ),
-                    ...credits.map((compte) => _buildCompteCard(compte, Colors.purple, context, false)),
+                    ...credits.map(
+                      (compte) => _buildCompteCard(
+                        compte,
+                        Colors.purple,
+                        context,
+                        false,
+                      ),
+                    ),
                     SizedBox(height: 24),
                   ],
                   if (dettes.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Text('Dettes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Text(
+                        'Dettes',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ),
-                    ...dettes.map((compte) => _buildCompteCard(compte, Colors.red, context, false)),
+                    ...dettes.map(
+                      (compte) =>
+                          _buildCompteCard(compte, Colors.red, context, false),
+                    ),
                     SizedBox(height: 24),
                   ],
                   if (investissements.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Text('Comptes d\'investissement', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Text(
+                        'Comptes d\'investissement',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ),
-                    ...investissements.map((compte) => _buildCompteCard(compte, Colors.green, context, false)),
+                    ...investissements.map(
+                      (compte) => _buildCompteCard(
+                        compte,
+                        Colors.green,
+                        context,
+                        false,
+                      ),
+                    ),
                   ],
                   if (comptes.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(32.0),
-                      child: Center(child: Text('Aucun compte pour le moment.', style: TextStyle(color: Colors.white54))),
+                      child: Center(
+                        child: Text(
+                          'Aucun compte pour le moment.',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -98,10 +172,16 @@ class PageComptes extends StatelessWidget {
     );
   }
 
-  Widget _buildCompteCard(Compte compte, Color defaultColor, BuildContext context, bool isCheque) {
+  Widget _buildCompteCard(
+    Compte compte,
+    Color defaultColor,
+    BuildContext context,
+    bool isCheque,
+  ) {
     final color = Color(compte.couleur);
     // Détecter les comptes automatiques par leur nom et par detteAssocieeId
-    final isDetteAutomatique = compte.type == 'Dette' &&
+    final isDetteAutomatique =
+        compte.type == 'Dette' &&
         (compte.detteAssocieeId != null || compte.nom.startsWith("Prêt : "));
 
     return Container(
@@ -162,10 +242,7 @@ class PageComptes extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         compte.type,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                       if (isDetteAutomatique)
                         Text(
@@ -187,13 +264,18 @@ class PageComptes extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: compte.solde >= 0 ? Colors.green[700] : Colors.red[700],
+                        color: compte.solde >= 0
+                            ? Colors.green[700]
+                            : Colors.red[700],
                       ),
                     ),
                     if (isCheque && compte.pretAPlacer > 0)
                       Container(
                         margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: color,
                           borderRadius: BorderRadius.circular(12),
@@ -211,7 +293,9 @@ class PageComptes extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  isDetteAutomatique ? Icons.account_balance : Icons.chevron_right,
+                  isDetteAutomatique
+                      ? Icons.account_balance
+                      : Icons.chevron_right,
                   color: Colors.grey[400],
                 ),
               ],
@@ -237,7 +321,8 @@ class PageComptes extends StatelessWidget {
                   Navigator.pop(context);
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => PageModificationCompte(compte: compte),
+                      builder: (context) =>
+                          PageModificationCompte(compte: compte),
                     ),
                   );
                 },
@@ -250,14 +335,18 @@ class PageComptes extends StatelessWidget {
                     Navigator.pop(context);
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => PageReconciliation(compte: compte),
+                        builder: (context) =>
+                            PageReconciliation(compte: compte),
                       ),
                     );
                   },
                 ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Supprimer',
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmDelete(context, compte);
@@ -276,7 +365,9 @@ class PageComptes extends StatelessWidget {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Confirmer la suppression'),
-          content: Text('Êtes-vous sûr de vouloir supprimer le compte "${compte.nom}" ?'),
+          content: Text(
+            'Êtes-vous sûr de vouloir supprimer le compte "${compte.nom}" ?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -293,18 +384,23 @@ class PageComptes extends StatelessWidget {
                   });
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Compte supprimé avec succès')),
+                      const SnackBar(
+                        content: Text('Compte supprimé avec succès'),
+                      ),
                     );
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Erreur: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Erreur: $e')));
                   }
                 }
               },
-              child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Supprimer',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         );

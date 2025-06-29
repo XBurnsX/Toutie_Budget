@@ -7,11 +7,11 @@ class SelecteurTypeTransaction extends StatelessWidget {
   final Function(TypeTransaction, TypeMouvementFinancier) onTypeChanged;
 
   const SelecteurTypeTransaction({
-    Key? key,
+    super.key,
     required this.typeSelectionne,
     required this.typeMouvementSelectionne,
     required this.onTypeChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

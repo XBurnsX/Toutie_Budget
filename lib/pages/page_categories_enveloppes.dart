@@ -4,10 +4,11 @@ import '../services/firebase_service.dart';
 import 'page_set_objectif.dart';
 
 class PageCategoriesEnveloppes extends StatefulWidget {
-  const PageCategoriesEnveloppes({Key? key}) : super(key: key);
+  const PageCategoriesEnveloppes({super.key});
 
   @override
-  State<PageCategoriesEnveloppes> createState() => _PageCategoriesEnveloppesState();
+  State<PageCategoriesEnveloppes> createState() =>
+      _PageCategoriesEnveloppesState();
 }
 
 class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
@@ -82,7 +83,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   }
 
   void _renommerCategorie(Categorie categorie) async {
-    final TextEditingController controller = TextEditingController(text: categorie.nom);
+    final TextEditingController controller = TextEditingController(
+      text: categorie.nom,
+    );
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -118,7 +121,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer la catégorie'),
-        content: Text('Voulez-vous vraiment supprimer la catégorie "${categorie.nom}" et toutes ses enveloppes ?'),
+        content: Text(
+          'Voulez-vous vraiment supprimer la catégorie "${categorie.nom}" et toutes ses enveloppes ?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -137,7 +142,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   }
 
   void _renommerEnveloppe(Categorie categorie, Enveloppe enveloppe) async {
-    final TextEditingController controller = TextEditingController(text: enveloppe.nom);
+    final TextEditingController controller = TextEditingController(
+      text: enveloppe.nom,
+    );
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -159,9 +166,11 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       ),
     );
     if (result != null && result.isNotEmpty && result != enveloppe.nom) {
-      final newEnveloppes = categorie.enveloppes.map((e) =>
-        e.id == enveloppe.id ? Enveloppe(id: e.id, nom: result) : e
-      ).toList();
+      final newEnveloppes = categorie.enveloppes
+          .map(
+            (e) => e.id == enveloppe.id ? Enveloppe(id: e.id, nom: result) : e,
+          )
+          .toList();
       final updatedCat = Categorie(
         id: categorie.id,
         nom: categorie.nom,
@@ -176,7 +185,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer l\'enveloppe'),
-        content: Text('Voulez-vous vraiment supprimer l\'enveloppe "${enveloppe.nom}" ?'),
+        content: Text(
+          'Voulez-vous vraiment supprimer l\'enveloppe "${enveloppe.nom}" ?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -190,7 +201,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       ),
     );
     if (confirm == true) {
-      final newEnveloppes = categorie.enveloppes.where((e) => e.id != enveloppe.id).toList();
+      final newEnveloppes = categorie.enveloppes
+          .where((e) => e.id != enveloppe.id)
+          .toList();
       final updatedCat = Categorie(
         id: categorie.id,
         nom: categorie.nom,
@@ -252,97 +265,141 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                               Expanded(
                                 child: Text(
                                   categorie.nom,
-                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white70),
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ),
                               if (_editionMode) ...[
                                 IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.white70, size: 22),
+                                  icon: const Icon(
+                                    Icons.edit,
+                                    color: Colors.white70,
+                                    size: 22,
+                                  ),
                                   tooltip: 'Renommer la catégorie',
-                                  onPressed: () => _renommerCategorie(categorie),
+                                  onPressed: () =>
+                                      _renommerCategorie(categorie),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.redAccent,
+                                    size: 22,
+                                  ),
                                   tooltip: 'Supprimer la catégorie',
-                                  onPressed: () => _supprimerCategorie(categorie),
+                                  onPressed: () =>
+                                      _supprimerCategorie(categorie),
                                 ),
                               ] else ...[
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, color: Colors.white70, size: 22),
+                                  icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    color: Colors.white70,
+                                    size: 22,
+                                  ),
                                   tooltip: 'Ajouter une enveloppe',
                                   onPressed: () => _ajouterEnveloppe(categorie),
                                 ),
                               ],
                             ],
                           ),
-                          ...categorie.enveloppes.map((enveloppe) => Card(
-      color: const Color(0xFF232526),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-        child: SizedBox(
-          height: 40,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  enveloppe.nom,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (_editionMode) ...[
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.white70, size: 18),
-                  tooltip: 'Renommer l\'enveloppe',
-                  onPressed: () => _renommerEnveloppe(categorie, enveloppe),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                  tooltip: 'Supprimer l\'enveloppe',
-                  onPressed: () => _supprimerEnveloppe(categorie, enveloppe),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ] else ...[
-                Builder(
-                  builder: (context) {
-                    return GestureDetector(
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PageSetObjectif(
-                              categorie: categorie,
-                              enveloppe: enveloppe,
+                          ...categorie.enveloppes.map(
+                            (enveloppe) => Card(
+                              color: const Color(0xFF232526),
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 0,
+                                ),
+                                child: SizedBox(
+                                  height: 40,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          enveloppe.nom,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (_editionMode) ...[
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.edit,
+                                            color: Colors.white70,
+                                            size: 18,
+                                          ),
+                                          tooltip: 'Renommer l\'enveloppe',
+                                          onPressed: () => _renommerEnveloppe(
+                                            categorie,
+                                            enveloppe,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.redAccent,
+                                            size: 18,
+                                          ),
+                                          tooltip: 'Supprimer l\'enveloppe',
+                                          onPressed: () => _supprimerEnveloppe(
+                                            categorie,
+                                            enveloppe,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ] else ...[
+                                        Builder(
+                                          builder: (context) {
+                                            return GestureDetector(
+                                              onTap: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        PageSetObjectif(
+                                                          categorie: categorie,
+                                                          enveloppe: enveloppe,
+                                                        ),
+                                                  ),
+                                                );
+                                                // TODO: gérer la mise à jour de l'objectif si besoin
+                                              },
+                                              child: Text(
+                                                (enveloppe.objectif > 0)
+                                                    ? '${enveloppe.objectif.toStringAsFixed(2)} \$'
+                                                    : 'Objectif',
+                                                style: TextStyle(
+                                                  color:
+                                                      (enveloppe.objectif > 0)
+                                                      ? Colors.greenAccent
+                                                      : Theme.of(
+                                                          context,
+                                                        ).colorScheme.primary,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        );
-                        // TODO: gérer la mise à jour de l'objectif si besoin
-                      },
-                      child: Text(
-                        (enveloppe.objectif > 0)
-                            ? '${enveloppe.objectif.toStringAsFixed(2)} \$'
-                            : 'Objectif',
-                        style: TextStyle(
-                          color: (enveloppe.objectif > 0)
-                              ? Colors.greenAccent
-                              : Theme.of(context).colorScheme.primary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    )),
                           const SizedBox(height: 24),
                         ],
                       );

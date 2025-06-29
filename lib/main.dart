@@ -121,7 +121,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> _pages = <Widget>[
+    final List<Widget> pages = <Widget>[
       _pageBudget,
       _pageComptes,
       EcranAjoutTransactionRefactored(
@@ -135,7 +135,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _pageStatistiques,
     ];
 
-    void _onItemTapped(int index) {
+    void onItemTapped(int index) {
       if (index == 2) {
         // On sauvegarde l'index courant avant d'aller sur l'ajout
         _lastIndexBeforeAjout = _selectedIndex;
@@ -147,7 +147,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return Scaffold(
       // Suppression de l'AppBar pour un affichage sans barre supérieure
-      body: _pages[_selectedIndex],
+      body: pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         items: <BottomNavigationBarItem>[
@@ -201,7 +201,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Theme.of(context).colorScheme.primary,
-        onTap: _onItemTapped,
+        onTap: onItemTapped,
       ),
     );
   }

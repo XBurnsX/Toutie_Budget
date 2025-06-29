@@ -9,12 +9,12 @@ class ChampCompte extends StatelessWidget {
   final Function(String?) onCompteChanged;
 
   const ChampCompte({
-    Key? key,
+    super.key,
     required this.compteSelectionne,
     required this.listeComptesAffichables,
     required this.typeMouvementSelectionne,
     required this.onCompteChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

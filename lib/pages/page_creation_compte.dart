@@ -8,7 +8,7 @@ import '../widgets/numeric_keyboard.dart';
 
 /// Page de création d'un nouveau compte bancaire, carte de crédit ou investissement
 class PageCreationCompte extends StatefulWidget {
-  const PageCreationCompte({Key? key}) : super(key: key);
+  const PageCreationCompte({super.key});
 
   @override
   State<PageCreationCompte> createState() => _PageCreationCompteState();

@@ -7,12 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
-import 'package:toutie_budget/models/categorie.dart';
-import '../models/compte.dart';
 import 'page_archivage.dart';
 
 class PageParametres extends StatefulWidget {
-  const PageParametres({Key? key}) : super(key: key);
+  const PageParametres({super.key});
 
   @override
   State<PageParametres> createState() => _PageParametresState();
@@ -26,9 +24,7 @@ class _PageParametresState extends State<PageParametres> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Paramètres'),
-      ),
+      appBar: AppBar(title: const Text('Paramètres')),
       body: ListView(
         children: [
           const SizedBox(height: 16),
@@ -45,12 +41,12 @@ class _PageParametresState extends State<PageParametres> {
           ListTile(
             leading: const Icon(Icons.archive),
             title: const Text('Archive'),
-            subtitle: const Text('Voir et restaurer les comptes ou enveloppes archivés'),
+            subtitle: const Text(
+              'Voir et restaurer les comptes ou enveloppes archivés',
+            ),
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PageArchivage(),
-                ),
+                MaterialPageRoute(builder: (context) => const PageArchivage()),
               );
             },
           ),
@@ -72,7 +68,9 @@ class _PageParametresState extends State<PageParametres> {
           ListTile(
             leading: const Icon(Icons.warning),
             title: const Text('Alerte budget'),
-            subtitle: Text('Alerte si le budget dépasse ${budgetNotif.toInt()}%'),
+            subtitle: Text(
+              'Alerte si le budget dépasse ${budgetNotif.toInt()}%',
+            ),
             trailing: SizedBox(
               width: 120,
               child: Slider(
@@ -88,24 +86,33 @@ class _PageParametresState extends State<PageParametres> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.update, color: Colors.blue),
-            title: const Text('Mise à jour', style: TextStyle(color: Colors.blue)),
+            title: const Text(
+              'Mise à jour',
+              style: TextStyle(color: Colors.blue),
+            ),
             onTap: () async {
               final info = await PackageInfo.fromPlatform();
               final currentVersion = info.version;
               final remoteConfig = FirebaseRemoteConfig.instance;
-              await remoteConfig.setConfigSettings(RemoteConfigSettings(
-                fetchTimeout: const Duration(seconds: 10),
-                minimumFetchInterval: const Duration(seconds: 0),
-              ));
+              await remoteConfig.setConfigSettings(
+                RemoteConfigSettings(
+                  fetchTimeout: const Duration(seconds: 10),
+                  minimumFetchInterval: const Duration(seconds: 0),
+                ),
+              );
               await remoteConfig.fetchAndActivate();
               final latestVersion = remoteConfig.getString('latest_version');
               final apkUrl = remoteConfig.getString('apk_url');
-              if (latestVersion.isNotEmpty && apkUrl.isNotEmpty && latestVersion.compareTo(currentVersion) > 0) {
+              if (latestVersion.isNotEmpty &&
+                  apkUrl.isNotEmpty &&
+                  latestVersion.compareTo(currentVersion) > 0) {
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Mise à jour disponible'),
-                    content: Text('Vous avez la version $currentVersion. La version $latestVersion est disponible.'),
+                    content: Text(
+                      'Vous avez la version $currentVersion. La version $latestVersion est disponible.',
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
@@ -123,17 +130,24 @@ class _PageParametresState extends State<PageParametres> {
                               return StatefulBuilder(
                                 builder: (context, setState) {
                                   double progress = 0.0;
-                                  String statusMessage = 'Préparation du téléchargement...';
+                                  String statusMessage =
+                                      'Préparation du téléchargement...';
 
                                   return AlertDialog(
-                                    title: const Text('Téléchargement en cours'),
+                                    title: const Text(
+                                      'Téléchargement en cours',
+                                    ),
                                     content: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        LinearProgressIndicator(value: progress),
+                                        LinearProgressIndicator(
+                                          value: progress,
+                                        ),
                                         const SizedBox(height: 16),
                                         Text(statusMessage),
-                                        Text('${(progress * 100).toStringAsFixed(0)}%'),
+                                        Text(
+                                          '${(progress * 100).toStringAsFixed(0)}%',
+                                        ),
                                       ],
                                     ),
                                   );
@@ -155,7 +169,9 @@ class _PageParametresState extends State<PageParametres> {
                                 if (total != -1) {
                                   final progress = received / total;
                                   // Mettre à jour la progression (nécessiterait un StatefulWidget pour être parfait)
-                                  print('Progression: ${(progress * 100).toStringAsFixed(1)}%');
+                                  print(
+                                    'Progression: ${(progress * 100).toStringAsFixed(1)}%',
+                                  );
                                 }
                               },
                             );
@@ -166,7 +182,9 @@ class _PageParametresState extends State<PageParametres> {
                             // Afficher message de succès avec instructions
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Téléchargement terminé ! Ouverture de l\'installateur...'),
+                                content: Text(
+                                  'Téléchargement terminé ! Ouverture de l\'installateur...',
+                                ),
                                 backgroundColor: Colors.green,
                                 duration: Duration(seconds: 3),
                               ),
@@ -180,13 +198,19 @@ class _PageParametresState extends State<PageParametres> {
                               // Installation lancée avec succès
                               _showInstallationInstructions();
                             } else if (result.type == ResultType.noAppToOpen) {
-                              _showInstallationError('Aucune application trouvée pour installer le fichier APK. Vérifiez que l\'installation depuis des sources inconnues est autorisée.');
-                            } else if (result.type == ResultType.permissionDenied) {
-                              _showInstallationError('Permission refusée. Allez dans Paramètres > Sécurité > Sources inconnues et autorisez l\'installation d\'applications.');
+                              _showInstallationError(
+                                'Aucune application trouvée pour installer le fichier APK. Vérifiez que l\'installation depuis des sources inconnues est autorisée.',
+                              );
+                            } else if (result.type ==
+                                ResultType.permissionDenied) {
+                              _showInstallationError(
+                                'Permission refusée. Allez dans Paramètres > Sécurité > Sources inconnues et autorisez l\'installation d\'applications.',
+                              );
                             } else {
-                              _showInstallationError('Erreur lors de l\'ouverture: ${result.message ?? "Erreur inconnue"}');
+                              _showInstallationError(
+                                'Erreur lors de l\'ouverture: ${result.message ?? "Erreur inconnue"}',
+                              );
                             }
-
                           } catch (e) {
                             // Fermer le dialogue de progression s'il est encore ouvert
                             Navigator.of(context).pop();
@@ -195,8 +219,11 @@ class _PageParametresState extends State<PageParametres> {
                             if (e.toString().contains('SocketException')) {
                               errorMessage = 'Erreur de connexion internet';
                             } else if (e.toString().contains('HttpException')) {
-                              errorMessage = 'Erreur lors du téléchargement (serveur)';
-                            } else if (e.toString().contains('PathAccessException')) {
+                              errorMessage =
+                                  'Erreur lors du téléchargement (serveur)';
+                            } else if (e.toString().contains(
+                              'PathAccessException',
+                            )) {
                               errorMessage = 'Erreur d\'accès au stockage';
                             } else {
                               errorMessage = 'Erreur : ${e.toString()}';
@@ -218,7 +245,11 @@ class _PageParametresState extends State<PageParametres> {
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Vous avez la version $currentVersion. Aucune mise à jour disponible.')),
+                  SnackBar(
+                    content: Text(
+                      'Vous avez la version $currentVersion. Aucune mise à jour disponible.',
+                    ),
+                  ),
                 );
               }
             },
@@ -227,13 +258,17 @@ class _PageParametresState extends State<PageParametres> {
           ListTile(
             leading: const Icon(Icons.delete_forever, color: Colors.red),
             title: const Text('Réinitialiser votre compte'),
-            subtitle: const Text('Supprimer toutes vos données de la base de données'),
+            subtitle: const Text(
+              'Supprimer toutes vos données de la base de données',
+            ),
             onTap: () async {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Confirmer la réinitialisation'),
-                  content: const Text('Toutes vos données (comptes, enveloppes, transactions, etc.) seront supprimées. Êtes-vous sûr ?'),
+                  content: const Text(
+                    'Toutes vos données (comptes, enveloppes, transactions, etc.) seront supprimées. Êtes-vous sûr ?',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -249,7 +284,9 @@ class _PageParametresState extends State<PageParametres> {
               if (confirm == true) {
                 await _deleteAllUserData();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Toutes vos données ont été supprimées.')),
+                  const SnackBar(
+                    content: Text('Toutes vos données ont été supprimées.'),
+                  ),
                 );
                 await FirebaseService().signOut();
                 Navigator.of(context).popUntil((route) => route.isFirst);
@@ -297,7 +334,9 @@ class _PageParametresState extends State<PageParametres> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Installation en cours'),
-        content: const Text('L\'installateur a été ouvert. Suivez les instructions à l\'écran pour terminer l\'installation de la mise à jour.'),
+        content: const Text(
+          'L\'installateur a été ouvert. Suivez les instructions à l\'écran pour terminer l\'installation de la mise à jour.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

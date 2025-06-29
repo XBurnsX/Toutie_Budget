@@ -6,7 +6,7 @@ import 'page_virer_argent.dart';
 
 /// Page pour afficher et gérer les enveloppes en situation d'urgence (solde négatif)
 class PageSituationsUrgence extends StatelessWidget {
-  const PageSituationsUrgence({Key? key}) : super(key: key);
+  const PageSituationsUrgence({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -30,27 +30,36 @@ class PageSituationsUrgence extends StatelessWidget {
               final categories = catSnapshot.data!;
 
               // Filtrer les comptes avec prêt à placer négatif
-              final comptesNegatifs = comptes.where((compte) =>
-                compte.pretAPlacer < 0 &&
-                compte.type != 'Dette' &&
-                compte.type != 'Investissement'
-              ).toList();
+              final comptesNegatifs = comptes
+                  .where(
+                    (compte) =>
+                        compte.pretAPlacer < 0 &&
+                        compte.type != 'Dette' &&
+                        compte.type != 'Investissement',
+                  )
+                  .toList();
 
               // Filtrer les catégories qui ont des enveloppes négatives
-              final categoriesAvecEnveloppesNegatives = <Map<String, dynamic>>[];
+              final categoriesAvecEnveloppesNegatives =
+                  <Map<String, dynamic>>[];
 
               for (var categorie in categories) {
-                final enveloppesNegatives = categorie.enveloppes.where((env) => env.solde < 0).toList();
+                final enveloppesNegatives = categorie.enveloppes
+                    .where((env) => env.solde < 0)
+                    .toList();
                 if (enveloppesNegatives.isNotEmpty) {
                   categoriesAvecEnveloppesNegatives.add({
                     'id': categorie.id,
                     'nom': categorie.nom,
-                    'enveloppes': enveloppesNegatives.map((e) => e.toMap()).toList(),
+                    'enveloppes': enveloppesNegatives
+                        .map((e) => e.toMap())
+                        .toList(),
                   });
                 }
               }
 
-              if (comptesNegatifs.isEmpty && categoriesAvecEnveloppesNegatives.isEmpty) {
+              if (comptesNegatifs.isEmpty &&
+                  categoriesAvecEnveloppesNegatives.isEmpty) {
                 return const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -59,7 +68,10 @@ class PageSituationsUrgence extends StatelessWidget {
                       SizedBox(height: 16),
                       Text(
                         'Aucune situation d\'urgence !',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       SizedBox(height: 8),
                       Text(
@@ -88,7 +100,11 @@ class PageSituationsUrgence extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.warning, color: Colors.red[700], size: 24),
+                            Icon(
+                              Icons.warning,
+                              color: Colors.red[700],
+                              size: 24,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Actions nécessaires',
@@ -126,61 +142,75 @@ class PageSituationsUrgence extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...comptesNegatifs.map((compte) => Container(
-                      width: MediaQuery.of(context).size.width * 0.92,
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red[700],
-                        borderRadius: const BorderRadius.all(Radius.circular(32)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(64),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
+                    ...comptesNegatifs.map(
+                      (compte) => Container(
+                        width: MediaQuery.of(context).size.width * 0.92,
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red[700],
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(32),
                           ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.warning, color: Colors.white, size: 24),
-                              const SizedBox(width: 8),
-                              Text(
-                                compte.nom,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(64),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.warning,
                                   color: Colors.white,
+                                  size: 24,
                                 ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'Prêt à placer',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
+                                const SizedBox(width: 8),
+                                Text(
+                                  compte.nom,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '${compte.pretAPlacer.toStringAsFixed(2)} \$',
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  'Prêt à placer',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                                Text(
+                                  '${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    )),
+                    ),
                     const SizedBox(height: 20),
                   ],
 
@@ -204,21 +234,28 @@ class PageSituationsUrgence extends StatelessWidget {
                     Expanded(
                       child: UrgencyListeCategoriesEnveloppes(
                         categories: categoriesAvecEnveloppesNegatives,
-                        comptes: comptes.map((compte) => {
-                          'id': compte.id,
-                          'couleur': compte.couleur,
-                        }).toList(),
+                        comptes: comptes
+                            .map(
+                              (compte) => {
+                                'id': compte.id,
+                                'couleur': compte.couleur,
+                              },
+                            )
+                            .toList(),
                         onEnveloppePressed: (enveloppeId) {
                           // Trouver l'enveloppe pour récupérer son solde négatif
                           double montantNegatif = 0.0;
                           for (var cat in categoriesAvecEnveloppesNegatives) {
-                            final enveloppes = cat['enveloppes'] as List<Map<String, dynamic>>;
+                            final enveloppes =
+                                cat['enveloppes'] as List<Map<String, dynamic>>;
                             final enveloppe = enveloppes.firstWhere(
                               (env) => env['id'] == enveloppeId,
                               orElse: () => <String, dynamic>{},
                             );
                             if (enveloppe.isNotEmpty) {
-                              montantNegatif = (enveloppe['solde'] ?? 0.0).toDouble().abs();
+                              montantNegatif = (enveloppe['solde'] ?? 0.0)
+                                  .toDouble()
+                                  .abs();
                               break;
                             }
                           }
@@ -253,11 +290,11 @@ class UrgencyListeCategoriesEnveloppes extends StatelessWidget {
   final Function(String) onEnveloppePressed;
 
   const UrgencyListeCategoriesEnveloppes({
-    Key? key,
+    super.key,
     required this.categories,
     required this.comptes,
     required this.onEnveloppePressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +303,8 @@ class UrgencyListeCategoriesEnveloppes extends StatelessWidget {
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final categorie = categories[index];
-        final enveloppes = categorie['enveloppes'] as List<Map<String, dynamic>>;
+        final enveloppes =
+            categorie['enveloppes'] as List<Map<String, dynamic>>;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,15 +334,15 @@ class UrgencyListeCategoriesEnveloppes extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       border: Border(
-                        right: BorderSide(
-                          color: Colors.red,
-                          width: 8,
-                        ),
+                        right: BorderSide(color: Colors.red, width: 8),
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
                       child: Row(
                         children: [
                           Icon(Icons.warning, color: Colors.red[700], size: 20),
@@ -333,7 +371,10 @@ class UrgencyListeCategoriesEnveloppes extends StatelessWidget {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red,
                               borderRadius: BorderRadius.circular(8),
@@ -348,7 +389,11 @@ class UrgencyListeCategoriesEnveloppes extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Icon(Icons.arrow_forward_ios, color: Colors.red[700], size: 16),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            color: Colors.red[700],
+                            size: 16,
+                          ),
                         ],
                       ),
                     ),
