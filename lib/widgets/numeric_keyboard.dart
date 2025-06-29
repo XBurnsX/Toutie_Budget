@@ -69,10 +69,19 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
       }
     } else {
       String currentText = widget.controller.text;
-      if (currentText == '0') {
-        widget.controller.text = key;
+
+      if (key == '.') {
+        if (!currentText.contains('.')) {
+          widget.controller.text = currentText.isEmpty
+              ? '0.'
+              : currentText + '.';
+        }
       } else {
-        widget.controller.text = currentText + key;
+        if (currentText == '0') {
+          widget.controller.text = key;
+        } else {
+          widget.controller.text = currentText + key;
+        }
       }
     }
     widget.controller.selection = TextSelection.fromPosition(
@@ -301,7 +310,9 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildOvalButton(widget.showDecimal ? '-' : ''),
+                _buildOvalButton(
+                  widget.isMoney ? '-' : (widget.showDecimal ? '.' : ''),
+                ),
                 const SizedBox(width: 35),
                 _buildOvalButton('0'),
                 const SizedBox(width: 35),
