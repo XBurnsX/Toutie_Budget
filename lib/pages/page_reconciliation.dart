@@ -9,7 +9,7 @@ import '../widgets/numeric_keyboard.dart';
 class PageReconciliation extends StatefulWidget {
   final Compte compte;
 
-  const PageReconciliation({Key? key, required this.compte}) : super(key: key);
+  const PageReconciliation({super.key, required this.compte});
 
   @override
   State<PageReconciliation> createState() => _PageReconciliationState();

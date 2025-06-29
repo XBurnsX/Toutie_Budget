@@ -4,13 +4,14 @@ import '../models/compte.dart';
 import '../models/categorie.dart';
 
 class PageArchivage extends StatefulWidget {
-  const PageArchivage({Key? key}) : super(key: key);
+  const PageArchivage({super.key});
 
   @override
   State<PageArchivage> createState() => _PageArchivageState();
 }
 
-class _PageArchivageState extends State<PageArchivage> with SingleTickerProviderStateMixin {
+class _PageArchivageState extends State<PageArchivage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -54,64 +55,78 @@ class _PageArchivageState extends State<PageArchivage> with SingleTickerProvider
     return StreamBuilder<List<Compte>>(
       stream: FirebaseService().lireComptes(),
       builder: (context, snapshot) {
-        final archives = (snapshot.data ?? []).where((c) => c.estArchive == true).toList();
+        final archives = (snapshot.data ?? [])
+            .where((c) => c.estArchive == true)
+            .toList();
         if (archives.isEmpty) {
-          return const Center(child: Text('Aucun compte archivé', style: TextStyle(color: Colors.white54)));
+          return const Center(
+            child: Text(
+              'Aucun compte archivé',
+              style: TextStyle(color: Colors.white54),
+            ),
+          );
         }
         return ListView(
-          children: archives.map((compte) => Card(
-            color: const Color(0xFF232526),
-            child: ListTile(
-              leading: const Icon(Icons.archive, color: Colors.grey),
-              title: Text(compte.type),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(compte.nom),
-                  if (compte.dateSuppression != null)
-                    Text(
-                      'Archivé le ${compte.dateSuppression!.day.toString().padLeft(2, '0')}/${compte.dateSuppression!.month.toString().padLeft(2, '0')}/${compte.dateSuppression!.year}',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                ],
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.restore, color: Colors.green),
-                tooltip: 'Restaurer',
-                onPressed: () async {
-                  await FirebaseService().updateCompte(compte.id, {
-                    'estArchive': false,
-                    'dateSuppression': null,
-                  });
-                },
-              ),
-              onLongPress: () async {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (context) {
-                    return SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.restore),
-                            title: const Text('Restaurer'),
-                            onTap: () async {
-                              Navigator.pop(context);
-                              await FirebaseService().updateCompte(compte.id, {
-                                'estArchive': false,
-                                'dateSuppression': null,
-                              });
-                            },
+          children: archives
+              .map(
+                (compte) => Card(
+                  color: const Color(0xFF232526),
+                  child: ListTile(
+                    leading: const Icon(Icons.archive, color: Colors.grey),
+                    title: Text(compte.type),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(compte.nom),
+                        if (compte.dateSuppression != null)
+                          Text(
+                            'Archivé le ${compte.dateSuppression!.day.toString().padLeft(2, '0')}/${compte.dateSuppression!.month.toString().padLeft(2, '0')}/${compte.dateSuppression!.year}',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          )).toList(),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.restore, color: Colors.green),
+                      tooltip: 'Restaurer',
+                      onPressed: () async {
+                        await FirebaseService().updateCompte(compte.id, {
+                          'estArchive': false,
+                          'dateSuppression': null,
+                        });
+                      },
+                    ),
+                    onLongPress: () async {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (context) {
+                          return SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.restore),
+                                  title: const Text('Restaurer'),
+                                  onTap: () async {
+                                    Navigator.pop(context);
+                                    await FirebaseService().updateCompte(
+                                      compte.id,
+                                      {
+                                        'estArchive': false,
+                                        'dateSuppression': null,
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              )
+              .toList(),
         );
       },
     );
@@ -134,25 +149,37 @@ class _PageArchivageState extends State<PageArchivage> with SingleTickerProvider
           }
         }
         if (enveloppesArchivees.isEmpty) {
-          return const Center(child: Text('Aucune enveloppe archivée', style: TextStyle(color: Colors.white54)));
+          return const Center(
+            child: Text(
+              'Aucune enveloppe archivée',
+              style: TextStyle(color: Colors.white54),
+            ),
+          );
         }
         return ListView(
-          children: enveloppesArchivees.map((item) => Card(
-            color: const Color(0xFF232526),
-            child: ListTile(
-              leading: const Icon(Icons.archive, color: Colors.grey),
-              title: Text(item['enveloppe']['nom'] ?? ''),
-              subtitle: Text('Catégorie : ${item['categorie']}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.restore, color: Colors.green),
-                tooltip: 'Restaurer',
-                onPressed: () async {
-                  // Restaurer l'enveloppe (archive: false)
-                  await FirebaseService().restaurerEnveloppe(item['categorieId'], item['enveloppe']['id']);
-                },
-              ),
-            ),
-          )).toList(),
+          children: enveloppesArchivees
+              .map(
+                (item) => Card(
+                  color: const Color(0xFF232526),
+                  child: ListTile(
+                    leading: const Icon(Icons.archive, color: Colors.grey),
+                    title: Text(item['enveloppe']['nom'] ?? ''),
+                    subtitle: Text('Catégorie : ${item['categorie']}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.restore, color: Colors.green),
+                      tooltip: 'Restaurer',
+                      onPressed: () async {
+                        // Restaurer l'enveloppe (archive: false)
+                        await FirebaseService().restaurerEnveloppe(
+                          item['categorieId'],
+                          item['enveloppe']['id'],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         );
       },
     );

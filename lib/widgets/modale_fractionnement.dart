@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../models/fractionnement_model.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../models/compte.dart';
@@ -10,20 +9,20 @@ class ModaleFractionnement extends StatefulWidget {
   final Function(TransactionFractionnee) onConfirmer;
 
   const ModaleFractionnement({
-    Key? key,
+    super.key,
     required this.montantTotal,
     required this.enveloppes,
     required this.onConfirmer,
-  }) : super(key: key);
+  });
 
   @override
   State<ModaleFractionnement> createState() => _ModaleFractionnementState();
 }
 
 class _ModaleFractionnementState extends State<ModaleFractionnement> {
-  List<SousItemFractionnement> _sousItems = [];
+  final List<SousItemFractionnement> _sousItems = [];
   int _prochaineId = 1;
-  List<String> _montantInputs = [];
+  final List<String> _montantInputs = [];
 
   // Données de Firebase et état de chargement
   bool _comptesCharges = false;
@@ -273,7 +272,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
-                                      solde.toStringAsFixed(2) + ' \$',
+                                      '${solde.toStringAsFixed(2)} \$',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,

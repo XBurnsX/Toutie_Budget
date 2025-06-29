@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/rollover_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../widgets/liste_categories_enveloppes.dart';
@@ -9,20 +8,13 @@ import 'page_categories_enveloppes.dart';
 import '../widgets/month_picker.dart';
 import 'page_virer_argent.dart';
 import 'page_pret_personnel.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import 'page_parametres.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'page_situations_urgence.dart';
 
-
 /// Page d'affichage du budget et des enveloppes
 class PageBudget extends StatefulWidget {
-  const PageBudget({Key? key}) : super(key: key);
+  const PageBudget({super.key});
 
   @override
   State<PageBudget> createState() => _PageBudgetState();
@@ -61,12 +53,17 @@ class _PageBudgetState extends State<PageBudget> {
       "${selectedMonth.year.toString().padLeft(4, '0')}-${selectedMonth.month.toString().padLeft(2, '0')}";
 
   /// Calcule le montant total en négatif (comptes + enveloppes)
-  double _calculerMontantNegatifTotal(List<Compte> comptes, List<Categorie> categories) {
+  double _calculerMontantNegatifTotal(
+    List<Compte> comptes,
+    List<Categorie> categories,
+  ) {
     double total = 0.0;
 
     // Comptes avec prêt à placer négatif
     for (var compte in comptes) {
-      if (compte.pretAPlacer < 0 && compte.type != 'Dette' && compte.type != 'Investissement') {
+      if (compte.pretAPlacer < 0 &&
+          compte.type != 'Dette' &&
+          compte.type != 'Investissement') {
         total += compte.pretAPlacer.abs();
       }
     }
@@ -86,15 +83,17 @@ class _PageBudgetState extends State<PageBudget> {
   /// Vérifie s'il y a des situations d'urgence
   bool _aSituationsUrgence(List<Compte> comptes, List<Categorie> categories) {
     // Vérifier les comptes négatifs
-    final comptesNegatifs = comptes.any((compte) =>
-      compte.pretAPlacer < 0 &&
-      compte.type != 'Dette' &&
-      compte.type != 'Investissement'
+    final comptesNegatifs = comptes.any(
+      (compte) =>
+          compte.pretAPlacer < 0 &&
+          compte.type != 'Dette' &&
+          compte.type != 'Investissement',
     );
 
     // Vérifier les enveloppes négatives
-    final enveloppesNegatives = categories.any((categorie) =>
-      categorie.enveloppes.any((enveloppe) => enveloppe.solde < 0)
+    final enveloppesNegatives = categories.any(
+      (categorie) =>
+          categorie.enveloppes.any((enveloppe) => enveloppe.solde < 0),
     );
 
     return comptesNegatifs || enveloppesNegatives;
@@ -159,7 +158,8 @@ class _PageBudgetState extends State<PageBudget> {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const PageCategoriesEnveloppes(),
+                            builder: (context) =>
+                                const PageCategoriesEnveloppes(),
                           ),
                         );
                       },
@@ -197,9 +197,16 @@ class _PageBudgetState extends State<PageBudget> {
                           value: 'nettoyage_provenances',
                           child: Row(
                             children: [
-                              Icon(Icons.cleaning_services, size: 20, color: Colors.orange),
+                              Icon(
+                                Icons.cleaning_services,
+                                size: 20,
+                                color: Colors.orange,
+                              ),
                               SizedBox(width: 8),
-                              Text('🔧 Nettoyage provenances', style: TextStyle(color: Colors.orange)),
+                              Text(
+                                '🔧 Nettoyage provenances',
+                                style: TextStyle(color: Colors.orange),
+                              ),
                             ],
                           ),
                         ),
@@ -232,87 +239,107 @@ class _PageBudgetState extends State<PageBudget> {
           final comptes = snapshot.data ?? [];
           if (comptes.isEmpty) {
             return const Center(
-                child: Text('Aucun compte disponible',
-                    style: TextStyle(color: Colors.white70)));
+              child: Text(
+                'Aucun compte disponible',
+                style: TextStyle(color: Colors.white70),
+              ),
+            );
           }
           return StreamBuilder<List<Categorie>>(
             key: ValueKey(refreshKey),
             stream: FirebaseService().lireCategories(),
             builder: (context, catSnapshot) {
               final categories = catSnapshot.data ?? [];
-              final montantNegatif = _calculerMontantNegatifTotal(comptes, categories);
-              final aSituationsUrgence = _aSituationsUrgence(comptes, categories);
+              final montantNegatif = _calculerMontantNegatifTotal(
+                comptes,
+                categories,
+              );
+              final aSituationsUrgence = _aSituationsUrgence(
+                comptes,
+                categories,
+              );
 
               return Column(
                 children: [
                   const SizedBox(height: 20),
                   ...comptes
                       .where((compte) => compte.type == 'Chèque')
-                      .map((compte) => Container(
-                            width: MediaQuery.of(context).size.width * 0.92,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Color(compte.couleur),
-                              borderRadius:
-                                  const BorderRadius.all(Radius.circular(32)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(64),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                              gradient: LinearGradient(
-                                colors: [
-                                  Color(compte.couleur),
-                                  Color(compte.couleur).withAlpha(217),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                      .map(
+                        (compte) => Container(
+                          width: MediaQuery.of(context).size.width * 0.92,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Color(compte.couleur),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(32),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(64),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.account_balance_wallet,
-                                        color: Colors.white, size: 24),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      compte.nom,
-                                      style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          letterSpacing: 0.5),
-                                    ),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Prêt à placer',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white.withAlpha(217)),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${compte.pretAPlacer.toStringAsFixed(2)} \$',
-                                      style: const TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white),
-                                    ),
-                                  ],
-                                ),
+                            ],
+                            gradient: LinearGradient(
+                              colors: [
+                                Color(compte.couleur),
+                                Color(compte.couleur).withAlpha(217),
                               ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                         )),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 4,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.account_balance_wallet,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    compte.nom,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Prêt à placer',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white.withAlpha(217),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
                   // Bandeau d'alerte rouge pour les situations d'urgence
                   if (aSituationsUrgence) ...[
@@ -330,7 +357,9 @@ class _PageBudgetState extends State<PageBudget> {
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
                           color: Colors.red[700],
-                          borderRadius: const BorderRadius.all(Radius.circular(32)),
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(32),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withAlpha(64),
@@ -339,10 +368,17 @@ class _PageBudgetState extends State<PageBudget> {
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
-                            const Icon(Icons.warning, color: Colors.white, size: 24),
+                            const Icon(
+                              Icons.warning,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -375,7 +411,11 @@ class _PageBudgetState extends State<PageBudget> {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 18),
+                            const Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white70,
+                              size: 18,
+                            ),
                           ],
                         ),
                       ),
@@ -386,18 +426,23 @@ class _PageBudgetState extends State<PageBudget> {
                   Expanded(
                     child: ListeCategoriesEnveloppes(
                       categories: categories
-                          .map((c) => {
-                                'id': c.id,
-                                'nom': c.nom,
-                                'enveloppes':
-                                    c.enveloppes.map((e) => e.toMap()).toList(),
-                              })
+                          .map(
+                            (c) => {
+                              'id': c.id,
+                              'nom': c.nom,
+                              'enveloppes': c.enveloppes
+                                  .map((e) => e.toMap())
+                                  .toList(),
+                            },
+                          )
                           .toList(),
                       comptes: comptes
-                          .map((compte) => {
-                                'id': compte.id,
-                                'couleur': compte.couleur,
-                              })
+                          .map(
+                            (compte) => {
+                              'id': compte.id,
+                              'couleur': compte.couleur,
+                            },
+                          )
                           .toList(),
                       selectedMonthKey: selectedMonthKey,
                     ),

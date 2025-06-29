@@ -53,7 +53,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
 
   // Pour les enveloppes dynamiques
   List<Map<String, dynamic>> _categoriesFirebase = [];
-  List<String> _listeMarqueurs = ['Aucun', 'Important', 'À vérifier'];
+  final List<String> _listeMarqueurs = ['Aucun', 'Important', 'À vérifier'];
 
   // Variables pour le fractionnement
   bool _estFractionnee = false;
@@ -421,12 +421,9 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
       }
     }
 
+    print('DEBUG: showModalBottomSheet - montant = $montantDouble');
     print(
-      'DEBUG: showModalBottomSheet - montant = ' + montantDouble.toString(),
-    );
-    print(
-      'DEBUG: showModalBottomSheet - enveloppes = ' +
-          toutesEnveloppes.length.toString(),
+      'DEBUG: showModalBottomSheet - enveloppes = ${toutesEnveloppes.length}',
     );
     await showModalBottomSheet(
       context: context,
@@ -489,31 +486,29 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._transactionFractionnee!.sousItems
-                .map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            item.description,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            '${item.montant.toStringAsFixed(2)} \$',
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
+            ..._transactionFractionnee!.sousItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        item.description,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
+                    Expanded(
+                      child: Text(
+                        '${item.montant.toStringAsFixed(2)} \$',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const Divider(),
             Row(
               children: [
@@ -829,9 +824,10 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                           fieldTextEditingController.text !=
                               _payeController.text) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted)
+                          if (mounted) {
                             fieldTextEditingController.text =
                                 _payeController.text;
+                          }
                         });
                       }
                       fieldTextEditingController.addListener(() {
@@ -1109,8 +1105,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                               ],
                             ),
                           );
-                        })
-                        .toList(),
+                        }),
                   ],
                   onChanged: (String? newValue) =>
                       setState(() => _enveloppeSelectionnee = newValue),
@@ -1301,7 +1296,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                           0.0;
                       final String tiersTexte = _payeController.text.trim();
                       if (montantDouble <= 0) {
-                        if (mounted)
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
@@ -1309,11 +1304,12 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                               ),
                             ),
                           );
+                        }
                         return;
                       }
                       if (_compteSelectionne == null ||
                           _compteSelectionne!.isEmpty) {
-                        if (mounted)
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
@@ -1321,13 +1317,14 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                               ),
                             ),
                           );
+                        }
                         return;
                       }
 
                       // Validation spécifique pour les transactions fractionnées
                       if (_estFractionnee && _transactionFractionnee != null) {
                         if (!_transactionFractionnee!.estValide) {
-                          if (mounted)
+                          if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
@@ -1335,6 +1332,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                                 ),
                               ),
                             );
+                          }
                           return;
                         }
                       }
@@ -1668,7 +1666,7 @@ class _EcranAjoutTransactionState extends State<EcranAjoutTransaction> {
                 if (nomCompte.toLowerCase().contains(nomTiers.toLowerCase())) {
                   dettesATiers.add(dette);
                   print(
-                    'DEBUG - Correspondance trouvée via compte associé : "${nomCompte}"',
+                    'DEBUG - Correspondance trouvée via compte associé : "$nomCompte"',
                   );
                   break;
                 }

@@ -8,8 +8,7 @@ import '../services/firebase_service.dart';
 /// Page affichant la liste des transactions d'un compte chèque
 class PageTransactionsCompte extends StatelessWidget {
   final Compte compte;
-  const PageTransactionsCompte({Key? key, required this.compte})
-    : super(key: key);
+  const PageTransactionsCompte({super.key, required this.compte});
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +101,7 @@ class PageTransactionsCompte extends StatelessWidget {
                         print('DEBUG Transaction fractionnée:');
                         print('  - tiers: ${t.tiers}');
                         print('  - sousItems: ${t.sousItems}');
-                        print('  - enveloppeIdToNom: ${enveloppeIdToNom}');
+                        print('  - enveloppeIdToNom: $enveloppeIdToNom');
 
                         // Afficher la liste des enveloppes et montants avec format demandé
                         final enveloppesFormatees = t.sousItems!.map((item) {

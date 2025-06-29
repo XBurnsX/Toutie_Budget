@@ -7,10 +7,10 @@ class PageSetObjectif extends StatefulWidget {
   final Enveloppe enveloppe;
   final Categorie categorie;
   const PageSetObjectif({
-    Key? key,
+    super.key,
     required this.enveloppe,
     required this.categorie,
-  }) : super(key: key);
+  });
 
   @override
   State<PageSetObjectif> createState() => _PageSetObjectifState();
@@ -174,9 +174,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                     onPressed: () {
                       setState(() {
                         _objectifType = 'date';
-                        if (_selectedDate == null) {
-                          _selectedDate = DateTime.now();
-                        }
+                        _selectedDate ??= DateTime.now();
                       });
                     },
                     style: ElevatedButton.styleFrom(

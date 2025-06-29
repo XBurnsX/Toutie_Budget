@@ -27,11 +27,19 @@ void main() {
       final dateCible = DateTime(2025, 12, 1);
       final dateReference = DateTime(2025, 6, 1);
       final soldeActuel = 300.0;
-      final moisTotal = (dateCible.year - dateCreation.year) * 12 + (dateCible.month - dateCreation.month) + 1;
-      final moisRestants = (dateCible.year - dateReference.year) * 12 + (dateCible.month - dateReference.month) + 1;
+      final moisTotal =
+          (dateCible.year - dateCreation.year) * 12 +
+          (dateCible.month - dateCreation.month) +
+          1;
+      final moisRestants =
+          (dateCible.year - dateReference.year) * 12 +
+          (dateCible.month - dateReference.month) +
+          1;
       final montantNecessaire = moisTotal > 0 ? objectifTotal / moisTotal : 0;
       final manquant = objectifTotal - soldeActuel;
-      final montantParMoisRestant = moisRestants > 0 ? manquant / moisRestants : 0;
+      final montantParMoisRestant = moisRestants > 0
+          ? manquant / moisRestants
+          : 0;
       expect(moisTotal, 12);
       expect(moisRestants, 7);
       expect(montantNecessaire, closeTo(100.0, 0.01));
@@ -49,14 +57,16 @@ void main() {
       final ancienPretAPlacer = 200.0;
       final ancienSolde = 1000.0;
       final nouveauSolde = 1200.0;
-      final nouveauPretAPlacer = ancienPretAPlacer + (nouveauSolde - ancienSolde);
+      final nouveauPretAPlacer =
+          ancienPretAPlacer + (nouveauSolde - ancienSolde);
       expect(nouveauPretAPlacer, 400.0);
     });
 
     test('Calcul montant négatif total', () {
       final comptes = [-100.0, 200.0, -50.0, 300.0];
       final categories = [0.0, -20.0, 10.0];
-      final totalNegatif = comptes.where((c) => c < 0).fold(0.0, (a, b) => a + b) +
+      final totalNegatif =
+          comptes.where((c) => c < 0).fold(0.0, (a, b) => a + b) +
           categories.where((c) => c < 0).fold(0.0, (a, b) => a + b);
       expect(totalNegatif, -170.0);
     });
@@ -66,7 +76,16 @@ void main() {
     test('allouerPretAPlacer déduit le montant si suffisant', () async {
       // Ce test nécessite un mock ou un fake de FirebaseService et Compte
       // Ici, on simule la logique métier sans accès à Firebase
-      final compte = Compte(id: '1', nom: 'Test', type: 'Chèque', solde: 1000, pretAPlacer: 500, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
+      final compte = Compte(
+        id: '1',
+        nom: 'Test',
+        type: 'Chèque',
+        solde: 1000,
+        pretAPlacer: 500,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
       final service = ArgentService();
       // On simule la logique métier :
       double pretAPlacerAvant = compte.pretAPlacer;
@@ -79,19 +98,49 @@ void main() {
       }
     });
 
-    test('allouerPretAPlacer lève une exception si montant insuffisant', () async {
-      final compte = Compte(id: '1', nom: 'Test', type: 'Chèque', solde: 1000, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      final montant = 200;
-      expect(() {
-        if (compte.pretAPlacer < montant) {
-          throw Exception('Montant insuffisant');
-        }
-      }, throwsException);
-    });
+    test(
+      'allouerPretAPlacer lève une exception si montant insuffisant',
+      () async {
+        final compte = Compte(
+          id: '1',
+          nom: 'Test',
+          type: 'Chèque',
+          solde: 1000,
+          pretAPlacer: 100,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        final montant = 200;
+        expect(() {
+          if (compte.pretAPlacer < montant) {
+            throw Exception('Montant insuffisant');
+          }
+        }, throwsException);
+      },
+    );
 
     test('virementEntreComptes ajuste les deux comptes si suffisant', () async {
-      final source = Compte(id: '1', nom: 'Source', type: 'Chèque', solde: 1000, pretAPlacer: 500, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      final dest = Compte(id: '2', nom: 'Dest', type: 'Chèque', solde: 500, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
+      final source = Compte(
+        id: '1',
+        nom: 'Source',
+        type: 'Chèque',
+        solde: 1000,
+        pretAPlacer: 500,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
+      final dest = Compte(
+        id: '2',
+        nom: 'Dest',
+        type: 'Chèque',
+        solde: 500,
+        pretAPlacer: 100,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
       final montant = 200.0;
       if (source.pretAPlacer < montant) {
         expect(() => throw Exception('Montant insuffisant'), throwsException);
@@ -103,55 +152,145 @@ void main() {
       }
     });
 
-    test('virementEntreComptes lève une exception si source insuffisant', () async {
-      final source = Compte(id: '1', nom: 'Source', type: 'Chèque', solde: 1000, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      final dest = Compte(id: '2', nom: 'Dest', type: 'Chèque', solde: 500, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      final montant = 200.0;
-      expect(() {
-        if (source.pretAPlacer < montant) {
-          throw Exception('Montant insuffisant');
-        }
-      }, throwsException);
-    });
+    test(
+      'virementEntreComptes lève une exception si source insuffisant',
+      () async {
+        final source = Compte(
+          id: '1',
+          nom: 'Source',
+          type: 'Chèque',
+          solde: 1000,
+          pretAPlacer: 100,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        final dest = Compte(
+          id: '2',
+          nom: 'Dest',
+          type: 'Chèque',
+          solde: 500,
+          pretAPlacer: 100,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        final montant = 200.0;
+        expect(() {
+          if (source.pretAPlacer < montant) {
+            throw Exception('Montant insuffisant');
+          }
+        }, throwsException);
+      },
+    );
 
     test('allouerPretAPlacer avec montant égal à pretAPlacer', () async {
-      final compte = Compte(id: '3', nom: 'Test2', type: 'Chèque', solde: 1000, pretAPlacer: 200, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
+      final compte = Compte(
+        id: '3',
+        nom: 'Test2',
+        type: 'Chèque',
+        solde: 1000,
+        pretAPlacer: 200,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
       double montant = 200;
       final pretAPlacerApres = compte.pretAPlacer - montant;
       expect(pretAPlacerApres, 0);
     });
 
-    test('allouerPretAPlacer avec montant négatif lève une exception', () async {
-      final compte = Compte(id: '4', nom: 'Test3', type: 'Chèque', solde: 1000, pretAPlacer: 200, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      double montant = -50;
-      expect(() {
-        if (montant <= 0) {
-          throw Exception('Montant invalide');
-        }
-      }, throwsException);
-    });
+    test(
+      'allouerPretAPlacer avec montant négatif lève une exception',
+      () async {
+        final compte = Compte(
+          id: '4',
+          nom: 'Test3',
+          type: 'Chèque',
+          solde: 1000,
+          pretAPlacer: 200,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        double montant = -50;
+        expect(() {
+          if (montant <= 0) {
+            throw Exception('Montant invalide');
+          }
+        }, throwsException);
+      },
+    );
 
     test('allouerPretAPlacer avec montant nul ne change rien', () async {
-      final compte = Compte(id: '5', nom: 'Test4', type: 'Chèque', solde: 1000, pretAPlacer: 200, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
+      final compte = Compte(
+        id: '5',
+        nom: 'Test4',
+        type: 'Chèque',
+        solde: 1000,
+        pretAPlacer: 200,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
       double montant = 0;
       final pretAPlacerApres = compte.pretAPlacer - montant;
       expect(pretAPlacerApres, 200);
     });
 
-    test('virementEntreComptes avec montant négatif lève une exception', () async {
-      final source = Compte(id: '6', nom: 'Source2', type: 'Chèque', solde: 1000, pretAPlacer: 300, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      final dest = Compte(id: '7', nom: 'Dest2', type: 'Chèque', solde: 500, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      double montant = -100;
-      expect(() {
-        if (montant <= 0) {
-          throw Exception('Montant invalide');
-        }
-      }, throwsException);
-    });
+    test(
+      'virementEntreComptes avec montant négatif lève une exception',
+      () async {
+        final source = Compte(
+          id: '6',
+          nom: 'Source2',
+          type: 'Chèque',
+          solde: 1000,
+          pretAPlacer: 300,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        final dest = Compte(
+          id: '7',
+          nom: 'Dest2',
+          type: 'Chèque',
+          solde: 500,
+          pretAPlacer: 100,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        double montant = -100;
+        expect(() {
+          if (montant <= 0) {
+            throw Exception('Montant invalide');
+          }
+        }, throwsException);
+      },
+    );
 
     test('virementEntreComptes avec montant nul ne change rien', () async {
-      final source = Compte(id: '8', nom: 'Source3', type: 'Chèque', solde: 1000, pretAPlacer: 300, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      final dest = Compte(id: '9', nom: 'Dest3', type: 'Chèque', solde: 500, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
+      final source = Compte(
+        id: '8',
+        nom: 'Source3',
+        type: 'Chèque',
+        solde: 1000,
+        pretAPlacer: 300,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
+      final dest = Compte(
+        id: '9',
+        nom: 'Dest3',
+        type: 'Chèque',
+        solde: 500,
+        pretAPlacer: 100,
+        couleur: 0,
+        dateCreation: DateTime.now(),
+        estArchive: false,
+      );
       double montant = 0;
       final pretAPlacerSourceApres = source.pretAPlacer - montant;
       final pretAPlacerDestApres = dest.pretAPlacer + montant;
@@ -159,103 +298,189 @@ void main() {
       expect(pretAPlacerDestApres, 100);
     });
 
-    test('virementEntreComptes avec comptes identiques ne change rien', () async {
-      final compte = Compte(id: '10', nom: 'Identique', type: 'Chèque', solde: 1000, pretAPlacer: 300, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      double montant = 100;
-      final pretAPlacerAvant = compte.pretAPlacer;
-      // Si source et dest sont identiques, rien ne change
-      final pretAPlacerApres = pretAPlacerAvant - montant + montant;
-      expect(pretAPlacerApres, pretAPlacerAvant);
-    });
+    test(
+      'virementEntreComptes avec comptes identiques ne change rien',
+      () async {
+        final compte = Compte(
+          id: '10',
+          nom: 'Identique',
+          type: 'Chèque',
+          solde: 1000,
+          pretAPlacer: 300,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        double montant = 100;
+        final pretAPlacerAvant = compte.pretAPlacer;
+        // Si source et dest sont identiques, rien ne change
+        final pretAPlacerApres = pretAPlacerAvant - montant + montant;
+        expect(pretAPlacerApres, pretAPlacerAvant);
+      },
+    );
 
-    test('virementEntreComptes avec source ou dest inexistant lève une exception', () async {
-      Compte? source;
-      final dest = Compte(id: '11', nom: 'Dest4', type: 'Chèque', solde: 500, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: false);
-      double montant = 100;
-      expect(() {
-        if (source == null || dest == null) {
+    test(
+      'virementEntreComptes avec source ou dest inexistant lève une exception',
+      () async {
+        Compte? source;
+        final dest = Compte(
+          id: '11',
+          nom: 'Dest4',
+          type: 'Chèque',
+          solde: 500,
+          pretAPlacer: 100,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: false,
+        );
+        double montant = 100;
+        expect(() {
           throw Exception('Compte inexistant');
-        }
-      }, throwsException);
-    });
+        }, throwsException);
+      },
+    );
 
-    test('virementEntreComptes avec comptes archivés lève une exception', () async {
-      final source = Compte(id: '12', nom: 'SourceArch', type: 'Chèque', solde: 1000, pretAPlacer: 300, couleur: 0, dateCreation: DateTime.now(), estArchive: true);
-      final dest = Compte(id: '13', nom: 'DestArch', type: 'Chèque', solde: 500, pretAPlacer: 100, couleur: 0, dateCreation: DateTime.now(), estArchive: true);
-      double montant = 100;
-      expect(() {
-        if (source.estArchive || dest.estArchive) {
-          throw Exception('Compte archivé');
-        }
-      }, throwsException);
-    });
+    test(
+      'virementEntreComptes avec comptes archivés lève une exception',
+      () async {
+        final source = Compte(
+          id: '12',
+          nom: 'SourceArch',
+          type: 'Chèque',
+          solde: 1000,
+          pretAPlacer: 300,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: true,
+        );
+        final dest = Compte(
+          id: '13',
+          nom: 'DestArch',
+          type: 'Chèque',
+          solde: 500,
+          pretAPlacer: 100,
+          couleur: 0,
+          dateCreation: DateTime.now(),
+          estArchive: true,
+        );
+        double montant = 100;
+        expect(() {
+          if (source.estArchive || dest.estArchive) {
+            throw Exception('Compte archivé');
+          }
+        }, throwsException);
+      },
+    );
 
     // Pour virementEnveloppeVersEnveloppe, il faudrait mocker Enveloppe et la logique de provenance, mais voici un exemple de test logique :
-    test('virementEnveloppeVersEnveloppe avec montant négatif lève une exception', () async {
-      final source = {'solde': 100.0};
-      final dest = {'solde': 50.0};
-      double montant = -20;
-      expect(() {
-        if (montant <= 0) {
-          throw Exception('Montant invalide');
-        }
-      }, throwsException);
-    });
+    test(
+      'virementEnveloppeVersEnveloppe avec montant négatif lève une exception',
+      () async {
+        final source = {'solde': 100.0};
+        final dest = {'solde': 50.0};
+        double montant = -20;
+        expect(() {
+          if (montant <= 0) {
+            throw Exception('Montant invalide');
+          }
+        }, throwsException);
+      },
+    );
 
-    test('virementEnveloppeVersEnveloppe avec montant supérieur au solde source lève une exception', () async {
-      final source = {'solde': 100.0};
-      final dest = {'solde': 50.0};
-      double montant = 200;
-      expect(() {
-        if ((source['solde'] as double) < montant) {
-          throw Exception('Montant insuffisant dans l\'enveloppe source');
-        }
-      }, throwsException);
-    });
+    test(
+      'virementEnveloppeVersEnveloppe avec montant supérieur au solde source lève une exception',
+      () async {
+        final source = {'solde': 100.0};
+        final dest = {'solde': 50.0};
+        double montant = 200;
+        expect(() {
+          if ((source['solde'] as double) < montant) {
+            throw Exception('Montant insuffisant dans l\'enveloppe source');
+          }
+        }, throwsException);
+      },
+    );
 
-    test('virementEnveloppeVersEnveloppe avec montant nul ne change rien', () async {
-      final source = {'solde': 100.0};
-      final dest = {'solde': 50.0};
-      double montant = 0;
-      final soldeSourceApres = (source['solde'] as double) - montant;
-      final soldeDestApres = (dest['solde'] as double) + montant;
-      expect(soldeSourceApres, 100.0);
-      expect(soldeDestApres, 50.0);
-    });
+    test(
+      'virementEnveloppeVersEnveloppe avec montant nul ne change rien',
+      () async {
+        final source = {'solde': 100.0};
+        final dest = {'solde': 50.0};
+        double montant = 0;
+        final soldeSourceApres = (source['solde'] as double) - montant;
+        final soldeDestApres = (dest['solde'] as double) + montant;
+        expect(soldeSourceApres, 100.0);
+        expect(soldeDestApres, 50.0);
+      },
+    );
 
-    test('virementEnveloppeVersEnveloppe avec source ou dest inexistant lève une exception', () async {
-      Map<String, dynamic>? source;
-      final dest = {'solde': 50.0};
-      double montant = 10;
-      expect(() {
-        if (source == null || dest == null) {
+    test(
+      'virementEnveloppeVersEnveloppe avec source ou dest inexistant lève une exception',
+      () async {
+        Map<String, dynamic>? source;
+        final dest = {'solde': 50.0};
+        double montant = 10;
+        expect(() {
           throw Exception('Enveloppe inexistante');
-        }
-      }, throwsException);
-    });
+        }, throwsException);
+      },
+    );
 
-    test('virementEnveloppeVersEnveloppe avec provenances incompatibles lève une exception', () async {
-      final source = {'solde': 100.0, 'provenances': [{'compte_id': 'A', 'montant': 100.0}]};
-      final dest = {'solde': 50.0, 'provenances': [{'compte_id': 'B', 'montant': 50.0}]};
-      double montant = 10;
-      expect(() {
-        final comptesSource = (source['provenances'] as List).map((prov) => (prov as Map)['compte_id'].toString()).toSet();
-        final comptesDest = (dest['provenances'] as List).map((prov) => (prov as Map)['compte_id'].toString()).toSet();
-        if (!comptesSource.every((id) => comptesDest.contains(id)) || !comptesDest.every((id) => comptesSource.contains(id))) {
-          throw Exception('Impossible de mélanger des fonds provenant de comptes différents.');
-        }
-      }, throwsException);
-    });
+    test(
+      'virementEnveloppeVersEnveloppe avec provenances incompatibles lève une exception',
+      () async {
+        final source = {
+          'solde': 100.0,
+          'provenances': [
+            {'compte_id': 'A', 'montant': 100.0},
+          ],
+        };
+        final dest = {
+          'solde': 50.0,
+          'provenances': [
+            {'compte_id': 'B', 'montant': 50.0},
+          ],
+        };
+        double montant = 10;
+        expect(() {
+          final comptesSource = (source['provenances'] as List)
+              .map((prov) => (prov as Map)['compte_id'].toString())
+              .toSet();
+          final comptesDest = (dest['provenances'] as List)
+              .map((prov) => (prov as Map)['compte_id'].toString())
+              .toSet();
+          if (!comptesSource.every((id) => comptesDest.contains(id)) ||
+              !comptesDest.every((id) => comptesSource.contains(id))) {
+            throw Exception(
+              'Impossible de mélanger des fonds provenant de comptes différents.',
+            );
+          }
+        }, throwsException);
+      },
+    );
 
-    test('virementEnveloppeVersEnveloppe avec provenances compatibles réussit', () async {
-      final source = {'solde': 100.0, 'provenances': [{'compte_id': 'A', 'montant': 100.0}]};
-      final dest = {'solde': 50.0, 'provenances': [{'compte_id': 'A', 'montant': 50.0}]};
-      double montant = 10;
-      final soldeSourceApres = (source['solde'] as double) - montant;
-      final soldeDestApres = (dest['solde'] as double) + montant;
-      expect(soldeSourceApres, 90.0);
-      expect(soldeDestApres, 60.0);
-    });
+    test(
+      'virementEnveloppeVersEnveloppe avec provenances compatibles réussit',
+      () async {
+        final source = {
+          'solde': 100.0,
+          'provenances': [
+            {'compte_id': 'A', 'montant': 100.0},
+          ],
+        };
+        final dest = {
+          'solde': 50.0,
+          'provenances': [
+            {'compte_id': 'A', 'montant': 50.0},
+          ],
+        };
+        double montant = 10;
+        final soldeSourceApres = (source['solde'] as double) - montant;
+        final soldeDestApres = (dest['solde'] as double) + montant;
+        expect(soldeSourceApres, 90.0);
+        expect(soldeDestApres, 60.0);
+      },
+    );
   });
 
   group('DetteService', () {
@@ -277,20 +502,23 @@ void main() {
     });
 
     test('création de dette avec montant négatif', () async {
-      expect(() {
-        Dette(
-          id: '2',
-          nomTiers: 'Paul',
-          montantInitial: -100,
-          solde: -100,
-          type: 'dette',
-          historique: [],
-          archive: false,
-          dateCreation: DateTime.now(),
-          dateArchivage: null,
-          userId: 'user1',
-        );
-      }, returnsNormally); // Peut lever une exception selon la logique métier réelle
+      expect(
+        () {
+          Dette(
+            id: '2',
+            nomTiers: 'Paul',
+            montantInitial: -100,
+            solde: -100,
+            type: 'dette',
+            historique: [],
+            archive: false,
+            dateCreation: DateTime.now(),
+            dateArchivage: null,
+            userId: 'user1',
+          );
+        },
+        returnsNormally,
+      ); // Peut lever une exception selon la logique métier réelle
     });
 
     test('remboursement partiel de dette', () async {
@@ -366,17 +594,26 @@ void main() {
       final archive = true;
       final dateArchivage = DateTime.now();
       expect(archive, true);
-      expect(dateArchivage.isBefore(DateTime.now().add(Duration(seconds: 1))), true);
+      expect(
+        dateArchivage.isBefore(DateTime.now().add(Duration(seconds: 1))),
+        true,
+      );
     });
   });
 
   group('RolloverService', () {
     test('Rollover d\'une enveloppe avec solde positif', () async {
-      final enveloppe = {'solde': 100.0, 'depense': 50.0, 'objectif': 200.0, 'historique': <String, Map<String, dynamic>>{}};
+      final enveloppe = {
+        'solde': 100.0,
+        'depense': 50.0,
+        'objectif': 200.0,
+        'historique': <String, Map<String, dynamic>>{},
+      };
       final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
       enveloppe['depense'] = 0.0;
       enveloppe['solde'] = 100.0;
-      (enveloppe['historique'] as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
+      (enveloppe['historique']
+          as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
         'solde': enveloppe['solde'],
         'depense': enveloppe['depense'],
         'objectif': enveloppe['objectif'],
@@ -386,11 +623,17 @@ void main() {
     });
 
     test('Rollover d\'une enveloppe avec solde négatif', () async {
-      final enveloppe = {'solde': -20.0, 'depense': 10.0, 'objectif': 100.0, 'historique': <String, Map<String, dynamic>>{}};
+      final enveloppe = {
+        'solde': -20.0,
+        'depense': 10.0,
+        'objectif': 100.0,
+        'historique': <String, Map<String, dynamic>>{},
+      };
       final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
       enveloppe['depense'] = 0.0;
       enveloppe['solde'] = -20.0;
-      (enveloppe['historique'] as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
+      (enveloppe['historique']
+          as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
         'solde': enveloppe['solde'],
         'depense': enveloppe['depense'],
         'objectif': enveloppe['objectif'],
@@ -400,11 +643,17 @@ void main() {
     });
 
     test('Rollover d\'une enveloppe avec solde nul', () async {
-      final enveloppe = {'solde': 0.0, 'depense': 0.0, 'objectif': 50.0, 'historique': <String, Map<String, dynamic>>{}};
+      final enveloppe = {
+        'solde': 0.0,
+        'depense': 0.0,
+        'objectif': 50.0,
+        'historique': <String, Map<String, dynamic>>{},
+      };
       final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
       enveloppe['depense'] = 0.0;
       enveloppe['solde'] = 0.0;
-      (enveloppe['historique'] as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
+      (enveloppe['historique']
+          as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
         'solde': enveloppe['solde'],
         'depense': enveloppe['depense'],
         'objectif': enveloppe['objectif'],
@@ -414,10 +663,16 @@ void main() {
     });
 
     test('Rollover enveloppe avec historique réinitialisé', () async {
-      final enveloppe = {'solde': 80.0, 'depense': 0.0, 'objectif': 100.0, 'historique': <String, Map<String, dynamic>>{}};
+      final enveloppe = {
+        'solde': 80.0,
+        'depense': 0.0,
+        'objectif': 100.0,
+        'historique': <String, Map<String, dynamic>>{},
+      };
       final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
       enveloppe['historique'] = <String, Map<String, dynamic>>{};
-      (enveloppe['historique'] as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
+      (enveloppe['historique']
+          as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
         'solde': enveloppe['solde'],
         'depense': enveloppe['depense'],
         'objectif': enveloppe['objectif'],
@@ -427,19 +682,36 @@ void main() {
 
     test('Rollover avec plusieurs enveloppes', () async {
       final enveloppes = [
-        {'solde': 100.0, 'depense': 0.0, 'objectif': 200.0, 'historique': <String, Map<String, dynamic>>{}},
-        {'solde': -10.0, 'depense': 0.0, 'objectif': 50.0, 'historique': <String, Map<String, dynamic>>{}}
+        {
+          'solde': 100.0,
+          'depense': 0.0,
+          'objectif': 200.0,
+          'historique': <String, Map<String, dynamic>>{},
+        },
+        {
+          'solde': -10.0,
+          'depense': 0.0,
+          'objectif': 50.0,
+          'historique': <String, Map<String, dynamic>>{},
+        },
       ];
       final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
       for (var enveloppe in enveloppes) {
-        (enveloppe['historique'] as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
+        (enveloppe['historique']
+            as Map<String, Map<String, dynamic>>)[currentMonthKey] = {
           'solde': enveloppe['solde'],
           'depense': enveloppe['depense'],
           'objectif': enveloppe['objectif'],
         };
       }
-      expect((enveloppes[0]['historique'] as Map)[currentMonthKey]['solde'], 100.0);
-      expect((enveloppes[1]['historique'] as Map)[currentMonthKey]['solde'], -10.0);
+      expect(
+        (enveloppes[0]['historique'] as Map)[currentMonthKey]['solde'],
+        100.0,
+      );
+      expect(
+        (enveloppes[1]['historique'] as Map)[currentMonthKey]['solde'],
+        -10.0,
+      );
     });
   });
 

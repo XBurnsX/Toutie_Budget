@@ -8,8 +8,7 @@ import '../widgets/numeric_keyboard.dart';
 class PageModificationCompte extends StatefulWidget {
   final Compte compte;
 
-  const PageModificationCompte({Key? key, required this.compte})
-    : super(key: key);
+  const PageModificationCompte({super.key, required this.compte});
 
   @override
   State<PageModificationCompte> createState() => _PageModificationCompteState();

@@ -13,7 +13,7 @@ class ChampEnveloppe extends StatelessWidget {
   final Color Function(Map<String, dynamic>) getCouleurCompteEnveloppe;
 
   const ChampEnveloppe({
-    Key? key,
+    super.key,
     required this.enveloppeSelectionnee,
     required this.categoriesFirebase,
     required this.comptesFirebase,
@@ -22,7 +22,7 @@ class ChampEnveloppe extends StatelessWidget {
     required this.compteSelectionne,
     required this.onEnveloppeChanged,
     required this.getCouleurCompteEnveloppe,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -11,12 +11,12 @@ class ChampMontant extends StatelessWidget {
   final VoidCallback onMontantChange;
 
   const ChampMontant({
-    Key? key,
+    super.key,
     required this.controller,
     required this.estFractionnee,
     required this.onFractionnementSupprime,
     required this.onMontantChange,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

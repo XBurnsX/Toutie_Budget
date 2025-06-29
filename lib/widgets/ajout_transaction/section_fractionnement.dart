@@ -8,12 +8,12 @@ class SectionFractionnement extends StatelessWidget {
   final VoidCallback onOuvrirModaleFractionnement;
 
   const SectionFractionnement({
-    Key? key,
+    super.key,
     required this.estFractionnee,
     required this.transactionFractionnee,
     required this.onSupprimerFractionnement,
     required this.onOuvrirModaleFractionnement,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -68,31 +68,29 @@ class SectionFractionnement extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            ...transactionFractionnee!.sousItems
-                .map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            item.description,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            '${item.montant.toStringAsFixed(2)} \$',
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
+            ...transactionFractionnee!.sousItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        item.description,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
+                    Expanded(
+                      child: Text(
+                        '${item.montant.toStringAsFixed(2)} \$',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const Divider(),
             Row(
               children: [
