@@ -224,14 +224,56 @@ class UpdateService {
 
   // Workflow complet de mise à jour
   Future<void> checkAndProposeUpdate(BuildContext context) async {
-    final updateInfo = await checkForUpdate();
+    // Afficher un indicateur de chargement
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Vérification des mises à jour...'),
+          ],
+        ),
+      ),
+    );
 
-    if (updateInfo != null) {
-      final shouldUpdate = await proposeUpdate(context, updateInfo);
+    try {
+      final updateInfo = await checkForUpdate();
 
-      if (shouldUpdate) {
-        await downloadAndInstall(context, updateInfo);
+      // Fermer le dialogue de chargement
+      Navigator.of(context).pop();
+
+      if (updateInfo != null) {
+        final shouldUpdate = await proposeUpdate(context, updateInfo);
+
+        if (shouldUpdate) {
+          await downloadAndInstall(context, updateInfo);
+        }
+      } else {
+        // Afficher un message si aucune mise à jour n'est disponible
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '✅ Vous utilisez déjà la dernière version disponible !',
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
+    } catch (e) {
+      // Fermer le dialogue de chargement en cas d'erreur
+      Navigator.of(context).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Erreur lors de la vérification : ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
 

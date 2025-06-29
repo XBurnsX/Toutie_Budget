@@ -57,7 +57,6 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   mockito: any
   firebase_core_platform_interface: any
-  firebase_app_distribution: ^1.1.1
 
 flutter_icons:
   android: true
@@ -78,4 +77,5 @@ flutter:
   # Déclaration des assets pour la splash screen
   assets:
     - assets/images/login.png
+    - assets/images/app_icon.png
     - assets/icons/

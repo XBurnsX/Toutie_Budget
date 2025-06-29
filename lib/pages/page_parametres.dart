@@ -98,6 +98,13 @@ class _PageParametresState extends State<PageParametres> {
                   'Mise à jour',
                   style: TextStyle(color: Colors.blue),
                 ),
+                subtitle: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    final version = snapshot.data?.version ?? '';
+                    return Text('Version actuelle : $version');
+                  },
+                ),
                 onTap: () async {
                   // Utiliser le nouveau service de mise à jour
                   await UpdateService().checkAndProposeUpdate(context);
@@ -234,8 +241,36 @@ class _PageParametresState extends State<PageParametres> {
                   showAboutDialog(
                     context: context,
                     applicationName: 'Toutie Budget',
-                    applicationVersion: info.version,
-                    applicationLegalese: '© 2025 XBurnsX Inc',
+                    applicationVersion:
+                        'Version ${info.version} (Build ${info.buildNumber})',
+                    applicationIcon: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Image.asset(
+                        'assets/images/app_icon.png',
+                        fit: BoxFit.contain,
+                        width: 50,
+                        height: 50,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Icon(Icons.info, size: 50, color: Colors.blue),
+                      ),
+                    ),
+                    applicationLegalese:
+                        '© 2025 XBurnsX Inc\n\nApplication de gestion de budget personnel avec système de comptes, enveloppes et suivi des dettes.',
+                    children: [
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Fonctionnalités principales :',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '• Gestion des comptes et enveloppes\n• Suivi des transactions\n• Gestion des dettes et prêts\n• Statistiques et graphiques\n• Mises à jour automatiques',
+                      ),
+                    ],
                   );
                 },
               ),

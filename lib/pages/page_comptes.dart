@@ -129,39 +129,42 @@ class PageComptes extends StatelessWidget {
                       ];
 
                       if (dettesAfficher.isNotEmpty) {
-                        return Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
-                              ),
-                              child: Text(
-                                'Dettes',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white70,
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8.0,
+                                ),
+                                child: Text(
+                                  'Dettes',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ),
-                            ),
-                            ...dettesAfficher.map((item) {
-                              if (item is Compte) {
-                                // Dette manuelle (compte)
-                                return _buildCompteCard(
-                                  item,
-                                  Colors.red,
-                                  context,
-                                  false,
-                                );
-                              } else if (item is Dette) {
-                                // Dette de la collection dettes
-                                return _buildDetteCard(item, context);
-                              }
-                              return SizedBox.shrink();
-                            }),
-                            SizedBox(height: 24),
-                          ],
+                              ...dettesAfficher.map((item) {
+                                if (item is Compte) {
+                                  // Dette manuelle (compte)
+                                  return _buildCompteCard(
+                                    item,
+                                    Colors.red,
+                                    context,
+                                    false,
+                                  );
+                                } else if (item is Dette) {
+                                  // Dette de la collection dettes
+                                  return _buildDetteCard(item, context);
+                                }
+                                return SizedBox.shrink();
+                              }),
+                              SizedBox(height: 24),
+                            ],
+                          ),
                         );
                       }
                       return SizedBox.shrink();

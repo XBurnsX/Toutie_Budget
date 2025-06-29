@@ -55,9 +55,11 @@ class ThemeService extends ChangeNotifier {
     return ThemeData(
       primarySwatch: _createMaterialColor(primaryColor),
       primaryColor: primaryColor,
+      scaffoldBackgroundColor: const Color(0xFF18191A),
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.dark,
+        background: const Color(0xFF18191A),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: primaryColor,
