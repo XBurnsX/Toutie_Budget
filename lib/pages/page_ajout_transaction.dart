@@ -167,7 +167,11 @@ class _EcranAjoutTransactionRefactoredState
             messageFinalisation = '${result['nomTiers']} a finalisé son prêt !';
           } else if (result['typeMouvement'] ==
               TypeMouvementFinancier.remboursementEffectue) {
-            messageFinalisation = 'Félicitations, votre prêt est terminé !';
+            if (result['estManuelle'] == true) {
+              messageFinalisation = 'Félicitations, votre dette est terminée !';
+            } else {
+              messageFinalisation = 'Félicitations, votre prêt est terminé !';
+            }
           }
 
           if (mounted && messageFinalisation.isNotEmpty) {

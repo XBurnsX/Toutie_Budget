@@ -410,6 +410,7 @@ class AjoutTransactionController extends ChangeNotifier {
         dateCreation: DateTime.now(),
         dateArchivage: null,
         userId: user.uid,
+        estManuelle: false,
       );
 
       print(
@@ -538,10 +539,16 @@ class AjoutTransactionController extends ChangeNotifier {
 
       // Retourner l'information sur la finalisation de la dette
       if (detteFinalisee) {
+        // On prend la dernière dette finalisée pour récupérer estManuelle
+        final detteFinaliseeObj = dettesATiers.lastWhere(
+          (d) => d.solde <= 0,
+          orElse: () => dettesATiers.last,
+        );
         return {
           'finalisee': true,
           'typeMouvement': typeMouvement,
           'nomTiers': nomTiers,
+          'estManuelle': detteFinaliseeObj.estManuelle,
         };
       }
 
