@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
@@ -137,9 +138,14 @@ class UpdateService {
       );
 
       // Télécharger l'APK avec mise à jour de la progression
-      final tempDir = await getTemporaryDirectory();
+      final externalDir = await getExternalStorageDirectory();
+      final downloadDir = Directory("${externalDir!.path}");
+      if (!await downloadDir.exists()) {
+        await downloadDir.create(recursive: true);
+      }
+
       final savePath =
-          "${tempDir.path}/mise_a_jour_${updateInfo.latestVersion}.apk";
+          "${externalDir.path}/mise_a_jour_${updateInfo.latestVersion}.apk";
       final dio = Dio();
 
       await dio.download(
@@ -175,8 +181,11 @@ class UpdateService {
         ),
       );
 
-      // Ouvrir l'APK pour installation
-      final result = await OpenFile.open(savePath);
+      // Ouvrir l'APK pour installation avec type MIME spécifique
+      final result = await OpenFile.open(
+        savePath,
+        type: "application/vnd.android.package-archive",
+      );
 
       // Gérer le résultat
       if (result.type == ResultType.done) {

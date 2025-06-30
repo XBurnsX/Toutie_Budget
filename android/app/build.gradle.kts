@@ -43,7 +43,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("debug")
             
             // Appliquer le plugin App Distribution uniquement en release
             project.plugins.apply("com.google.firebase.appdistribution")
