@@ -178,8 +178,9 @@ class DetteService {
       }
       await doc.update(updates);
 
-      // Si le solde est maintenant à 0, archiver automatiquement la dette
-      if (nouveauSolde == 0) {
+      // Si le solde est maintenant à 0 (ou très proche de 0), archiver automatiquement la dette
+      if (nouveauSolde.abs() <= 0.01) {
+        // Tolérance de 1 cent
         await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
 
         // Supprimer l'enveloppe correspondante
@@ -325,7 +326,7 @@ class DetteService {
       // Le solde est maintenant calculé automatiquement par _recalculerSolde()
       if (detteTerminee) {
         final detteActuelle = await getDette(dette.id);
-        if (detteActuelle != null && detteActuelle.solde <= 0) {
+        if (detteActuelle != null && detteActuelle.solde.abs() <= 0.01) {
           await ajusterSoldeEtArchiver(dette.id, 0);
         }
       }
@@ -445,7 +446,7 @@ class DetteService {
       // lors de l'ajout du mouvement. Plus besoin de calcul linéaire.
       // On vérifie juste si la dette doit être archivée en récupérant le solde actuel.
       final detteActuelle = await getDette(dette.id);
-      if (detteActuelle != null && detteActuelle.solde <= 0) {
+      if (detteActuelle != null && detteActuelle.solde.abs() <= 0.01) {
         await ajusterSoldeEtArchiver(dette.id, 0);
       }
 
@@ -454,7 +455,8 @@ class DetteService {
 
       // Vérifier si la dette est soldée après recalcul automatique
       final detteApresRecalcul = await getDette(dette.id);
-      if (detteApresRecalcul != null && detteApresRecalcul.solde <= 0) {
+      if (detteApresRecalcul != null &&
+          detteApresRecalcul.solde.abs() <= 0.01) {
         messagesArchivage.add(
           '${typeDetteRecherche == 'pret' ? 'Prêt à' : 'Dette envers'} ${dette.nomTiers} de ${dette.montantInitial.toStringAsFixed(2)}\$ soldé et archivé.',
         );
@@ -507,7 +509,8 @@ class DetteService {
     // Mettre à jour le solde dans la collection 'comptes' (en négatif)
     await compteRef.update({'solde': -nouveauSolde});
 
-    if (nouveauSolde <= 0) {
+    if (nouveauSolde.abs() <= 0.01) {
+      // Tolérance de 1 cent
       await docRef.update({
         'archive': true,
         'dateArchivage': FieldValue.serverTimestamp(),
@@ -612,7 +615,8 @@ class DetteService {
       await _mettreAJourObjectifEnveloppeDette(dette);
 
       // 3. Gérer l'archivage de la dette si le solde est nul ou négatif
-      if (dette.solde <= 0) {
+      if (dette.solde.abs() <= 0.01) {
+        // Tolérance de 1 cent
         await docRef.update({
           'archive': true,
           'dateArchivage': FieldValue.serverTimestamp(),
@@ -652,6 +656,24 @@ class DetteService {
         if (!data.containsKey('estManuelle')) {
           print('DEBUG: Mise à jour dette ${doc.id} - ajout estManuelle: true');
           await dettesRef.doc(doc.id).update({'estManuelle': true});
+        }
+
+        // Vérifier si le solde est proche de 0 et archiver si nécessaire
+        final solde = (data['solde'] as num?)?.toDouble() ?? 0.0;
+        if (solde.abs() <= 0.01) {
+          print(
+            'DEBUG: Dette ${doc.id} avec solde proche de 0 ($solde) - archivage automatique',
+          );
+          await doc.reference.update({
+            'archive': true,
+            'dateArchivage': FieldValue.serverTimestamp(),
+          });
+
+          // Supprimer l'enveloppe correspondante
+          final nomTiers = data['nomTiers'] as String?;
+          if (nomTiers != null) {
+            await _supprimerEnveloppeDette(nomTiers);
+          }
         }
       }
 
@@ -763,15 +785,21 @@ class DetteService {
           .where((env) => env.nom != nomTiersDette)
           .toList();
 
-      // 3. Mettre à jour la catégorie
-      final categorieModifiee = Categorie(
-        id: categorieDettes.id,
-        nom: categorieDettes.nom,
-        enveloppes: enveloppesRestantes,
-        userId: user.uid,
-      );
+      // 3. Si plus d'enveloppes dans la catégorie "Dettes", supprimer la catégorie entière
+      if (enveloppesRestantes.isEmpty) {
+        await firebaseService.supprimerCategorie(categorieDettes.id);
+        print('DEBUG: Catégorie "Dettes" supprimée car plus d\'enveloppes');
+      } else {
+        // 4. Sinon, mettre à jour la catégorie avec les enveloppes restantes
+        final categorieModifiee = Categorie(
+          id: categorieDettes.id,
+          nom: categorieDettes.nom,
+          enveloppes: enveloppesRestantes,
+          userId: user.uid,
+        );
 
-      await firebaseService.ajouterCategorie(categorieModifiee);
+        await firebaseService.ajouterCategorie(categorieModifiee);
+      }
 
       print('DEBUG: Enveloppe supprimée pour la dette: $nomTiersDette');
     } catch (e) {
