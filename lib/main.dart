@@ -5,7 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:toutie_budget/pages/page_login.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
-import 'package:toutie_budget/services/update_service.dart';
+
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -174,12 +174,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    // Vérifier les mises à jour au démarrage (avec un délai pour laisser l'app se charger)
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        UpdateService().checkAndProposeUpdate(context);
-      }
-    });
 
     // Mettre à jour les dettes existantes pour ajouter le champ estManuelle
     Future.delayed(const Duration(seconds: 3), () {

@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:dio/dio.dart';
-import 'package:open_file/open_file.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:path_provider/path_provider.dart';
+
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
-import 'package:toutie_budget/services/update_service.dart';
+
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../themes/dropdown_theme_extension.dart';
 
 class PageParametres extends StatefulWidget {
@@ -93,25 +91,7 @@ class _PageParametresState extends State<PageParametres> {
                   ),
                 ),
               ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.update, color: Colors.blue),
-                title: const Text(
-                  'Mise à jour',
-                  style: TextStyle(color: Colors.blue),
-                ),
-                subtitle: FutureBuilder<PackageInfo>(
-                  future: PackageInfo.fromPlatform(),
-                  builder: (context, snapshot) {
-                    final version = snapshot.data?.version ?? '';
-                    return Text('Version actuelle : $version');
-                  },
-                ),
-                onTap: () async {
-                  // Utiliser le nouveau service de mise à jour
-                  await UpdateService().checkAndProposeUpdate(context);
-                },
-              ),
+
               const Divider(),
               ListTile(
                 leading: Icon(Icons.palette, color: themeService.primaryColor),
@@ -181,15 +161,7 @@ class _PageParametresState extends State<PageParametres> {
                 ),
               ),
               const Divider(),
-              // ListTile(
-              //   leading: Icon(Icons.speed, color: themeService.primaryColor),
-              //   title: const Text('Test barre de progression'),
-              //   subtitle: const Text('Tester la barre de téléchargement'),
-              //   onTap: () async {
-              //     await UpdateService().testDownloadProgress(context);
-              //   },
-              // ),
-              // const Divider(),
+
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.red),
                 title: const Text('Réinitialiser votre compte'),
@@ -290,40 +262,6 @@ class _PageParametresState extends State<PageParametres> {
             ],
           );
         },
-      ),
-    );
-  }
-
-  void _showInstallationInstructions() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Installation en cours'),
-        content: const Text(
-          'L\'installateur a été ouvert. Suivez les instructions à l\'écran pour terminer l\'installation de la mise à jour.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showInstallationError(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Erreur d\'installation'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }
