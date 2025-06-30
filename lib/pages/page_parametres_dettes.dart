@@ -44,7 +44,14 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   String? _erreurSimulateur;
   bool _afficherResultatsCalcul = false;
 
+  // Total des paiements réellement enregistrés dans les transactions
+  double _totalRemboursements = 0.0;
+  double _totalAssocie = 0.0;
+  double _totalCompte = 0.0;
+  double? _soldeFirestore;
+
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _detteListener;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _txListener;
 
   @override
   void initState() {
@@ -65,11 +72,57 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           final data = snapshot.data();
           if (data == null) return;
           final paiements = (data['paiementsEffectues'] as num?)?.toInt() ?? 0;
+          _soldeFirestore = (data['solde'] as num?)?.toDouble();
+
           if (_paiementsEffectuesController.text != paiements.toString()) {
             setState(() {
               _paiementsEffectuesController.text = paiements.toString();
             });
           }
+        });
+
+    void _updateAssocie(QuerySnapshot<Map<String, dynamic>> snapshot) {
+      double total = 0.0;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final montant = (data['montant'] as num?)?.toDouble() ?? 0.0;
+        final typeMvt = data['typeMouvement'] as String?;
+        if (typeMvt == 'remboursementEffectue' ||
+            typeMvt == 'remboursementRecu') {
+          total += montant;
+        }
+      }
+      _totalAssocie = total;
+      setState(() {
+        _totalRemboursements = _totalAssocie + _totalCompte;
+      });
+    }
+
+    _txListener = FirebaseFirestore.instance
+        .collection('transactions')
+        .where('compteDePassifAssocie', isEqualTo: widget.dette.id)
+        .snapshots()
+        .listen(_updateAssocie);
+
+    FirebaseFirestore.instance
+        .collection('transactions')
+        .where('compteId', isEqualTo: widget.dette.id)
+        .snapshots()
+        .listen((snapshot) {
+          double total = 0.0;
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final montant = (data['montant'] as num?)?.toDouble() ?? 0.0;
+            final typeMvt = data['typeMouvement'] as String?;
+            if (typeMvt == 'remboursementEffectue' ||
+                typeMvt == 'remboursementRecu') {
+              total += montant;
+            }
+          }
+          _totalCompte = total;
+          setState(() {
+            _totalRemboursements = _totalAssocie + _totalCompte;
+          });
         });
   }
 
@@ -939,6 +992,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       final nouveauSolde = _calculerValeursPret()['soldeRestant'];
       final ancienSolde = widget.dette.solde;
 
+      // Calculer le coût total avec intérêts
+      final calculs = _calculerValeursPret();
+      final coutTotalCalcule = calculs['coutTotal'];
+
       // Créer l'objet Dette complet avec toutes les informations à jour
       final detteModifiee = widget.dette.copyWith(
         tauxInteret: _toDouble(_tauxController.text) ?? 0,
@@ -946,6 +1003,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         dateFin: _parseDate(_dateFinController.text),
         montantMensuel: _toDouble(_montantMensuelController.text) ?? 0,
         prixAchat: _toDouble(_prixAchatController.text) ?? 0,
+        coutTotal: coutTotalCalcule, // Stocker le coût total avec intérêts
         nombrePaiements: int.tryParse(_nombrePaiementsController.text),
         paiementsEffectues: int.tryParse(_paiementsEffectuesController.text),
         solde: nouveauSolde, // On met à jour le solde ici pour la sauvegarde
@@ -1002,6 +1060,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     print('  Durée (mois, depuis dates): $dureeMois');
     print('  Paiements Effectués: $paiementsEffectues');
     print('  Paiement Mensuel Saisi: $paiementMensuelSaisi');
+    print('  Solde Firestore: $_soldeFirestore');
 
     double? montantMensuel;
     double? coutTotal;
@@ -1018,34 +1077,30 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         dureeMois: dureeMois,
       );
 
-      final paiementMensuelEffectif = paiementMensuelSaisi ?? montantMensuel;
-
-      if (paiementMensuelEffectif != null) {
+      // Utiliser le coût total stocké dans Firebase si disponible
+      if (widget.dette.coutTotal != null) {
+        coutTotal = widget.dette.coutTotal;
+      } else {
+        // Sinon le calculer (pour compatibilité avec anciennes dettes)
         coutTotal = CalculPretService.calculerCoutTotal(
-          paiementMensuel: paiementMensuelEffectif,
+          paiementMensuel: montantMensuel,
           dureeMois: dureeMois,
         );
-
-        if (paiementsEffectues != null) {
-          final totalPaye = paiementMensuelEffectif * paiementsEffectues;
-          soldeRestant = coutTotal - totalPaye;
-
-          if (soldeRestant < 0) soldeRestant = 0;
-
-          // Calcul des intérêts payés
-          if (soldeRestant != null) {
-            final capitalRembourse = prixAchat - soldeRestant;
-            interetsPayes = totalPaye - capitalRembourse;
-          }
-        }
       }
-    } else if (paiementMensuelSaisi != null &&
-        dureeMois != null &&
-        paiementsEffectues != null) {
-      coutTotal = paiementMensuelSaisi * dureeMois;
-      final totalPaye = paiementMensuelSaisi * paiementsEffectues;
-      soldeRestant = coutTotal - totalPaye;
-      if (soldeRestant < 0) soldeRestant = 0;
+
+      // Appliquer les remboursements réels au coût total
+      double calc = coutTotal! - _totalRemboursements;
+      if (calc < 0) calc = 0;
+      soldeRestant = calc;
+
+      // Prendre le solde Firestore comme source de vérité si présent
+      if (_soldeFirestore != null) {
+        soldeRestant = _soldeFirestore;
+      }
+
+      // Intérêts payés = total remboursé - capital remboursé
+      final capitalRembourse = prixAchat - (soldeRestant ?? 0);
+      interetsPayes = _totalRemboursements - capitalRembourse;
     }
 
     print('  -> Montant Mensuel Calculé: $montantMensuel');
@@ -1105,6 +1160,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     // Annuler l'abonnement Firestore
     _detteListener?.cancel();
+    _txListener?.cancel();
     super.dispose();
   }
 

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/dette.dart';
 import '../models/compte.dart';
 import 'firebase_service.dart';
+import 'calcul_pret_service.dart';
 
 class DetteService {
   final CollectionReference dettesRef = FirebaseFirestore.instance.collection(
@@ -70,19 +71,59 @@ class DetteService {
           .map((item) => MouvementDette.fromMap(item as Map<String, dynamic>))
           .toList();
 
-      // Calculer le nouveau solde basé sur l'historique
-      double nouveauSolde = montantInitial;
+      // Vérifier si c'est un prêt amortissable (avec taux d'intérêt)
+      final tauxInteret = detteData['tauxInteret'] != null
+          ? (detteData['tauxInteret'] as num).toDouble()
+          : null;
+      final prixAchat = detteData['prixAchat'] != null
+          ? (detteData['prixAchat'] as num).toDouble()
+          : null;
+      final dateDebut = detteData['dateDebut'] != null
+          ? (detteData['dateDebut'] as Timestamp).toDate()
+          : null;
+      final dateFin = detteData['dateFin'] != null
+          ? (detteData['dateFin'] as Timestamp).toDate()
+          : null;
+      final paiementsEffectues = detteData['paiementsEffectues'] != null
+          ? (detteData['paiementsEffectues'] as num).toInt()
+          : 0;
 
-      for (MouvementDette mouvement in historique) {
-        // Les remboursements sont stockés avec un montant négatif, donc on les additionne directement
-        if (mouvement.type == 'remboursement_recu' ||
-            mouvement.type == 'remboursement_effectue') {
-          nouveauSolde += mouvement.montant; // montant est déjà négatif
+      double nouveauSolde;
+
+      // Nouveau calcul : coutTotal - transactions
+      final coutTotal = detteData['coutTotal'] != null
+          ? (detteData['coutTotal'] as num).toDouble()
+          : null;
+
+      if (coutTotal != null) {
+        // Utiliser le coût total stocké dans Firebase
+        double totalRemboursements = 0.0;
+
+        for (MouvementDette mouvement in historique) {
+          if (mouvement.type == 'remboursement_recu' ||
+              mouvement.type == 'remboursement_effectue') {
+            totalRemboursements += mouvement.montant.abs(); // Montant positif
+          }
         }
-      }
 
-      // S'assurer que le solde ne devient pas négatif
-      nouveauSolde = nouveauSolde < 0 ? 0 : nouveauSolde;
+        // Calcul : coutTotal - remboursements
+        nouveauSolde = coutTotal - totalRemboursements;
+
+        // S'assurer que le solde ne devient pas négatif
+        if (nouveauSolde < 0) nouveauSolde = 0;
+      } else {
+        // Fallback : ancien calcul pour compatibilité
+        nouveauSolde = montantInitial;
+
+        for (MouvementDette mouvement in historique) {
+          if (mouvement.type == 'remboursement_recu' ||
+              mouvement.type == 'remboursement_effectue') {
+            nouveauSolde += mouvement.montant; // montant est déjà négatif
+          }
+        }
+
+        nouveauSolde = nouveauSolde < 0 ? 0 : nouveauSolde;
+      }
 
       // Mettre à jour le solde dans Firestore
       await doc.update({'solde': nouveauSolde});
@@ -211,9 +252,13 @@ class DetteService {
         });
       }
 
-      // Si la dette est terminée, l'archiver automatiquement
+      // Si la dette était terminée, vérifier si elle doit être archivée
+      // Le solde est maintenant calculé automatiquement par _recalculerSolde()
       if (detteTerminee) {
-        await ajusterSoldeEtArchiver(dette.id, 0);
+        final detteActuelle = await getDette(dette.id);
+        if (detteActuelle != null && detteActuelle.solde <= 0) {
+          await ajusterSoldeEtArchiver(dette.id, 0);
+        }
       }
     }
 
@@ -327,24 +372,20 @@ class DetteService {
         aDejaIncremente = true;
       }
 
-      // Calculer le nouveau solde selon le type
-      double nouveauSolde;
-      if (typeRemboursement == 'remboursement_recu') {
-        // Pour un prêt : le solde diminue quand on reçoit un remboursement
-        nouveauSolde = dette.solde - montantAPayer;
-      } else {
-        // Pour une dette contractée : le solde diminue quand on rembourse
-        nouveauSolde = dette.solde - montantAPayer;
+      // Le solde est maintenant calculé automatiquement par _recalculerSolde()
+      // lors de l'ajout du mouvement. Plus besoin de calcul linéaire.
+      // On vérifie juste si la dette doit être archivée en récupérant le solde actuel.
+      final detteActuelle = await getDette(dette.id);
+      if (detteActuelle != null && detteActuelle.solde <= 0) {
+        await ajusterSoldeEtArchiver(dette.id, 0);
       }
-
-      // Ajuster le solde et archiver si nécessaire
-      await ajusterSoldeEtArchiver(dette.id, nouveauSolde);
 
       // Déduire le montant payé du montant restant
       montantRestant -= montantAPayer;
 
-      // Vérifier si la dette est soldée
-      if (nouveauSolde <= 0) {
+      // Vérifier si la dette est soldée après recalcul automatique
+      final detteApresRecalcul = await getDette(dette.id);
+      if (detteApresRecalcul != null && detteApresRecalcul.solde <= 0) {
         messagesArchivage.add(
           '${typeDetteRecherche == 'pret' ? 'Prêt à' : 'Dette envers'} ${dette.nomTiers} de ${dette.montantInitial.toStringAsFixed(2)}\$ soldé et archivé.',
         );
@@ -425,6 +466,7 @@ class DetteService {
       dateFin: dette.dateFin,
       montantMensuel: dette.montantMensuel,
       prixAchat: dette.prixAchat,
+      coutTotal: dette.coutTotal,
       nombrePaiements: dette.nombrePaiements,
       dateDebut: dette.dateDebut,
       paiementsEffectues: dette.paiementsEffectues,
