@@ -38,10 +38,6 @@ android {
             keyPassword = "android"
             storeFile = file("upload-keystore.jks")
             storePassword = "android"
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
-            enableV4Signing = true
         }
     }
 
