@@ -90,13 +90,29 @@ class FirebaseService {
           isEqualTo: user.uid,
         ) // Ne lit que les catégories de l'utilisateur
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
+        .map((snapshot) {
+          final categories = snapshot.docs
               .map(
                 (doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>),
               )
-              .toList(),
-        );
+              .toList();
+
+          // Trier les catégories : "Dettes" en premier, puis les autres
+          categories.sort((a, b) {
+            final aEstDettes =
+                a.nom.toLowerCase() == 'dettes' ||
+                a.nom.toLowerCase() == 'dette';
+            final bEstDettes =
+                b.nom.toLowerCase() == 'dettes' ||
+                b.nom.toLowerCase() == 'dette';
+
+            if (aEstDettes && !bEstDettes) return -1;
+            if (!aEstDettes && bEstDettes) return 1;
+            return a.nom.compareTo(b.nom);
+          });
+
+          return categories;
+        });
   }
 
   Future<void> ajouterTransaction(app_model.Transaction transaction) async {

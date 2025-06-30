@@ -183,9 +183,10 @@ class DetteService {
         // Tolérance de 1 cent
         await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
 
-        // Supprimer l'enveloppe correspondante
+        // Supprimer l'enveloppe correspondante seulement si c'était une dette (pas un prêt)
+        final typeDette = detteData['type'] as String?;
         final nomTiersDette = detteData['nomTiers'] as String?;
-        if (nomTiersDette != null) {
+        if (nomTiersDette != null && typeDette == 'dette') {
           await _supprimerEnveloppeDette(nomTiersDette);
         }
       }
@@ -684,8 +685,17 @@ class DetteService {
   }
 
   /// Crée automatiquement une catégorie "Dette" (ou "Dettes") et une enveloppe pour la dette
+  /// Seulement pour les dettes où l'utilisateur doit de l'argent (type 'dette'), pas les prêts
   Future<void> _creerEnveloppePourDette(Dette dette) async {
     try {
+      // Ne créer une enveloppe que pour les dettes (pas les prêts)
+      if (dette.type != 'dette') {
+        print(
+          'DEBUG: Pas de création d\'enveloppe pour le type: ${dette.type}',
+        );
+        return;
+      }
+
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("Aucun utilisateur connecté");
 
@@ -809,8 +819,14 @@ class DetteService {
   }
 
   /// Met à jour l'objectif de l'enveloppe correspondante à une dette
+  /// Seulement pour les dettes où l'utilisateur doit de l'argent (type 'dette'), pas les prêts
   Future<void> _mettreAJourObjectifEnveloppeDette(Dette dette) async {
     try {
+      // Ne mettre à jour l'objectif que pour les dettes (pas les prêts)
+      if (dette.type != 'dette') {
+        return;
+      }
+
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
