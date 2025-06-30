@@ -531,7 +531,9 @@ class AjoutTransactionController extends ChangeNotifier {
       );
 
       // Vérifier si le montant du remboursement ne dépasse pas le solde restant
-      if (montant > totalSoldeRestant) {
+      // Utiliser une marge d'erreur pour éviter les problèmes de précision des nombres à virgule flottante
+      const double epsilon = 0.01; // Marge d'erreur de 1 cent
+      if (montant > totalSoldeRestant + epsilon) {
         final message =
             typeMouvement == TypeMouvementFinancier.remboursementEffectue
             ? 'Seulement ${totalSoldeRestant.abs().toStringAsFixed(2)} dollars sont nécessaires pour rembourser votre dette à $nomTiers'
