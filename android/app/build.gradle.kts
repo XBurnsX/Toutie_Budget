@@ -38,12 +38,16 @@ android {
             keyPassword = "android"
             storeFile = file("upload-keystore.jks")
             storePassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             
             // Appliquer le plugin App Distribution uniquement en release
             project.plugins.apply("com.google.firebase.appdistribution")
