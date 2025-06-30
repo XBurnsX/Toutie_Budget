@@ -87,8 +87,10 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
               title: Text('${dette.nomTiers}${archive ? typeLabel : ''}'),
               subtitle: archive
                   ? Text(
-                      'Montant initial : ${dette.montantInitial.toStringAsFixed(2)}',
-                    ) // Pas de solde pour les archivées
+                      dette.estManuelle && dette.coutTotal != null
+                          ? 'Montant initial : ${dette.montantInitial.toStringAsFixed(2)}\nCoût total : ${dette.coutTotal!.toStringAsFixed(2)}'
+                          : 'Montant initial : ${dette.montantInitial.toStringAsFixed(2)}',
+                    ) // Pour les archivées : montant initial + coût total si dette manuelle
                   : Text(
                       'Montant initial : ${dette.montantInitial.toStringAsFixed(2)}\nSolde : ${dette.solde.toStringAsFixed(2)}',
                     ), // Avec solde pour les actives
