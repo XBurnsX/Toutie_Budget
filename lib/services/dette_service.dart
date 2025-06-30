@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/dette.dart';
-import '../models/compte.dart';
+import '../models/categorie.dart';
 import 'firebase_service.dart';
-import 'calcul_pret_service.dart';
 
 class DetteService {
   final CollectionReference dettesRef = FirebaseFirestore.instance.collection(
@@ -37,6 +36,9 @@ class DetteService {
     // Créer la dette dans Firestore
     await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
     print('DEBUG: Dette sauvegardée dans Firestore: ${dette.id}');
+
+    // Créer automatiquement une enveloppe pour cette dette
+    await _creerEnveloppePourDette(detteAvecUser);
   }
 
   Future<void> ajouterMouvement(
@@ -179,6 +181,12 @@ class DetteService {
       // Si le solde est maintenant à 0, archiver automatiquement la dette
       if (nouveauSolde == 0) {
         await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
+
+        // Supprimer l'enveloppe correspondante
+        final nomTiersDette = detteData['nomTiers'] as String?;
+        if (nomTiersDette != null) {
+          await _supprimerEnveloppeDette(nomTiersDette);
+        }
       }
     } catch (e) {
       print('Erreur lors du recalcul du solde: $e');
@@ -188,8 +196,21 @@ class DetteService {
   Future<void> archiverDette(String detteId) async {
     final doc = dettesRef.doc(detteId);
 
+    // Récupérer les infos de la dette avant archivage
+    String? nomTiersDette;
+    final detteDoc = await doc.get();
+    if (detteDoc.exists) {
+      final data = detteDoc.data() as Map<String, dynamic>;
+      nomTiersDette = data['nomTiers'] as String?;
+    }
+
     // Archiver la dette
     await doc.update({'archive': true, 'dateArchivage': Timestamp.now()});
+
+    // Supprimer l'enveloppe correspondante
+    if (nomTiersDette != null) {
+      await _supprimerEnveloppeDette(nomTiersDette);
+    }
   }
 
   Future<Dette?> getDette(String detteId) async {
@@ -470,6 +491,16 @@ class DetteService {
         .collection('comptes')
         .doc(detteId);
 
+    // Récupérer les infos de la dette avant archivage
+    String? nomTiersDette;
+    if (nouveauSolde <= 0) {
+      final detteDoc = await docRef.get();
+      if (detteDoc.exists) {
+        final data = detteDoc.data() as Map<String, dynamic>;
+        nomTiersDette = data['nomTiers'] as String?;
+      }
+    }
+
     // Mettre à jour le solde dans la collection 'dettes'
     await docRef.update({'solde': nouveauSolde});
 
@@ -485,6 +516,11 @@ class DetteService {
         'estArchive': true,
         'dateSuppression': DateTime.now().toIso8601String(),
       });
+
+      // Supprimer l'enveloppe correspondante
+      if (nomTiersDette != null) {
+        await _supprimerEnveloppeDette(nomTiersDette);
+      }
     }
   }
 
@@ -525,6 +561,9 @@ class DetteService {
     print(
       'DEBUG: Dette sauvegardée dans Firestore: ${dette.id} avec estManuelle: ${dette.estManuelle}',
     );
+
+    // Créer automatiquement une enveloppe pour cette dette
+    await _creerEnveloppePourDette(detteAvecUser);
   }
 
   /// Sauvegarde les paramètres d'intérêt d'une dette manuelle
@@ -545,6 +584,12 @@ class DetteService {
       });
 
       print('DEBUG: Paramètres d\'intérêt sauvegardés pour dette: $detteId');
+
+      // Mettre à jour l'objectif de l'enveloppe avec les nouveaux paramètres
+      final dette = await getDette(detteId);
+      if (dette != null) {
+        await _mettreAJourObjectifEnveloppeDette(dette);
+      }
     } catch (e) {
       print('Erreur lors de la sauvegarde des paramètres d\'intérêt: $e');
       throw Exception('Erreur lors de la sauvegarde des paramètres d\'intérêt');
@@ -563,13 +608,19 @@ class DetteService {
       await docRef.set(dette.toMap());
       print('DEBUG: Document de dette complet sauvegardé: ${dette.id}');
 
-      // 2. Gérer l'archivage de la dette si le solde est nul ou négatif
+      // 2. Mettre à jour l'objectif de l'enveloppe correspondante
+      await _mettreAJourObjectifEnveloppeDette(dette);
+
+      // 3. Gérer l'archivage de la dette si le solde est nul ou négatif
       if (dette.solde <= 0) {
         await docRef.update({
           'archive': true,
           'dateArchivage': FieldValue.serverTimestamp(),
         });
         print('DEBUG: Dette archivée: ${dette.id}');
+
+        // Supprimer l'enveloppe correspondante
+        await _supprimerEnveloppeDette(dette.nomTiers);
       }
 
       // Note: Les dettes manuelles n'ont pas de compte associé dans la collection 'comptes'
@@ -607,6 +658,189 @@ class DetteService {
       print('DEBUG: Mise à jour des dettes existantes terminée');
     } catch (e) {
       print('Erreur lors de la mise à jour des dettes existantes: $e');
+    }
+  }
+
+  /// Crée automatiquement une catégorie "Dette" (ou "Dettes") et une enveloppe pour la dette
+  Future<void> _creerEnveloppePourDette(Dette dette) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("Aucun utilisateur connecté");
+
+      final firebaseService = FirebaseService();
+
+      // 1. Vérifier si la catégorie "Dettes" existe déjà
+      final categories = await firebaseService.lireCategories().first;
+      Categorie? categorieDettes = categories
+          .where(
+            (cat) =>
+                cat.nom.toLowerCase() == 'dettes' ||
+                cat.nom.toLowerCase() == 'dette',
+          )
+          .firstOrNull;
+
+      // 2. Si la catégorie n'existe pas, la créer
+      if (categorieDettes == null) {
+        final nomCategorie =
+            categories.any((cat) => cat.nom.toLowerCase().contains('dette'))
+            ? 'Dettes'
+            : 'Dettes';
+        categorieDettes = Categorie(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          nom: nomCategorie,
+          enveloppes: [],
+          userId: user.uid,
+        );
+        await firebaseService.ajouterCategorie(categorieDettes);
+      }
+
+      // 3. Créer l'enveloppe pour cette dette
+      final enveloppeId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      // Déterminer l'objectif selon les règles spécifiées
+      Map<String, dynamic> enveloppeData = {
+        'id': enveloppeId,
+        'nom': dette.nomTiers,
+        'solde': 0.0,
+        'depense': 0.0,
+        'historique': <String, dynamic>{},
+        'provenances': <dynamic>[],
+      };
+
+      // À la création initiale, pas d'objectif configuré (sera mis à jour lors de la sauvegarde des paramètres)
+      enveloppeData['objectif'] = 0.0;
+      enveloppeData['frequence_objectif'] = null;
+      enveloppeData['objectif_jour'] = null;
+
+      // 4. Ajouter l'enveloppe à la catégorie
+      final nouvellesEnveloppes = [
+        ...categorieDettes.enveloppes.map((e) => e.toMap()),
+        enveloppeData,
+      ];
+
+      final categorieModifiee = Categorie(
+        id: categorieDettes.id,
+        nom: categorieDettes.nom,
+        enveloppes: nouvellesEnveloppes
+            .map((e) => Enveloppe.fromMap(e))
+            .toList(),
+        userId: user.uid,
+      );
+
+      await firebaseService.ajouterCategorie(categorieModifiee);
+
+      print(
+        'DEBUG: Enveloppe créée pour la dette ${dette.nomTiers} avec ID: $enveloppeId',
+      );
+    } catch (e) {
+      print('Erreur lors de la création de l\'enveloppe pour la dette: $e');
+      // Ne pas faire échouer la création de la dette si l'enveloppe échoue
+    }
+  }
+
+  /// Supprime l'enveloppe correspondante à une dette lors de son archivage
+  Future<void> _supprimerEnveloppeDette(String nomTiersDette) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final firebaseService = FirebaseService();
+
+      // 1. Trouver la catégorie "Dettes"
+      final categories = await firebaseService.lireCategories().first;
+      final categorieDettes = categories
+          .where(
+            (cat) =>
+                cat.nom.toLowerCase() == 'dettes' ||
+                cat.nom.toLowerCase() == 'dette',
+          )
+          .firstOrNull;
+
+      if (categorieDettes == null) return;
+
+      // 2. Trouver et supprimer l'enveloppe correspondante
+      final enveloppesRestantes = categorieDettes.enveloppes
+          .where((env) => env.nom != nomTiersDette)
+          .toList();
+
+      // 3. Mettre à jour la catégorie
+      final categorieModifiee = Categorie(
+        id: categorieDettes.id,
+        nom: categorieDettes.nom,
+        enveloppes: enveloppesRestantes,
+        userId: user.uid,
+      );
+
+      await firebaseService.ajouterCategorie(categorieModifiee);
+
+      print('DEBUG: Enveloppe supprimée pour la dette: $nomTiersDette');
+    } catch (e) {
+      print('Erreur lors de la suppression de l\'enveloppe de la dette: $e');
+      // Ne pas faire échouer l'archivage si la suppression d'enveloppe échoue
+    }
+  }
+
+  /// Met à jour l'objectif de l'enveloppe correspondante à une dette
+  Future<void> _mettreAJourObjectifEnveloppeDette(Dette dette) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final firebaseService = FirebaseService();
+
+      // 1. Trouver la catégorie "Dettes"
+      final categories = await firebaseService.lireCategories().first;
+      final categorieDettes = categories
+          .where(
+            (cat) =>
+                cat.nom.toLowerCase() == 'dettes' ||
+                cat.nom.toLowerCase() == 'dette',
+          )
+          .firstOrNull;
+
+      if (categorieDettes == null) return;
+
+      // 2. Trouver l'enveloppe correspondante
+      final enveloppes = categorieDettes.enveloppes
+          .map((e) => e.toMap())
+          .toList();
+      final indexEnveloppe = enveloppes.indexWhere(
+        (env) => env['nom'] == dette.nomTiers,
+      );
+
+      if (indexEnveloppe == -1) return; // Enveloppe non trouvée
+
+      // 3. Mettre à jour l'objectif selon les nouvelles règles
+      if (dette.estManuelle &&
+          dette.coutTotal != null &&
+          dette.dateDebut != null) {
+        // Dette manuelle avec coût total → objectif mensuel au jour du début
+        enveloppes[indexEnveloppe]['objectif'] = dette.montantMensuel ?? 0.0;
+        enveloppes[indexEnveloppe]['frequence_objectif'] = 'mensuel';
+        enveloppes[indexEnveloppe]['objectif_jour'] = dette.dateDebut!.day;
+      } else {
+        // Dette automatique ou dette manuelle sans coût total → aucun objectif
+        enveloppes[indexEnveloppe]['objectif'] = 0.0;
+        enveloppes[indexEnveloppe]['frequence_objectif'] = null;
+        enveloppes[indexEnveloppe]['objectif_jour'] = null;
+      }
+
+      // 4. Sauvegarder la catégorie modifiée
+      final categorieModifiee = Categorie(
+        id: categorieDettes.id,
+        nom: categorieDettes.nom,
+        enveloppes: enveloppes.map((e) => Enveloppe.fromMap(e)).toList(),
+        userId: user.uid,
+      );
+
+      await firebaseService.ajouterCategorie(categorieModifiee);
+
+      print(
+        'DEBUG: Objectif de l\'enveloppe mis à jour pour la dette: ${dette.nomTiers}',
+      );
+    } catch (e) {
+      print('Erreur lors de la mise à jour de l\'objectif de l\'enveloppe: $e');
+      // Ne pas faire échouer la sauvegarde si la mise à jour d'objectif échoue
     }
   }
 }
