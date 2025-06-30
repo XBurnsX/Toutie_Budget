@@ -234,7 +234,7 @@ class _PageParametresState extends State<PageParametres> {
                       ),
                     ),
                     applicationLegalese:
-                        '© 2025 XBurnsX Inc\n\nApplication de gestion de budget personnel avec système de comptes, enveloppes et suivi des dettes.',
+                        '© 2025 XBurnsX Inc\n\nApplication de gestion de budget personnel avec système de comptes, enveloppes et suivi des dettes.\n\n📧 Support : thexxburnsxx@gmail.com',
                     children: [
                       const SizedBox(height: 16),
                       const Text(

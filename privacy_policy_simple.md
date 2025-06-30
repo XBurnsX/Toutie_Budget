@@ -108,6 +108,7 @@ Pour toute question concernant cette politique de confidentialité ou vos donné
 
 **Développeur :** XBurnsX Inc  
 **Application :** Toutie Budget  
+**Email :** thexxburnsxx@gmail.com  
 **Support :** Via les paramètres de l'application  
 **Version :** 1.1.0+
 
