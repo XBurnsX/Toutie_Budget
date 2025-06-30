@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/transaction_model.dart';
 import '../../controllers/ajout_transaction_controller.dart';
+import '../../themes/dropdown_theme_extension.dart';
 
 class ChampTiers extends StatelessWidget {
   final TextEditingController controller;
@@ -20,6 +21,16 @@ class ChampTiers extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Utiliser la même couleur que les cartes du thème
+    final cardColor =
+        Theme.of(context).cardTheme.color ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey[850]!
+            : Colors.white);
+
+    // Couleur automatique du thème pour les dropdowns
+    final dropdownColor = Theme.of(context).dropdownColor;
+
     return Autocomplete<String>(
       key: ValueKey(typeMouvementSelectionne),
       optionsBuilder: (TextEditingValue textEditingValue) {
@@ -84,13 +95,72 @@ class ChampTiers extends StatelessWidget {
                             TypeMouvementFinancier.remboursementEffectue
                     ? 'Nom du prêteur'
                     : 'Payé à / Reçu de',
-                border: InputBorder.none,
-                isDense: true,
+                hintStyle: TextStyle(
+                  color: Theme.of(context).hintColor.withOpacity(0.7),
+                  fontSize: 16,
+                ),
+                prefixIcon: Icon(
+                  typeMouvementSelectionne ==
+                              TypeMouvementFinancier.detteContractee ||
+                          typeMouvementSelectionne ==
+                              TypeMouvementFinancier.remboursementEffectue
+                      ? Icons.account_balance
+                      : Icons.person_outline,
+                  color: Theme.of(context).hintColor,
+                  size: 20,
+                ),
+                suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: fieldTextEditingController,
+                  builder: (context, value, child) {
+                    return value.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(
+                              Icons.clear,
+                              color: Theme.of(context).hintColor,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              fieldTextEditingController.clear();
+                              controller.clear();
+                              ajoutController.notifyListeners();
+                            },
+                          )
+                        : Icon(
+                            Icons.arrow_drop_down,
+                            color: Theme.of(context).hintColor,
+                          );
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).primaryColor,
+                    width: 2,
+                  ),
+                ),
+                filled: true,
+                fillColor: cardColor,
+                isDense: false,
                 contentPadding: const EdgeInsets.symmetric(
-                  vertical: 10.0,
-                  horizontal: 10.0,
+                  vertical: 16.0,
+                  horizontal: 16.0,
                 ),
               ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
               onChanged: (value) {
                 // Synchronisation immédiate lors de la saisie
                 if (controller.text != value) {
@@ -115,25 +185,93 @@ class ChampTiers extends StatelessWidget {
         FocusScope.of(context).unfocus();
       },
       optionsViewBuilder: (context, onSelected, options) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4.0,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                itemCount: options.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final String option = options.elementAt(index);
-                  return InkWell(
-                    onTap: () => onSelected(option),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(option),
+        return TapRegion(
+          onTapOutside: (event) {
+            // Fermer la liste quand on clique en dehors
+            FocusScope.of(context).unfocus();
+          },
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 8.0,
+              borderRadius: BorderRadius.circular(12.0),
+              shadowColor: Colors.black.withOpacity(0.2),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.0),
+                  color: dropdownColor,
+                  border: Border.all(
+                    color: Theme.of(context).dividerColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 250,
+                    minWidth: 200,
+                  ),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    itemCount: options.length,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: Theme.of(context).dividerColor.withOpacity(0.3),
+                      indent: 16,
+                      endIndent: 16,
                     ),
-                  );
-                },
+                    itemBuilder: (BuildContext context, int index) {
+                      final String option = options.elementAt(index);
+                      final bool isAddOption = option.startsWith("Ajouter : ");
+
+                      return InkWell(
+                        onTap: () => onSelected(option),
+                        borderRadius: BorderRadius.circular(8.0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 12.0,
+                          ),
+                          child: Row(
+                            children: [
+                              if (isAddOption) ...[
+                                Icon(
+                                  Icons.add_circle_outline,
+                                  size: 20,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                                const SizedBox(width: 12),
+                              ] else ...[
+                                Icon(
+                                  Icons.person_outline,
+                                  size: 20,
+                                  color: Theme.of(context).hintColor,
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  option,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: isAddOption
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: isAddOption
+                                        ? Theme.of(context).primaryColor
+                                        : Theme.of(
+                                            context,
+                                          ).textTheme.bodyLarge?.color,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),

@@ -17,6 +17,7 @@ import 'pages/page_set_objectif.dart';
 import 'pages/page_ajout_transaction.dart';
 import 'pages/page_pret_personnel.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'themes/dropdown_theme_extension.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +79,28 @@ class MyApp extends StatelessWidget {
                 bodyLarge: TextStyle(color: Colors.white),
                 bodyMedium: TextStyle(color: Colors.white70),
               ),
+              // Thème pour les nouveaux DropdownMenu
+              dropdownMenuTheme: DropdownMenuThemeData(
+                menuStyle: MenuStyle(
+                  backgroundColor: WidgetStateProperty.all(
+                    Color.lerp(const Color(0xFF232526), Colors.black, 0.15) ??
+                        const Color(0xFF232526),
+                  ),
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              // Extensions pour supporter tous les types de dropdowns
+              extensions: <ThemeExtension<dynamic>>[
+                DropdownThemeExtension(
+                  dropdownColor:
+                      Color.lerp(const Color(0xFF232526), Colors.black, 0.15) ??
+                      const Color(0xFF232526),
+                ),
+              ],
             ),
             home: StreamBuilder<User?>(
               stream: FirebaseService().authStateChanges,

@@ -3,6 +3,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../models/compte.dart';
 import '../services/firebase_service.dart';
 import '../widgets/numeric_keyboard.dart';
+import '../themes/dropdown_theme_extension.dart';
 
 /// Page de modification d'un compte existant
 class PageModificationCompte extends StatefulWidget {
@@ -134,6 +135,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _type,
+                dropdownColor: Theme.of(context).dropdownColor,
                 decoration: const InputDecoration(
                   labelText: 'Type de compte',
                   border: OutlineInputBorder(),

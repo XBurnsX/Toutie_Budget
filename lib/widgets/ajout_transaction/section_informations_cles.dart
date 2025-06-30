@@ -4,6 +4,7 @@ import '../../controllers/ajout_transaction_controller.dart';
 import 'champ_tiers.dart';
 import 'champ_compte.dart';
 import 'champ_enveloppe.dart';
+import '../../themes/dropdown_theme_extension.dart';
 
 class SectionInformationsCles extends StatelessWidget {
   final TypeMouvementFinancier typeMouvementSelectionne;
@@ -199,6 +200,9 @@ class SectionInformationsCles extends StatelessWidget {
   }
 
   Widget _buildDropdownTypeMouvement(BuildContext context) {
+    // Couleur automatique du thème pour les dropdowns
+    final dropdownColor = Theme.of(context).dropdownColor;
+
     return DropdownButtonFormField<TypeMouvementFinancier>(
       value: typeMouvementSelectionne,
       items: TypeMouvementFinancier.values
@@ -225,10 +229,14 @@ class SectionInformationsCles extends StatelessWidget {
         contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 10.0),
       ),
       isExpanded: true,
+      dropdownColor: dropdownColor,
     );
   }
 
   Widget _buildDropdownMarqueur(BuildContext context) {
+    // Couleur automatique du thème pour les dropdowns
+    final dropdownColor = Theme.of(context).dropdownColor;
+
     final listeMarqueurs = ['Aucun', 'Important', 'À vérifier'];
 
     return DropdownButtonFormField<String>(
@@ -243,6 +251,7 @@ class SectionInformationsCles extends StatelessWidget {
         contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 10.0),
       ),
       isExpanded: true,
+      dropdownColor: dropdownColor,
     );
   }
 

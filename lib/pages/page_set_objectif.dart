@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/categorie.dart';
 import '../services/firebase_service.dart';
 import '../widgets/numeric_keyboard.dart';
+import '../themes/dropdown_theme_extension.dart';
 
 class PageSetObjectif extends StatefulWidget {
   final Enveloppe enveloppe;
@@ -263,7 +264,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                   const SizedBox(width: 16),
                   DropdownButton<int>(
                     value: _objectifJour,
-                    dropdownColor: Colors.grey[900],
+                    dropdownColor: Theme.of(context).dropdownColor,
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                     hint: const Text(
                       'Jour',

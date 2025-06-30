@@ -327,29 +327,7 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (widget.onClear != null)
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: widget.onClear,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade100,
-                        foregroundColor: Colors.red.shade700,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('Effacer'),
-                    ),
-                  ),
-                ],
-              ),
+
             const SizedBox(height: 8),
           ],
         ),

@@ -7,6 +7,7 @@ import '../models/dette.dart';
 import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
 import '../widgets/numeric_keyboard.dart';
+import '../themes/dropdown_theme_extension.dart';
 
 /// Page de création d'un nouveau compte bancaire, carte de crédit ou investissement
 class PageCreationCompte extends StatefulWidget {
@@ -113,6 +114,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _type,
+                dropdownColor: Theme.of(context).dropdownColor,
                 decoration: const InputDecoration(
                   labelText: 'Type de compte',
                   border: OutlineInputBorder(),

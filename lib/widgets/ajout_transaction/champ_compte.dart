@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/compte.dart';
 import '../../models/transaction_model.dart';
+import '../../themes/dropdown_theme_extension.dart';
 
 class ChampCompte extends StatelessWidget {
   final String? compteSelectionne;
@@ -18,6 +19,9 @@ class ChampCompte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Couleur automatique du thème pour les dropdowns
+    final dropdownColor = Theme.of(context).dropdownColor;
+
     return DropdownButtonFormField<String>(
       value: compteSelectionne,
       items: listeComptesAffichables.map((Compte compte) {
@@ -60,6 +64,7 @@ class ChampCompte extends StatelessWidget {
         ),
       ),
       isExpanded: true,
+      dropdownColor: dropdownColor,
     );
   }
 }

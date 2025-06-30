@@ -12,6 +12,7 @@ import 'package:toutie_budget/services/update_service.dart';
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../themes/dropdown_theme_extension.dart';
 
 class PageParametres extends StatefulWidget {
   const PageParametres({super.key});
@@ -65,6 +66,7 @@ class _PageParametresState extends State<PageParametres> {
                 subtitle: Text(langue == 'fr' ? 'Français' : 'Anglais'),
                 trailing: DropdownButton<String>(
                   value: langue,
+                  dropdownColor: Theme.of(context).dropdownColor,
                   items: const [
                     DropdownMenuItem(value: 'fr', child: Text('Français')),
                     DropdownMenuItem(value: 'en', child: Text('Anglais')),
@@ -121,6 +123,7 @@ class _PageParametresState extends State<PageParametres> {
                     value: themeService.currentTheme,
                     isExpanded: true,
                     underline: Container(),
+                    dropdownColor: Theme.of(context).dropdownColor,
                     items: ThemeService.themeNames.entries.map((entry) {
                       final themeName = entry.key;
                       final displayName = entry.value;

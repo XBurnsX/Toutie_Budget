@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/compte.dart';
 import '../../models/transaction_model.dart';
+import '../../themes/dropdown_theme_extension.dart';
 
 class ChampEnveloppe extends StatelessWidget {
   final String? enveloppeSelectionnee;
@@ -26,6 +27,9 @@ class ChampEnveloppe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Couleur automatique du thème pour les dropdowns
+    final dropdownColor = Theme.of(context).dropdownColor;
+
     return DropdownButtonFormField<String>(
       value: enveloppeSelectionnee,
       items: _buildEnveloppeItems(),
@@ -40,6 +44,7 @@ class ChampEnveloppe extends StatelessWidget {
         ),
       ),
       isExpanded: true,
+      dropdownColor: dropdownColor,
     );
   }
 

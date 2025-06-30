@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/fractionnement_model.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../models/compte.dart';
+import '../themes/dropdown_theme_extension.dart';
 
 class ModaleFractionnement extends StatefulWidget {
   final double montantTotal;
@@ -254,6 +255,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                             value: sousItem.enveloppeId.isEmpty
                                 ? null
                                 : sousItem.enveloppeId,
+                            dropdownColor: Theme.of(context).dropdownColor,
                             items: widget.enveloppes.map((enveloppe) {
                               final solde =
                                   (enveloppe['solde'] as num?)?.toDouble() ??
