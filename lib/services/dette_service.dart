@@ -125,8 +125,56 @@ class DetteService {
         nouveauSolde = nouveauSolde < 0 ? 0 : nouveauSolde;
       }
 
-      // Mettre à jour le solde dans Firestore
-      await doc.update({'solde': nouveauSolde});
+      // Calculer et mettre à jour les intérêts payés si c'est un prêt avec intérêts
+      double? interetsPayesCalcules;
+      if (tauxInteret != null && prixAchat != null && tauxInteret > 0) {
+        final montantMensuel = detteData['montantMensuel'] != null
+            ? (detteData['montantMensuel'] as num).toDouble()
+            : null;
+
+        if (montantMensuel != null) {
+          // Calculer les intérêts payés via simulation
+          double totalRemboursements = 0.0;
+          for (MouvementDette mouvement in historique) {
+            if (mouvement.type == 'remboursement_recu' ||
+                mouvement.type == 'remboursement_effectue') {
+              totalRemboursements += mouvement.montant.abs();
+            }
+          }
+
+          if (totalRemboursements > 0) {
+            final tauxMensuel = tauxInteret / 100 / 12;
+            double soldeSimule = prixAchat;
+            double interetsSimules = 0.0;
+            double remboursementsRestants = totalRemboursements;
+
+            while (remboursementsRestants > 0 && soldeSimule > 0) {
+              final interetMensuel = soldeSimule * tauxMensuel;
+              final paiementEffectif = remboursementsRestants >= montantMensuel
+                  ? montantMensuel
+                  : remboursementsRestants;
+
+              if (paiementEffectif <= interetMensuel) {
+                interetsSimules += paiementEffectif;
+              } else {
+                interetsSimules += interetMensuel;
+                soldeSimule -= (paiementEffectif - interetMensuel);
+              }
+
+              remboursementsRestants -= paiementEffectif;
+            }
+
+            interetsPayesCalcules = interetsSimules;
+          }
+        }
+      }
+
+      // Mettre à jour le solde et les intérêts payés dans Firestore
+      Map<String, dynamic> updates = {'solde': nouveauSolde};
+      if (interetsPayesCalcules != null) {
+        updates['interetsPayes'] = interetsPayesCalcules;
+      }
+      await doc.update(updates);
 
       // Si le solde est maintenant à 0, archiver automatiquement la dette
       if (nouveauSolde == 0) {
@@ -518,23 +566,34 @@ class DetteService {
       await docRef.set(dette.toMap());
       print('DEBUG: Document de dette complet sauvegardé: ${dette.id}');
 
-      // 2. Mettre à jour le solde dans le compte associé (en négatif)
-      await compteRef.update({'solde': -dette.solde});
-      print(
-        'DEBUG: Solde du compte mis à jour: ${-dette.solde} pour ${dette.id}',
-      );
+      // 2. Vérifier si un compte associé existe avant de le mettre à jour
+      final compteDoc = await compteRef.get();
+      if (compteDoc.exists) {
+        // Mettre à jour le solde dans le compte associé (en négatif)
+        await compteRef.update({'solde': -dette.solde});
+        print(
+          'DEBUG: Solde du compte mis à jour: ${-dette.solde} pour ${dette.id}',
+        );
 
-      // 3. Gérer l'archivage si le solde est nul ou négatif
+        // Gérer l'archivage du compte si le solde est nul ou négatif
+        if (dette.solde <= 0) {
+          await compteRef.update({
+            'estArchive': true,
+            'dateSuppression': DateTime.now().toIso8601String(),
+          });
+          print('DEBUG: Compte archivé: ${dette.id}');
+        }
+      } else {
+        print('DEBUG: Aucun compte associé trouvé pour la dette: ${dette.id}');
+      }
+
+      // 3. Gérer l'archivage de la dette si le solde est nul ou négatif
       if (dette.solde <= 0) {
         await docRef.update({
           'archive': true,
           'dateArchivage': FieldValue.serverTimestamp(),
         });
-        await compteRef.update({
-          'estArchive': true,
-          'dateSuppression': DateTime.now().toIso8601String(),
-        });
-        print('DEBUG: Dette et compte archivés: ${dette.id}');
+        print('DEBUG: Dette archivée: ${dette.id}');
       }
     } catch (e) {
       print('Erreur lors de la sauvegarde complète de la dette: $e');

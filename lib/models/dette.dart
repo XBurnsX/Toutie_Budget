@@ -56,6 +56,7 @@ class Dette {
   final double? montantMensuel; // Montant mensuel fixe
   final double? prixAchat; // Prix d'achat initial
   final double? coutTotal; // Coût total avec intérêts (prix + intérêts)
+  final double? interetsPayes; // Intérêts payés jusqu'à maintenant
   final int? nombrePaiements; // Nombre total de paiements
   final DateTime? dateDebut; // Date de début du prêt
   final int? paiementsEffectues; // Nombre de paiements effectués
@@ -79,6 +80,7 @@ class Dette {
     this.montantMensuel,
     this.prixAchat,
     this.coutTotal,
+    this.interetsPayes,
     this.nombrePaiements,
     this.dateDebut,
     this.paiementsEffectues,
@@ -107,6 +109,7 @@ class Dette {
     'montantMensuel': montantMensuel,
     'prixAchat': prixAchat,
     'coutTotal': coutTotal,
+    'interetsPayes': interetsPayes,
     'nombrePaiements': nombrePaiements,
     'dateDebut': dateDebut != null ? Timestamp.fromDate(dateDebut!) : null,
     'paiementsEffectues': paiementsEffectues,
@@ -149,6 +152,9 @@ class Dette {
     coutTotal: map['coutTotal'] != null
         ? (map['coutTotal'] as num).toDouble()
         : null,
+    interetsPayes: map['interetsPayes'] != null
+        ? (map['interetsPayes'] as num).toDouble()
+        : null,
     nombrePaiements: map['nombrePaiements'] != null
         ? (map['nombrePaiements'] as num).toInt()
         : null,
@@ -179,6 +185,7 @@ class Dette {
     double? montantMensuel,
     double? prixAchat,
     double? coutTotal,
+    double? interetsPayes,
     int? nombrePaiements,
     DateTime? dateDebut,
     int? paiementsEffectues,
@@ -203,6 +210,7 @@ class Dette {
       montantMensuel: montantMensuel ?? this.montantMensuel,
       prixAchat: prixAchat ?? this.prixAchat,
       coutTotal: coutTotal ?? this.coutTotal,
+      interetsPayes: interetsPayes ?? this.interetsPayes,
       nombrePaiements: nombrePaiements ?? this.nombrePaiements,
       dateDebut: dateDebut ?? this.dateDebut,
       paiementsEffectues: paiementsEffectues ?? this.paiementsEffectues,

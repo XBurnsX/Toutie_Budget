@@ -42,7 +42,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   double? _soldeRestantCalcule;
   double? _coutTotalCalcule;
   String? _erreurSimulateur;
-  bool _afficherResultatsCalcul = false;
+  Map<String, double?> calculs = {};
 
   // Total des paiements réellement enregistrés dans les transactions
   double _totalRemboursements = 0.0;
@@ -52,6 +52,13 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _detteListener;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _txListener;
+
+  void _calculerEtMettrAJour() {
+    final resultats = _calculerValeursPret();
+    setState(() {
+      calculs = resultats;
+    });
+  }
 
   @override
   void initState() {
@@ -95,6 +102,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       _totalAssocie = total;
       setState(() {
         _totalRemboursements = _totalAssocie + _totalCompte;
+        _calculerEtMettrAJour();
       });
     }
 
@@ -122,6 +130,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           _totalCompte = total;
           setState(() {
             _totalRemboursements = _totalAssocie + _totalCompte;
+            _calculerEtMettrAJour();
           });
         });
   }
@@ -185,6 +194,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     // Calculs initiaux après chargement
     _onParametresChanges();
+    _calculerEtMettrAJour();
 
     print('=== Fin du chargement des données ===');
   }
@@ -228,6 +238,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     // Potentiellement d'autres calculs à l'avenir
+    _calculerEtMettrAJour();
   }
 
   void _calculerDateFinParDefaut() {
@@ -304,7 +315,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         _dateFinController.text = _formaterDate(nouvelleDateFin);
         _recalculerPaiementMensuel();
         // Déclencher la mise à jour des calculs automatiques
-        _afficherResultatsCalcul = true;
       });
     }
   }
@@ -812,132 +822,81 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                print('Bouton "Calculer le montant mensuel" cliqué');
+                print('Bouton "Mettre à jour les calculs" cliqué');
 
-                // Vérifier d'abord si les champs sont remplis
-                print('Contenu des contrôleurs:');
-                print('  Prix d\'achat: "${_prixAchatController.text}"');
-                print('  Taux intérêt: "${_tauxController.text}"');
-                print(
-                  '  Nombre paiements: "${_nombrePaiementsController.text}"',
-                );
-                print('  Montant mensuel: "${_montantMensuelController.text}"');
+                // Calcul du montant mensuel et remplissage automatique du champ si vide
+                final prixAchat = _toDouble(_prixAchatController.text);
+                final tauxInteret = _toDouble(_tauxController.text);
+                final dateDebut = _parseDate(_dateDebutController.text);
+                final dateFin = _parseDate(_dateFinController.text);
 
-                setState(() {
-                  _afficherResultatsCalcul = true;
+                if (prixAchat != null &&
+                    tauxInteret != null &&
+                    dateDebut != null &&
+                    dateFin != null &&
+                    prixAchat > 0 &&
+                    tauxInteret >= 0 &&
+                    dateFin.isAfter(dateDebut)) {
+                  // Remplir le montant mensuel si vide
+                  if (_montantMensuelController.text.isEmpty ||
+                      _toDouble(_montantMensuelController.text) == null) {
+                    final dureeMois =
+                        (dateFin.year - dateDebut.year) * 12 +
+                        dateFin.month -
+                        dateDebut.month +
+                        1;
 
-                  // Calcul du montant mensuel et remplissage automatique du champ si vide
-                  final prixAchat = _toDouble(_prixAchatController.text);
-                  final tauxInteret = _toDouble(_tauxController.text);
-                  final dateDebut = _parseDate(_dateDebutController.text);
-                  final dateFin = _parseDate(_dateFinController.text);
-
-                  print('Valeurs parsées:');
-                  print('  prixAchat: $prixAchat');
-                  print('  tauxInteret: $tauxInteret');
-                  print('  dateDebut: $dateDebut');
-                  print('  dateFin: $dateFin');
-
-                  if (prixAchat != null &&
-                      tauxInteret != null &&
-                      dateDebut != null &&
-                      dateFin != null &&
-                      prixAchat > 0 &&
-                      tauxInteret >= 0 &&
-                      dateFin.isAfter(dateDebut)) {
-                    print('Tous les champs sont valides, calcul en cours...');
-                    try {
-                      final dureeMois =
-                          (dateFin.year - dateDebut.year) * 12 +
-                          dateFin.month -
-                          dateDebut.month +
-                          1;
-
-                      final montantMensuel =
-                          CalculPretService.calculerPaiementMensuel(
-                            principal: prixAchat,
-                            tauxAnnuel: tauxInteret,
-                            dureeMois: dureeMois,
-                          );
-                      print('montantMensuel calculé: $montantMensuel');
-
-                      if ((_montantMensuelController.text.isEmpty ||
-                          _toDouble(_montantMensuelController.text) == null)) {
-                        print(
-                          'Remplissage automatique du champ montant mensuel',
+                    final montantMensuel =
+                        CalculPretService.calculerPaiementMensuel(
+                          principal: prixAchat,
+                          tauxAnnuel: tauxInteret,
+                          dureeMois: dureeMois,
                         );
-                        _montantMensuelController.text = montantMensuel
-                            .toStringAsFixed(2);
-                      }
-                    } catch (e) {
-                      print('Erreur lors du calcul: $e');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Erreur lors du calcul: $e')),
-                      );
-                    }
-                  } else {
-                    print('Erreur: certains champs sont invalides ou vides');
-                    String message =
-                        'Veuillez remplir tous les champs obligatoires:\n';
-                    if (prixAchat == null || prixAchat <= 0)
-                      message += '- Prix d\'achat\n';
-                    if (tauxInteret == null || tauxInteret < 0)
-                      message += '- Taux d\'intérêt\n';
-                    if (dateFin == null ||
-                        dateDebut == null ||
-                        !dateFin.isAfter(dateDebut))
-                      message += '- Dates invalides\n';
-
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(message.trim())));
+                    _montantMensuelController.text = montantMensuel
+                        .toStringAsFixed(2);
                   }
-                });
+                }
+
+                // Mettre à jour les calculs
+                _calculerEtMettrAJour();
               },
-              icon: const Icon(Icons.calculate),
-              label: const Text('Calculer le montant mensuel'),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Mettre à jour les calculs'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
               ),
             ),
             const SizedBox(height: 16),
-            if (_afficherResultatsCalcul) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: SizedBox.shrink(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: SizedBox.shrink(),
+            ),
+            if (calculs['paiementMensuelSaisi'] != null)
+              _buildResultatCalcul(
+                'Paiement mensuel saisi',
+                calculs['paiementMensuelSaisi']!.toStringAsFixed(2) + ' \$',
+              )
+            else if (calculs['montantMensuel'] != null)
+              _buildResultatCalcul(
+                'Paiement mensuel (calculé)',
+                calculs['montantMensuel']!.toStringAsFixed(2) + ' \$',
               ),
-              if (calculs['paiementMensuelSaisi'] != null)
-                _buildResultatCalcul(
-                  'Paiement mensuel saisi',
-                  calculs['paiementMensuelSaisi']!.toStringAsFixed(2) + ' \$',
-                )
-              else if (calculs['montantMensuel'] != null)
-                _buildResultatCalcul(
-                  'Paiement mensuel (calculé)',
-                  calculs['montantMensuel']!.toStringAsFixed(2) + ' \$',
-                ),
-              if (calculs['coutTotal'] != null)
-                _buildResultatCalcul(
-                  'Coût total',
-                  calculs['coutTotal']!.toStringAsFixed(2) + ' \$',
-                ),
-              if (calculs['soldeRestant'] != null)
-                _buildResultatCalcul(
-                  'Solde restant',
-                  calculs['soldeRestant']!.toStringAsFixed(2) + ' \$',
-                ),
-              if (calculs['interetsPayes'] != null)
-                _buildResultatCalcul(
-                  'Intérêts payés',
-                  calculs['interetsPayes']!.toStringAsFixed(2) + ' \$',
-                ),
-            ] else ...[
-              const Text(
-                'Remplissez les champs puis cliquez sur "Calculer le montant mensuel" pour voir les résultats.',
-                style: TextStyle(color: Colors.grey),
+            if (calculs['coutTotal'] != null)
+              _buildResultatCalcul(
+                'Coût total',
+                calculs['coutTotal']!.toStringAsFixed(2) + ' \$',
               ),
-            ],
+            if (calculs['soldeRestant'] != null)
+              _buildResultatCalcul(
+                'Solde restant',
+                calculs['soldeRestant']!.toStringAsFixed(2) + ' \$',
+              ),
+            if (calculs['interetsPayes'] != null)
+              _buildResultatCalcul(
+                'Intérêts payés',
+                calculs['interetsPayes']!.toStringAsFixed(2) + ' \$',
+              ),
           ],
         ),
       ),
@@ -992,9 +951,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       final nouveauSolde = _calculerValeursPret()['soldeRestant'];
       final ancienSolde = widget.dette.solde;
 
-      // Calculer le coût total avec intérêts
+      // Calculer le coût total avec intérêts et les intérêts payés
       final calculs = _calculerValeursPret();
       final coutTotalCalcule = calculs['coutTotal'];
+      final interetsPayesCalcules = calculs['interetsPayes'];
 
       // Créer l'objet Dette complet avec toutes les informations à jour
       final detteModifiee = widget.dette.copyWith(
@@ -1004,6 +964,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         montantMensuel: _toDouble(_montantMensuelController.text) ?? 0,
         prixAchat: _toDouble(_prixAchatController.text) ?? 0,
         coutTotal: coutTotalCalcule, // Stocker le coût total avec intérêts
+        interetsPayes: interetsPayesCalcules, // Stocker les intérêts payés
         nombrePaiements: int.tryParse(_nombrePaiementsController.text),
         paiementsEffectues: int.tryParse(_paiementsEffectuesController.text),
         solde: nouveauSolde, // On met à jour le solde ici pour la sauvegarde
@@ -1098,9 +1059,42 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         soldeRestant = _soldeFirestore;
       }
 
-      // Intérêts payés = total remboursé - capital remboursé
-      final capitalRembourse = prixAchat - (soldeRestant ?? 0);
-      interetsPayes = _totalRemboursements - capitalRembourse;
+      // Utiliser les intérêts payés stockés dans Firebase si disponibles
+      if (widget.dette.interetsPayes != null) {
+        interetsPayes = widget.dette.interetsPayes;
+      } else {
+        // Sinon calculer pour compatibilité avec anciennes dettes
+        if (_totalRemboursements > 0) {
+          final tauxMensuel = tauxInteret / 100 / 12;
+          double soldeSimule = prixAchat;
+          double interetsSimules = 0.0;
+
+          // Simuler chaque paiement pour calculer les intérêts réels
+          double remboursementsRestants = _totalRemboursements;
+
+          while (remboursementsRestants > 0 && soldeSimule > 0) {
+            final interetMensuel = soldeSimule * tauxMensuel;
+            final paiementEffectif = remboursementsRestants >= montantMensuel
+                ? montantMensuel
+                : remboursementsRestants;
+
+            if (paiementEffectif <= interetMensuel) {
+              // Paiement ne couvre que les intérêts (ou moins)
+              interetsSimules += paiementEffectif;
+            } else {
+              // Paiement couvre intérêts + capital
+              interetsSimules += interetMensuel;
+              soldeSimule -= (paiementEffectif - interetMensuel);
+            }
+
+            remboursementsRestants -= paiementEffectif;
+          }
+
+          interetsPayes = interetsSimules;
+        } else {
+          interetsPayes = 0;
+        }
+      }
     }
 
     print('  -> Montant Mensuel Calculé: $montantMensuel');
