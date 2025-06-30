@@ -201,15 +201,18 @@ class SectionInformationsCles extends StatelessWidget {
   Widget _buildDropdownTypeMouvement(BuildContext context) {
     return DropdownButtonFormField<TypeMouvementFinancier>(
       value: typeMouvementSelectionne,
-      items: TypeMouvementFinancier.values.map((TypeMouvementFinancier type) {
-        return DropdownMenuItem<TypeMouvementFinancier>(
-          value: type,
-          child: Text(
-            _libellePourTypeMouvement(type),
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        );
-      }).toList(),
+      items: TypeMouvementFinancier.values
+          .where((type) => type != TypeMouvementFinancier.ajustement)
+          .map((TypeMouvementFinancier type) {
+            return DropdownMenuItem<TypeMouvementFinancier>(
+              value: type,
+              child: Text(
+                _libellePourTypeMouvement(type),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            );
+          })
+          .toList(),
       onChanged: (TypeMouvementFinancier? newValue) {
         if (newValue != null) {
           onTypeMouvementChanged(newValue);

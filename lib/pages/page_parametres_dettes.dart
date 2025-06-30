@@ -64,10 +64,14 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   void initState() {
     super.initState();
     _chargerDonnees();
+    // Ajouter des listeners pour la mise à jour automatique des calculs
     _nombrePaiementsController.addListener(_onParametresChanges);
     _dateDebutController.addListener(_onParametresChanges);
+    _dateFinController.addListener(_onParametresChanges);
     _tauxController.addListener(_onParametresChanges);
     _prixAchatController.addListener(_onParametresChanges);
+    _montantMensuelController.addListener(_onParametresChanges);
+    _paiementsEffectuesController.addListener(_onParametresChanges);
 
     // Écouter en temps réel les modifications du document dette pour mettre à jour
     _detteListener = FirebaseFirestore.instance
@@ -237,8 +241,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       });
     }
 
-    // Potentiellement d'autres calculs à l'avenir
-    _calculerEtMettrAJour();
+    // Mettre à jour les calculs et l'interface utilisateur
+    setState(() {
+      _calculerEtMettrAJour();
+    });
   }
 
   void _calculerDateFinParDefaut() {
@@ -801,7 +807,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
   Widget _buildCalculsAutomatiques() {
     final calculs = _calculerValeursPret();
-    final soldeRestant = calculs['soldeRestant'];
+    final solde = calculs['solde'];
 
     return Card(
       child: Padding(
@@ -822,9 +828,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                print('Bouton "Mettre à jour les calculs" cliqué');
+                print('Bouton "Calculer le paiement mensuel" cliqué');
 
-                // Calcul du montant mensuel et remplissage automatique du champ si vide
+                // Calcul du montant mensuel et remplissage automatique du champ
                 final prixAchat = _toDouble(_prixAchatController.text);
                 final tauxInteret = _toDouble(_tauxController.text);
                 final dateDebut = _parseDate(_dateDebutController.text);
@@ -837,33 +843,44 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     prixAchat > 0 &&
                     tauxInteret >= 0 &&
                     dateFin.isAfter(dateDebut)) {
-                  // Remplir le montant mensuel si vide
-                  if (_montantMensuelController.text.isEmpty ||
-                      _toDouble(_montantMensuelController.text) == null) {
-                    final dureeMois =
-                        (dateFin.year - dateDebut.year) * 12 +
-                        dateFin.month -
-                        dateDebut.month +
-                        1;
+                  final dureeMois =
+                      (dateFin.year - dateDebut.year) * 12 +
+                      dateFin.month -
+                      dateDebut.month +
+                      1;
 
-                    final montantMensuel =
-                        CalculPretService.calculerPaiementMensuel(
-                          principal: prixAchat,
-                          tauxAnnuel: tauxInteret,
-                          dureeMois: dureeMois,
-                        );
+                  final montantMensuel =
+                      CalculPretService.calculerPaiementMensuel(
+                        principal: prixAchat,
+                        tauxAnnuel: tauxInteret,
+                        dureeMois: dureeMois,
+                      );
+
+                  setState(() {
                     _montantMensuelController.text = montantMensuel
                         .toStringAsFixed(2);
-                  }
-                }
+                  });
 
-                // Mettre à jour les calculs
-                _calculerEtMettrAJour();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Paiement mensuel calculé automatiquement'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez remplir tous les champs requis'),
+                      backgroundColor: Colors.orange,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
               },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Mettre à jour les calculs'),
+              icon: const Icon(Icons.calculate),
+              label: const Text('Calculer le paiement mensuel'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -887,10 +904,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                 'Coût total',
                 calculs['coutTotal']!.toStringAsFixed(2) + ' \$',
               ),
-            if (calculs['soldeRestant'] != null)
+            if (calculs['solde'] != null)
               _buildResultatCalcul(
                 'Solde restant',
-                calculs['soldeRestant']!.toStringAsFixed(2) + ' \$',
+                calculs['solde']!.toStringAsFixed(2) + ' \$',
               ),
             if (calculs['interetsPayes'] != null)
               _buildResultatCalcul(
@@ -948,13 +965,22 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     try {
-      final nouveauSolde = _calculerValeursPret()['soldeRestant'];
-      final ancienSolde = widget.dette.solde;
-
-      // Calculer le coût total avec intérêts et les intérêts payés
+      // Calculer le nouveau solde avec coutTotal - totalTransactions
       final calculs = _calculerValeursPret();
       final coutTotalCalcule = calculs['coutTotal'];
       final interetsPayesCalcules = calculs['interetsPayes'];
+
+      double? nouveauSolde;
+      if (coutTotalCalcule != null) {
+        // Calculer le nouveau solde : coutTotal - transactions
+        final soldeCalcule = coutTotalCalcule - _totalRemboursements;
+        nouveauSolde = soldeCalcule < 0 ? 0 : soldeCalcule;
+      } else {
+        // Fallback si pas de coût total
+        nouveauSolde = _calculerValeursPret()['solde'];
+      }
+
+      final ancienSolde = widget.dette.solde;
 
       // Créer l'objet Dette complet avec toutes les informations à jour
       final detteModifiee = widget.dette.copyWith(
@@ -1025,7 +1051,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     double? montantMensuel;
     double? coutTotal;
-    double? soldeRestant;
+    double? solde;
     double? interetsPayes;
 
     if (prixAchat != null &&
@@ -1038,26 +1064,19 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         dureeMois: dureeMois,
       );
 
-      // Utiliser le coût total stocké dans Firebase si disponible
+      // Calculer le coût total
       if (widget.dette.coutTotal != null) {
         coutTotal = widget.dette.coutTotal;
       } else {
-        // Sinon le calculer (pour compatibilité avec anciennes dettes)
+        // Calculer pour compatibilité avec anciennes dettes
         coutTotal = CalculPretService.calculerCoutTotal(
           paiementMensuel: montantMensuel,
           dureeMois: dureeMois,
         );
       }
 
-      // Appliquer les remboursements réels au coût total
-      double calc = coutTotal! - _totalRemboursements;
-      if (calc < 0) calc = 0;
-      soldeRestant = calc;
-
-      // Prendre le solde Firestore comme source de vérité si présent
-      if (_soldeFirestore != null) {
-        soldeRestant = _soldeFirestore;
-      }
+      // Utiliser TOUJOURS le solde Firebase pour l'affichage
+      solde = _soldeFirestore;
 
       // Utiliser les intérêts payés stockés dans Firebase si disponibles
       if (widget.dette.interetsPayes != null) {
@@ -1099,13 +1118,13 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     print('  -> Montant Mensuel Calculé: $montantMensuel');
     print('  -> Coût Total: $coutTotal');
-    print('  -> Solde Restant: $soldeRestant');
+    print('  -> Solde: $solde');
     print('  -> Intérêts Payés: $interetsPayes');
 
     return {
       'montantMensuel': montantMensuel,
       'coutTotal': coutTotal,
-      'soldeRestant': soldeRestant,
+      'solde': solde,
       'interetsPayes': interetsPayes,
       'paiementMensuelSaisi': paiementMensuelSaisi,
     };
@@ -1147,10 +1166,14 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _simulateurPaiementController.dispose();
     _simulateurPrincipalController.dispose();
     _simulateurDureeController.dispose();
+    // Retirer tous les listeners
     _nombrePaiementsController.removeListener(_onParametresChanges);
     _dateDebutController.removeListener(_onParametresChanges);
+    _dateFinController.removeListener(_onParametresChanges);
     _tauxController.removeListener(_onParametresChanges);
     _prixAchatController.removeListener(_onParametresChanges);
+    _montantMensuelController.removeListener(_onParametresChanges);
+    _paiementsEffectuesController.removeListener(_onParametresChanges);
 
     // Annuler l'abonnement Firestore
     _detteListener?.cancel();

@@ -551,43 +551,19 @@ class DetteService {
     }
   }
 
-  /// Sauvegarde tous les paramètres d'une dette manuelle et met à jour les soldes
+  /// Sauvegarde tous les paramètres d'une dette manuelle
   Future<void> sauvegarderDetteManuelleComplet(Dette dette) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
     final docRef = dettesRef.doc(dette.id);
-    final compteRef = FirebaseFirestore.instance
-        .collection('comptes')
-        .doc(dette.id);
 
     try {
       // 1. Mettre à jour l'intégralité du document dans la collection 'dettes'
       await docRef.set(dette.toMap());
       print('DEBUG: Document de dette complet sauvegardé: ${dette.id}');
 
-      // 2. Vérifier si un compte associé existe avant de le mettre à jour
-      final compteDoc = await compteRef.get();
-      if (compteDoc.exists) {
-        // Mettre à jour le solde dans le compte associé (en négatif)
-        await compteRef.update({'solde': -dette.solde});
-        print(
-          'DEBUG: Solde du compte mis à jour: ${-dette.solde} pour ${dette.id}',
-        );
-
-        // Gérer l'archivage du compte si le solde est nul ou négatif
-        if (dette.solde <= 0) {
-          await compteRef.update({
-            'estArchive': true,
-            'dateSuppression': DateTime.now().toIso8601String(),
-          });
-          print('DEBUG: Compte archivé: ${dette.id}');
-        }
-      } else {
-        print('DEBUG: Aucun compte associé trouvé pour la dette: ${dette.id}');
-      }
-
-      // 3. Gérer l'archivage de la dette si le solde est nul ou négatif
+      // 2. Gérer l'archivage de la dette si le solde est nul ou négatif
       if (dette.solde <= 0) {
         await docRef.update({
           'archive': true,
@@ -595,6 +571,12 @@ class DetteService {
         });
         print('DEBUG: Dette archivée: ${dette.id}');
       }
+
+      // Note: Les dettes manuelles n'ont pas de compte associé dans la collection 'comptes'
+      // Elles sont affichées directement depuis la collection 'dettes' dans la page des comptes
+      print(
+        'DEBUG: Sauvegarde complète terminée pour la dette manuelle: ${dette.id}',
+      );
     } catch (e) {
       print('Erreur lors de la sauvegarde complète de la dette: $e');
       throw Exception('Erreur lors de la sauvegarde complète de la dette');
