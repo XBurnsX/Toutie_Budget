@@ -310,6 +310,21 @@ class ArgentService {
       if (srcIdx == -1) {
         throw Exception('Enveloppe source non trouvée dans la catégorie');
       }
+
+      // VÉRIFICATION DE PROVENANCE - L'enveloppe ne peut être vidée que vers son compte d'origine
+      final List<dynamic> provenances = srcEnvs[srcIdx]['provenances'] ?? [];
+      if (provenances.isNotEmpty) {
+        final comptesProvenance = provenances
+            .map((prov) => prov['compte_id'].toString())
+            .toSet();
+
+        if (!comptesProvenance.contains(destination.id)) {
+          throw Exception(
+            "Cette enveloppe contient de l'argent qui ne provient pas de ce compte. Vous ne pouvez retourner l'argent que vers son compte d'origine.",
+          );
+        }
+      }
+
       // Sécurisation en cas de champ solde null pour l'enveloppe source
       final srcOldSolde = (srcEnvs[srcIdx]['solde'] as num?)?.toDouble() ?? 0.0;
       srcEnvs[srcIdx]['solde'] = srcOldSolde - montant;
