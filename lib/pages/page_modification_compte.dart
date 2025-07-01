@@ -130,7 +130,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                 validator: (value) => value == null || value.isEmpty
                     ? 'Veuillez entrer un nom'
                     : null,
-                onSaved: (value) => _nom = value ?? '',
+                onChanged: (value) => setState(() => _nom = value),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
