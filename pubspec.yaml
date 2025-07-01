@@ -38,13 +38,15 @@ dependencies:
   intl: ^0.20.2
   month_picker_dialog: ^6.2.3
   firebase_auth: ^5.0.0
-  google_sign_in: 6.1.6
+  google_sign_in: ^6.1.6
   url_launcher: ^6.3.1
   flutter_svg: ^2.0.10+1
   package_info_plus: ^8.3.0
   cupertino_icons: ^1.0.8
   provider: ^6.1.1
   shared_preferences: ^2.2.2
+  csv: ^6.0.0
+  file_picker: ^8.1.4
 
 dev_dependencies:
   flutter_test:

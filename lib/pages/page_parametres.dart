@@ -9,6 +9,7 @@ import 'package:toutie_budget/services/theme_service.dart';
 
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
+import 'page_import_csv.dart';
 
 import '../themes/dropdown_theme_extension.dart';
 
@@ -97,7 +98,7 @@ class _PageParametresState extends State<PageParametres> {
                 leading: Icon(Icons.palette, color: themeService.primaryColor),
                 title: const Text('Thème'),
                 subtitle: Text('Couleur principale de l\'application'),
-                trailing: Container(
+                trailing: SizedBox(
                   width: 150,
                   child: DropdownButton<String>(
                     value: themeService.currentTheme,
@@ -159,6 +160,39 @@ class _PageParametresState extends State<PageParametres> {
                     },
                   ),
                 ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.upload_file),
+                title: const Text('Importer des transactions'),
+                subtitle: const Text(
+                  'Importer des transactions depuis un fichier CSV',
+                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PageImportCsv(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.science, color: Colors.orange),
+                title: const Text('🧪 Test Import CSV (Émulateur)'),
+                subtitle: const Text(
+                  'Tester l\'import avec le fichier exemple YNAB inclus',
+                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PageImportCsv(
+                        fichierTest: 'exemple_csv.csv',
+                        mappingTest: true,
+                      ),
+                    ),
+                  );
+                },
               ),
               const Divider(),
 

@@ -49,17 +49,11 @@ class ChampMontant extends StatelessWidget {
   }
 
   Color _getCouleurMontant(AjoutTransactionController controller) {
-    // Debug pour voir si la méthode est appelée
-    print(
-      'DEBUG: typeMouvementSelectionne = ${controller.typeMouvementSelectionne}',
-    );
-
     // Remboursements reçus et dettes contractées = revenus (vert)
     if (controller.typeMouvementSelectionne ==
             TypeMouvementFinancier.remboursementRecu ||
         controller.typeMouvementSelectionne ==
             TypeMouvementFinancier.detteContractee) {
-      print('DEBUG: Couleur VERTE choisie');
       return Colors.greenAccent[300] ?? Colors.green;
     }
 
@@ -68,7 +62,6 @@ class ChampMontant extends StatelessWidget {
             TypeMouvementFinancier.remboursementEffectue ||
         controller.typeMouvementSelectionne ==
             TypeMouvementFinancier.pretAccorde) {
-      print('DEBUG: Couleur ROUGE choisie');
       return const Color(0xFF8A0707);
     }
 
@@ -76,7 +69,6 @@ class ChampMontant extends StatelessWidget {
     final couleur = controller.typeSelectionne == TypeTransaction.depense
         ? const Color(0xFF8A0707)
         : Colors.greenAccent[300] ?? Colors.green;
-    print('DEBUG: Couleur par défaut choisie: ${controller.typeSelectionne}');
     return couleur;
   }
 
@@ -117,7 +109,6 @@ class ChampMontant extends StatelessWidget {
         controller: controller,
         onClear: onMontantChange,
         onValueChanged: (value) {
-          print('DEBUG: ChampMontant - onValueChanged: $value');
           onMontantChange();
         },
         showDecimal: true,

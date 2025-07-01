@@ -1,0 +1,16 @@
+Date,Montant,Type,Tiers,Compte,Enveloppe,Categorie,Note,Marqueur
+01/12/2024,-45.50,depense,Restaurant Le Gourmet,Compte Courant,Alimentation,Besoins essentiels,Déjeuner d'affaires,professionnel
+02/12/2024,2500.00,revenu,Employeur,Compte Courant,Salaire,Revenus,Salaire mensuel,
+03/12/2024,-120.00,depense,Hydro-Québec,Compte Courant,Électricité,Factures & Utilities,Facture électricité décembre,
+04/12/2024,-35.75,depense,Metro,Compte Courant,Alimentation,Besoins essentiels,Épicerie hebdomadaire,
+05/12/2024,-80.00,depense,Station Esso,Compte Courant,Transport,Besoins essentiels,Essence voiture,
+06/12/2024,-25.99,depense,Netflix,Carte de Crédit,Divertissement,Loisirs & Détente,Abonnement mensuel,
+07/12/2024,500.00,revenu,Travail freelance,Compte Courant,Revenus supplémentaires,Revenus,Projet web,
+08/12/2024,-15.50,depense,Tim Hortons,Compte Courant,Café & Resto,Loisirs & Détente,Café du matin,
+09/12/2024,-200.00,depense,Pharmacie,Compte Courant,Santé,Santé & Bien-être,Médicaments,
+10/12/2024,-89.99,depense,Amazon,Carte de Crédit,Shopping,Achats divers,Livres et fournitures,
+11/12/2024,100.00,revenu,Remboursement assurance,Compte Courant,Remboursements,Revenus,Frais médicaux,
+12/12/2024,-60.00,depense,Bell Canada,Compte Courant,Téléphone,Factures & Utilities,Facture mobile,
+13/12/2024,-150.00,depense,Costco,Compte Courant,Alimentation,Besoins essentiels,Achats en gros,
+14/12/2024,-40.00,depense,Cinéma,Compte Courant,Divertissement,Loisirs & Détente,Sortie en famille,
+15/12/2024,300.00,revenu,Vente en ligne,Compte Courant,Revenus supplémentaires,Revenus,Vente d'objets, 

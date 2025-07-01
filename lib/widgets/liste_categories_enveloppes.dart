@@ -131,16 +131,16 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                         : (solde / objectif).clamp(0.0, 1.0))
                   : 0.0;
               final Color etatColor = _getEtatColor(solde, objectif);
-              log(
-                '[DEBUG ENVELOPPE] mois=${selectedMonthKey ?? "courant"} | nom=${enveloppe['nom']} | solde=$solde | objectif=$objectif | depense=$depense',
-              );
+              // log(
+              //   '[DEBUG ENVELOPPE] mois=${selectedMonthKey ?? "courant"} | nom=${enveloppe['nom']} | solde=$solde | objectif=$objectif | depense=$depense',
+              // );
               if (objectif == 0) {
                 // Cas : aucun objectif attribué
                 final String compteId = enveloppe['provenance_compte_id'] ?? '';
                 Color bulleColor;
-                log(
-                  '[BULLE-DEBUG] enveloppe=${enveloppe.toString()} | compteId="$compteId"',
-                );
+                // log(
+                //   '[BULLE-DEBUG] enveloppe=${enveloppe.toString()} | compteId="$compteId"',
+                // );
                 if (solde == 0) {
                   bulleColor = const Color(
                     0xFF44474A,
@@ -152,9 +152,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                     (c) => c['id'].toString() == compteId.toString(),
                     orElse: () => <String, Object>{},
                   );
-                  log(
-                    '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
-                  );
+                  // log(
+                  //   '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
+                  // );
                   if (compte['couleur'] != null && compte['couleur'] is int) {
                     try {
                       bulleColor = Color(compte['couleur'] as int);
@@ -351,9 +351,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               // Couleur de la bulle basée sur la provenance (même logique que les enveloppes sans objectif)
               Color bulleColor;
               final String compteId = enveloppe['provenance_compte_id'] ?? '';
-              log(
-                '[BULLE-DEBUG] enveloppe=${enveloppe.toString()} | compteId="$compteId"',
-              );
+              // log(
+              //   '[BULLE-DEBUG] enveloppe=${enveloppe.toString()} | compteId="$compteId"',
+              // );
               if (solde == 0) {
                 bulleColor = const Color(
                   0xFF44474A,
@@ -365,9 +365,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                   (c) => c['id'].toString() == compteId.toString(),
                   orElse: () => <String, Object>{},
                 );
-                log(
-                  '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
-                );
+                // log(
+                //   '[BULLE] compteId=$compteId | comptes=${comptes.map((c) => c['id']).toList()} | compteTrouve=${compte['id']?.toString() ?? 'null'} | couleur=${compte['couleur']?.toString() ?? 'null'}',
+                // );
                 if (compte['couleur'] != null && compte['couleur'] is int) {
                   try {
                     bulleColor = Color(compte['couleur'] as int);

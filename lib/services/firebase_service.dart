@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
@@ -296,6 +297,19 @@ class FirebaseService {
 
         // Gérer les prêts à placer selon le type de mouvement
         switch (typeMouvement) {
+          case app_model.TypeMouvementFinancier.revenuNormal:
+            // Revenu normal (import CSV) : augmenter le prêt à placer
+            nouveauPretAPlacer = pretAPlacerActuel + montant;
+            break;
+
+          case app_model.TypeMouvementFinancier.depenseNormale:
+            // Dépense normale (import CSV) : diminuer le prêt à placer
+            // Dans l'import CSV, on simule l'assignment + la dépense en une seule opération
+            // Donc on doit diminuer le prêt à placer pour refléter l'argent utilisé
+            nouveauPretAPlacer = pretAPlacerActuel - montant;
+            if (nouveauPretAPlacer < 0) nouveauPretAPlacer = 0;
+            break;
+
           case app_model.TypeMouvementFinancier.remboursementRecu:
             // Remboursement reçu : augmenter le prêt à placer
             nouveauPretAPlacer = pretAPlacerActuel + montant;

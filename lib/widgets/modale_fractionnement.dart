@@ -36,10 +36,6 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   @override
   void initState() {
     super.initState();
-    print('DEBUG: ModaleFractionnement.initState');
-    print(
-      'DEBUG: INITSTATE - Nombre d\\\'enveloppes: ${widget.enveloppes.length}',
-    );
     if (!_comptesCharges) {
       _chargerDonneesInitiales();
     }
@@ -47,21 +43,14 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   }
 
   Future<void> _chargerDonneesInitiales() async {
-    print('DEBUG: ÉTAPE 1 - DÉBUT du chargement des données.');
     // TEST : on simule un chargement rapide, sans Firebase
     final comptes = <Compte>[];
     await Future.delayed(Duration(milliseconds: 100));
-    print('DEBUG: _chargerDonneesInitiales comptes simulés: ${comptes.length}');
-    print(
-      'DEBUG: ÉTAPE 2 - Nombre d\\\'enveloppes passées au widget: ${widget.enveloppes.length}',
-    );
     if (mounted) {
       setState(() {
         _comptesCharges = true;
-        print("DEBUG: ÉTAPE 1 - setState sur le point d'être appelé.");
       });
     }
-    print('DEBUG: ÉTAPE 1 - FIN du chargement des données.');
   }
 
   void _ajouterLigneSousItem() {
@@ -376,7 +365,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
         }
       }
     } catch (e) {
-      print('Erreur dans _getCouleurCompteEnveloppe: $e');
+      // Ignorer les erreurs de couleur
     }
 
     return Colors.grey;
@@ -384,8 +373,6 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
 
   @override
   Widget build(BuildContext context) {
-    print('DEBUG: ModaleFractionnement.build - DEBUT');
-    print('DEBUG: BUILD - Nombre d\\\'enveloppes: ${widget.enveloppes.length}');
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (!_comptesCharges) {
