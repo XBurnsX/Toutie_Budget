@@ -8,7 +8,10 @@ class ArgentService {
   final FirebaseService _firebaseService = FirebaseService();
 
   /// Alloue un montant du Prêt à placer d'un compte vers une enveloppe (ou autre usage)
-  Future<void> allouerPretAPlacer({required Compte compte, required double montant}) async {
+  Future<void> allouerPretAPlacer({
+    required Compte compte,
+    required double montant,
+  }) async {
     if (compte.pretAPlacer < montant) {
       throw Exception('Montant insuffisant');
     }
@@ -18,32 +21,51 @@ class ArgentService {
   }
 
   /// Virement entre deux comptes (ajuste le Prêt à placer des deux comptes)
-  Future<void> virementEntreComptes({required Compte source, required Compte destination, required double montant}) async {
+  Future<void> virementEntreComptes({
+    required Compte source,
+    required Compte destination,
+    required double montant,
+  }) async {
     if (source.pretAPlacer < montant) {
       throw Exception('Montant insuffisant');
     }
-    await _firebaseService.comptesRef.firestore.runTransaction((transaction) async {
+    await _firebaseService.comptesRef.firestore.runTransaction((
+      transaction,
+    ) async {
       final docSource = _firebaseService.comptesRef.doc(source.id);
       final docDest = _firebaseService.comptesRef.doc(destination.id);
       final snapSource = await transaction.get(docSource);
       final snapDest = await transaction.get(docDest);
       if (!snapSource.exists || !snapDest.exists) return;
-      final pretAPlacerSource = (snapSource.data() as Map<String, dynamic>)['pretAPlacer']?.toDouble() ?? 0;
-      final pretAPlacerDest = (snapDest.data() as Map<String, dynamic>)['pretAPlacer']?.toDouble() ?? 0;
+      final pretAPlacerSource =
+          (snapSource.data() as Map<String, dynamic>)['pretAPlacer']
+              ?.toDouble() ??
+          0;
+      final pretAPlacerDest =
+          (snapDest.data() as Map<String, dynamic>)['pretAPlacer']
+              ?.toDouble() ??
+          0;
       if (pretAPlacerSource < montant) throw Exception('Montant insuffisant');
-      transaction.update(docSource, {'pretAPlacer': pretAPlacerSource - montant});
+      transaction.update(docSource, {
+        'pretAPlacer': pretAPlacerSource - montant,
+      });
       transaction.update(docDest, {'pretAPlacer': pretAPlacerDest + montant});
     });
   }
 
   /// Virement d'une enveloppe vers une autre enveloppe
-  Future<void> virementEnveloppeVersEnveloppe({required Enveloppe source, required Enveloppe destination, required double montant}) async {
+  Future<void> virementEnveloppeVersEnveloppe({
+    required Enveloppe source,
+    required Enveloppe destination,
+    required double montant,
+  }) async {
     if (source.solde < montant) {
       throw Exception('Montant insuffisant dans l\'enveloppe source');
     }
     final categoriesRef = _firebaseService.categoriesRef;
     final now = DateTime.now();
-    final moisCourant = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+    final moisCourant =
+        "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
     await categoriesRef.firestore.runTransaction((transaction) async {
       QuerySnapshot catSnap = await categoriesRef.get();
       DocumentSnapshot? catSource;
@@ -54,43 +76,64 @@ class ArgentService {
         if (enveloppes.any((e) => e['id'] == source.id)) catSource = doc;
         if (enveloppes.any((e) => e['id'] == destination.id)) catDest = doc;
       }
-      if (catSource == null || catDest == null) throw Exception('Catégorie non trouvée');
+      if (catSource == null || catDest == null)
+        throw Exception('Catégorie non trouvée');
 
       // Source
       final srcData = catSource.data() as Map<String, dynamic>;
-      final srcEnvs = (srcData['enveloppes'] as List<dynamic>).map((e) => Map<String, dynamic>.from(e)).toList();
+      final srcEnvs = (srcData['enveloppes'] as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final srcIdx = srcEnvs.indexWhere((e) => e['id'] == source.id);
 
       // Destination
       final destData = catDest.data() as Map<String, dynamic>;
-      final destEnvs = (destData['enveloppes'] as List<dynamic>).map((e) => Map<String, dynamic>.from(e)).toList();
+      final destEnvs = (destData['enveloppes'] as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final destIdx = destEnvs.indexWhere((e) => e['id'] == destination.id);
 
       // Vérification des provenances - BLOQUER le mélange
-      final List<dynamic> provenancesSource = srcEnvs[srcIdx]['provenances'] ?? [];
-      final List<dynamic> provenancesDest = destEnvs[destIdx]['provenances'] ?? [];
+      final List<dynamic> provenancesSource =
+          srcEnvs[srcIdx]['provenances'] ?? [];
+      final List<dynamic> provenancesDest =
+          destEnvs[destIdx]['provenances'] ?? [];
 
       // Si l'enveloppe destination a déjà des fonds, vérifier la compatibilité
       if (provenancesDest.isNotEmpty && provenancesSource.isNotEmpty) {
-        final comptesSource = provenancesSource.map((prov) => prov['compte_id'].toString()).toSet();
-        final comptesDest = provenancesDest.map((prov) => prov['compte_id'].toString()).toSet();
+        final comptesSource = provenancesSource
+            .map((prov) => prov['compte_id'].toString())
+            .toSet();
+        final comptesDest = provenancesDest
+            .map((prov) => prov['compte_id'].toString())
+            .toSet();
 
         // Bloquer si les comptes de provenance sont différents
-        if (!comptesSource.every((compteId) => comptesDest.contains(compteId)) ||
-            !comptesDest.every((compteId) => comptesSource.contains(compteId))) {
-          throw Exception("Impossible de mélanger des fonds provenant de comptes différents. Cette enveloppe contient déjà de l'argent d'un autre compte.");
+        if (!comptesSource.every(
+              (compteId) => comptesDest.contains(compteId),
+            ) ||
+            !comptesDest.every(
+              (compteId) => comptesSource.contains(compteId),
+            )) {
+          throw Exception(
+            "Impossible de mélanger des fonds provenant de comptes différents. Cette enveloppe contient déjà de l'argent d'un autre compte.",
+          );
         }
       }
 
       final srcOldSolde = (srcEnvs[srcIdx]['solde'] as num?)?.toDouble() ?? 0.0;
       srcEnvs[srcIdx]['solde'] = srcOldSolde - montant;
 
-      final destOldSolde = (destEnvs[destIdx]['solde'] as num?)?.toDouble() ?? 0.0;
+      final destOldSolde =
+          (destEnvs[destIdx]['solde'] as num?)?.toDouble() ?? 0.0;
       destEnvs[destIdx]['solde'] = destOldSolde + montant;
 
       // Transférer les provenances proportionnellement SEULEMENT si compatible
       if (provenancesSource.isNotEmpty) {
-        double totalSource = provenancesSource.fold(0.0, (sum, prov) => sum + (prov['montant'] as num).toDouble());
+        double totalSource = provenancesSource.fold(
+          0.0,
+          (sum, prov) => sum + (prov['montant'] as num).toDouble(),
+        );
 
         // Réduire proportionnellement les provenances de la source
         for (var prov in provenancesSource) {
@@ -104,23 +147,32 @@ class ArgentService {
           }
 
           List<dynamic> provenancesDestFinal = destEnvs[destIdx]['provenances'];
-          int existingIndex = provenancesDestFinal.indexWhere((p) => p['compte_id'] == prov['compte_id']);
+          int existingIndex = provenancesDestFinal.indexWhere(
+            (p) => p['compte_id'] == prov['compte_id'],
+          );
           if (existingIndex != -1) {
-            provenancesDestFinal[existingIndex]['montant'] = ((provenancesDestFinal[existingIndex]['montant'] as num).toDouble() + proportionATransferer);
+            provenancesDestFinal[existingIndex]['montant'] =
+                ((provenancesDestFinal[existingIndex]['montant'] as num)
+                    .toDouble() +
+                proportionATransferer);
           } else {
             provenancesDestFinal.add({
               'compte_id': prov['compte_id'],
-              'montant': proportionATransferer
+              'montant': proportionATransferer,
             });
           }
         }
 
         // Nettoyer les provenances avec montant négligeable
-        srcEnvs[srcIdx]['provenances'] = provenancesSource.where((prov) => (prov['montant'] as num).toDouble() > 0.01).toList();
+        srcEnvs[srcIdx]['provenances'] = provenancesSource
+            .where((prov) => (prov['montant'] as num).toDouble() > 0.01)
+            .toList();
       }
 
       // --- MAJ historique source ---
-      Map<String, dynamic> histoSrc = srcEnvs[srcIdx]['historique'] != null ? Map<String, dynamic>.from(srcEnvs[srcIdx]['historique']) : {};
+      Map<String, dynamic> histoSrc = srcEnvs[srcIdx]['historique'] != null
+          ? Map<String, dynamic>.from(srcEnvs[srcIdx]['historique'])
+          : {};
       histoSrc[moisCourant] = {
         'depense': srcEnvs[srcIdx]['depense'] ?? 0.0,
         'solde': srcEnvs[srcIdx]['solde'],
@@ -130,7 +182,9 @@ class ArgentService {
       transaction.update(catSource.reference, {'enveloppes': srcEnvs});
 
       // --- MAJ historique destination ---
-      Map<String, dynamic> histoDest = destEnvs[destIdx]['historique'] != null ? Map<String, dynamic>.from(destEnvs[destIdx]['historique']) : {};
+      Map<String, dynamic> histoDest = destEnvs[destIdx]['historique'] != null
+          ? Map<String, dynamic>.from(destEnvs[destIdx]['historique'])
+          : {};
       histoDest[moisCourant] = {
         'depense': destEnvs[destIdx]['depense'] ?? 0.0,
         'solde': destEnvs[destIdx]['solde'],
@@ -142,10 +196,14 @@ class ArgentService {
   }
 
   /// Applique une dépense à une enveloppe et met à jour son historique
-  Future<void> appliquerDepenseAEnveloppe({required String enveloppeId, required double montant}) async {
+  Future<void> appliquerDepenseAEnveloppe({
+    required String enveloppeId,
+    required double montant,
+  }) async {
     final categoriesRef = _firebaseService.categoriesRef;
     final now = DateTime.now();
-    final moisCourant = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+    final moisCourant =
+        "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
 
     await categoriesRef.firestore.runTransaction((transaction) async {
       QuerySnapshot catSnap = await categoriesRef.get();
@@ -159,13 +217,17 @@ class ArgentService {
         }
       }
 
-      if (catDoc == null) throw Exception('Catégorie pour l\'enveloppe $enveloppeId non trouvée');
+      if (catDoc == null)
+        throw Exception('Catégorie pour l\'enveloppe $enveloppeId non trouvée');
 
       final catData = catDoc.data() as Map<String, dynamic>;
-      final envs = (catData['enveloppes'] as List<dynamic>).map((e) => Map<String, dynamic>.from(e)).toList();
+      final envs = (catData['enveloppes'] as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final idx = envs.indexWhere((e) => e['id'] == enveloppeId);
 
-      if (idx == -1) throw Exception('Enveloppe $enveloppeId non trouvée dans la catégorie');
+      if (idx == -1)
+        throw Exception('Enveloppe $enveloppeId non trouvée dans la catégorie');
 
       var env = envs[idx];
       final oldSolde = (env['solde'] as num? ?? 0.0).toDouble();
@@ -178,25 +240,33 @@ class ArgentService {
       if ((env['solde'] as double) == 0.0) {
         // Si le solde tombe à 0, réinitialiser complètement les provenances
         env['provenances'] = [];
-      } else if (env['provenances'] != null && (env['provenances'] as List).isNotEmpty) {
+      } else if (env['provenances'] != null &&
+          (env['provenances'] as List).isNotEmpty) {
         // Réduire proportionnellement les provenances
         final List<dynamic> provenances = env['provenances'];
-        double totalProvenances = provenances.fold(0.0, (sum, prov) => sum + (prov['montant'] as num).toDouble());
+        double totalProvenances = provenances.fold(
+          0.0,
+          (sum, prov) => sum + (prov['montant'] as num).toDouble(),
+        );
 
         if (totalProvenances > 0) {
           for (var prov in provenances) {
             double montantProv = (prov['montant'] as num).toDouble();
-            double proportionADeduire = (montantProv / totalProvenances) * montant;
+            double proportionADeduire =
+                (montantProv / totalProvenances) * montant;
             prov['montant'] = montantProv - proportionADeduire;
           }
 
           // Nettoyer les provenances avec montant négligeable
-          env['provenances'] = provenances.where((prov) => (prov['montant'] as num).toDouble() > 0.01).toList();
+          env['provenances'] = provenances
+              .where((prov) => (prov['montant'] as num).toDouble() > 0.01)
+              .toList();
         }
       }
 
       // Mettre à jour l'historique
-      Map<String, dynamic> historique = (env['historique'] as Map<String, dynamic>?) ?? {};
+      Map<String, dynamic> historique =
+          (env['historique'] as Map<String, dynamic>?) ?? {};
       historique[moisCourant] = {
         'depense': env['depense'],
         'solde': env['solde'],
@@ -211,7 +281,11 @@ class ArgentService {
   }
 
   /// Virement d'une enveloppe vers un compte (ajoute au prêt à placer du compte)
-  Future<void> enveloppeVersCompte({required Enveloppe source, required Compte destination, required double montant}) async {
+  Future<void> enveloppeVersCompte({
+    required Enveloppe source,
+    required Compte destination,
+    required double montant,
+  }) async {
     if (source.solde < montant) {
       throw Exception('Montant insuffisant dans l\'enveloppe');
     }
@@ -229,7 +303,9 @@ class ArgentService {
         throw Exception('Catégorie non trouvée');
       }
       final srcData = catSource.data() as Map<String, dynamic>;
-      final srcEnvs = (srcData['enveloppes'] as List<dynamic>).map((e) => Map<String, dynamic>.from(e)).toList();
+      final srcEnvs = (srcData['enveloppes'] as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final srcIdx = srcEnvs.indexWhere((e) => e['id'] == source.id);
       if (srcIdx == -1) {
         throw Exception('Enveloppe source non trouvée dans la catégorie');
@@ -258,7 +334,11 @@ class ArgentService {
   }
 
   /// Ajoute un montant à une enveloppe (utilisé pour Compte -> Enveloppe)
-  Future<void> crediterEnveloppe({required Enveloppe enveloppe, required double montant, required String compteId}) async {
+  Future<void> crediterEnveloppe({
+    required Enveloppe enveloppe,
+    required double montant,
+    required String compteId,
+  }) async {
     final categoriesRef = _firebaseService.categoriesRef;
     await categoriesRef.firestore.runTransaction((transaction) async {
       QuerySnapshot catSnap = await categoriesRef.get();
@@ -270,7 +350,9 @@ class ArgentService {
       }
       if (catDoc == null) throw Exception('Catégorie non trouvée');
       final catData = catDoc.data() as Map<String, dynamic>;
-      final envs = (catData['enveloppes'] as List<dynamic>).map((e) => Map<String, dynamic>.from(e)).toList();
+      final envs = (catData['enveloppes'] as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final idx = envs.indexWhere((e) => e['id'] == enveloppe.id);
 
       // Sécurisation en cas de champ solde null
@@ -278,7 +360,8 @@ class ArgentService {
 
       // NETTOYAGE AGRESSIF des provenances corrompues
       if (envs[idx]['provenances'] != null) {
-        final List<dynamic> provenancesRaw = envs[idx]['provenances'] as List<dynamic>;
+        final List<dynamic> provenancesRaw =
+            envs[idx]['provenances'] as List<dynamic>;
         // Nettoyer TOUTES les provenances avec montant <= 0.01 ou invalides
         final provenancesValides = provenancesRaw.where((prov) {
           if (prov == null || prov is! Map) return false;
@@ -297,9 +380,13 @@ class ArgentService {
         final provenances = envs[idx]['provenances'] as List<dynamic>? ?? [];
         // Blocage uniquement si la liste provenances nettoyée est non vide
         if (provenances.isNotEmpty) {
-          final comptesExistants = provenances.map((prov) => prov['compte_id'].toString()).toSet();
+          final comptesExistants = provenances
+              .map((prov) => prov['compte_id'].toString())
+              .toSet();
           if (!comptesExistants.contains(compteId)) {
-            throw Exception("L'argent de cette enveloppe provient déjà d'un autre compte.");
+            throw Exception(
+              "L'argent de cette enveloppe provient déjà d'un autre compte.",
+            );
           }
         }
       }
@@ -308,8 +395,10 @@ class ArgentService {
 
       // --- Ajout de la mise à jour de l'historique ---
       final now = DateTime.now();
-      final moisCourant = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
-      Map<String, dynamic> historique = (envs[idx]['historique'] as Map<String, dynamic>?) ?? {};
+      final moisCourant =
+          "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+      Map<String, dynamic> historique =
+          (envs[idx]['historique'] as Map<String, dynamic>?) ?? {};
       historique[moisCourant] = {
         'depense': envs[idx]['depense'] ?? 0.0,
         'solde': envs[idx]['solde'],
@@ -326,14 +415,21 @@ class ArgentService {
     });
   }
 
-  void ajouterOuMettreAJourProvenance(Map<String, dynamic> enveloppe, String compteId, double montant) {
+  void ajouterOuMettreAJourProvenance(
+    Map<String, dynamic> enveloppe,
+    String compteId,
+    double montant,
+  ) {
     if (enveloppe['provenances'] == null) {
       enveloppe['provenances'] = [];
     }
     final List provenances = enveloppe['provenances'];
-    final index = provenances.indexWhere((prov) => prov['compte_id'] == compteId);
+    final index = provenances.indexWhere(
+      (prov) => prov['compte_id'] == compteId,
+    );
     if (index >= 0) {
-      provenances[index]['montant'] = (provenances[index]['montant'] as num).toDouble() + montant;
+      provenances[index]['montant'] =
+          (provenances[index]['montant'] as num).toDouble() + montant;
     } else {
       provenances.add({'compte_id': compteId, 'montant': montant});
     }
@@ -348,7 +444,9 @@ class ArgentService {
 
       for (var catDoc in catSnap.docs) {
         final catData = catDoc.data() as Map<String, dynamic>;
-        final envs = (catData['enveloppes'] as List<dynamic>? ?? []).map((e) => Map<String, dynamic>.from(e)).toList();
+        final envs = (catData['enveloppes'] as List<dynamic>? ?? [])
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         bool modifie = false;
 
         for (int i = 0; i < envs.length; i++) {
@@ -357,14 +455,16 @@ class ArgentService {
 
           // Si le solde est proche de zéro, nettoyer complètement les provenances
           if (solde <= 0.01) {
-            if (env['provenances'] != null && (env['provenances'] as List).isNotEmpty) {
+            if (env['provenances'] != null &&
+                (env['provenances'] as List).isNotEmpty) {
               env['provenances'] = [];
               env.remove('provenance_compte_id');
               modifie = true;
             }
           } else if (env['provenances'] != null) {
             // Nettoyer les provenances invalides
-            final List<dynamic> provenancesOriginales = env['provenances'] as List<dynamic>;
+            final List<dynamic> provenancesOriginales =
+                env['provenances'] as List<dynamic>;
             final provenancesValides = provenancesOriginales.where((prov) {
               if (prov == null || prov is! Map) return false;
               final montantProv = (prov['montant'] as num?)?.toDouble();
@@ -407,5 +507,60 @@ class ArgentService {
       }
     }
     print("=== FIN DEBUG ===");
+  }
+
+  /// Méthode générique pour virer de l'argent entre comptes et/ou enveloppes
+  Future<void> virerArgent({
+    required String sourceId,
+    required String destinationId,
+    required double montant,
+  }) async {
+    // Récupérer tous les comptes et enveloppes
+    final comptes = await _firebaseService.lireComptes().first;
+    final categories = await _firebaseService.lireCategories().first;
+    final enveloppes = categories.expand((cat) => cat.enveloppes).toList();
+
+    // Identifier la source et la destination
+    final source = [...comptes, ...enveloppes].firstWhere(
+      (item) => (item is Compte ? item.id : (item as Enveloppe).id) == sourceId,
+      orElse: () => throw Exception('Source non trouvée'),
+    );
+
+    final destination = [...comptes, ...enveloppes].firstWhere(
+      (item) =>
+          (item is Compte ? item.id : (item as Enveloppe).id) == destinationId,
+      orElse: () => throw Exception('Destination non trouvée'),
+    );
+
+    // Déterminer le type de virement et appeler la méthode appropriée
+    if (source is Compte && destination is Compte) {
+      await virementEntreComptes(
+        source: source,
+        destination: destination,
+        montant: montant,
+      );
+    } else if (source is Enveloppe && destination is Enveloppe) {
+      await virementEnveloppeVersEnveloppe(
+        source: source,
+        destination: destination,
+        montant: montant,
+      );
+    } else if (source is Compte && destination is Enveloppe) {
+      // Compte vers Enveloppe : débiter le compte puis créditer l'enveloppe
+      await allouerPretAPlacer(compte: source, montant: montant);
+      await crediterEnveloppe(
+        enveloppe: destination,
+        montant: montant,
+        compteId: source.id,
+      );
+    } else if (source is Enveloppe && destination is Compte) {
+      await enveloppeVersCompte(
+        source: source,
+        destination: destination,
+        montant: montant,
+      );
+    } else {
+      throw Exception('Type de virement non supporté');
+    }
   }
 }

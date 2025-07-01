@@ -134,6 +134,87 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
   String getId(dynamic obj) => obj is Compte ? obj.id : (obj as Enveloppe).id;
 
+  bool _peutVirer() {
+    if (sourceId == null || destinationId == null || montant.isEmpty) {
+      return false;
+    }
+
+    double montantDouble = double.tryParse(montant.replaceAll(',', '.')) ?? 0;
+    if (montantDouble <= 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<void> _effectuerVirement() async {
+    if (!_peutVirer()) return;
+
+    try {
+      double montantDouble = double.parse(montant.replaceAll(',', '.'));
+
+      // Vérifier les soldes
+      if (source is Compte && (source as Compte).pretAPlacer < montantDouble) {
+        _afficherErreur('Solde insuffisant dans le compte source.');
+        return;
+      }
+      if (source is Enveloppe && (source as Enveloppe).solde < montantDouble) {
+        _afficherErreur('Solde insuffisant dans l\'enveloppe source.');
+        return;
+      }
+
+      await ArgentService().virerArgent(
+        sourceId: sourceId!,
+        destinationId: destinationId!,
+        montant: montantDouble,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Virement de ${montantDouble.toStringAsFixed(2)} \$ effectué avec succès',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      // Gestion spécifique des erreurs de mélange de fonds
+      String errorMessage = e.toString();
+
+      if (errorMessage.contains('mélanger des fonds') ||
+          errorMessage.contains('provient déjà d\'un autre compte')) {
+        // Déterminer le type d'erreur pour afficher la bonne modale
+        if (source is Enveloppe && destination is Compte) {
+          _afficherMessageErreurMelangeFonds(
+            context,
+            isEnveloppeVersCompte: true,
+          );
+        } else if (source is Enveloppe && destination is Enveloppe) {
+          _afficherMessageErreurMelangeFonds(
+            context,
+            isEnveloppeVersEnveloppe: true,
+          );
+        } else {
+          _afficherMessageErreurMelangeFonds(context);
+        }
+      } else {
+        // Autres erreurs
+        _afficherErreur('Erreur lors du virement: $e');
+      }
+    }
+  }
+
+  void _afficherErreur(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -404,6 +485,31 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                           });
                         },
                         showDecimal: true,
+                      ),
+                    ),
+                    // Bouton Virer ajouté
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      child: ElevatedButton(
+                        onPressed: _peutVirer() ? _effectuerVirement : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Virer',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ],
