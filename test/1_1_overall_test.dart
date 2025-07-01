@@ -2,33 +2,12 @@
 // Ce fichier teste TOUS les points de la feuille de route
 // Exécution : flutter test test/1_1_overall_test.dart --reporter=expanded
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-// Imports de l'application
-import 'package:toutie_budget/main.dart';
-import 'package:toutie_budget/services/firebase_service.dart';
-import 'package:toutie_budget/services/dette_service.dart';
-import 'package:toutie_budget/services/argent_service.dart';
-import 'package:toutie_budget/services/import_csv_service.dart';
-import 'package:toutie_budget/services/rollover_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
 import 'package:toutie_budget/models/compte.dart';
 import 'package:toutie_budget/models/categorie.dart';
 import 'package:toutie_budget/models/transaction_model.dart' as app_model;
 import 'package:toutie_budget/models/dette.dart';
-
-// Imports des pages
-import 'package:toutie_budget/pages/page_login.dart';
-import 'package:toutie_budget/pages/page_budget.dart';
-import 'package:toutie_budget/pages/page_comptes.dart';
-import 'package:toutie_budget/pages/page_statistiques.dart';
-import 'package:toutie_budget/pages/page_ajout_transaction.dart';
-import 'package:toutie_budget/pages/page_pret_personnel.dart';
-import 'package:toutie_budget/pages/page_parametres.dart';
 
 void main() {
   // Variables globales pour les tests (Firebase remplacé par données fake)
@@ -992,7 +971,6 @@ void main() {
     ) async {
       try {
         // Simuler un virement valide entre enveloppes du même compte
-        final compteSource = comptesFake.first;
         final enveloppeSource = categoriesFake.first.enveloppes.first;
         final enveloppeDestination = categoriesFake.last.enveloppes.first;
 

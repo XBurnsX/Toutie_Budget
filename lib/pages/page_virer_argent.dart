@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../services/argent_service.dart';
@@ -375,14 +374,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
                 // Mettre à jour les objets source et destination
                 _updateObjectsFromSelection(tout);
-                String getNom(dynamic obj) {
-                  if (obj is Compte) {
-                    return "${obj.nom} -> Prêt à placer";
-                  } else if (obj is Enveloppe) {
-                    return obj.nom;
-                  }
-                  return '';
-                }
 
                 Widget getNomAvecCouleur(dynamic obj) {
                   if (obj is Compte) {

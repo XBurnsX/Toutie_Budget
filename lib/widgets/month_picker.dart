@@ -47,7 +47,6 @@ class MonthPickerWidget extends StatelessWidget {
                                 final pickedYear = await showDialog<int>(
                                   context: context,
                                   builder: (context) {
-                                    int tempYear = year;
                                     final scrollController = ScrollController(
                                       initialScrollOffset:
                                           ((year - (DateTime.now().year - 20)) *

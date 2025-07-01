@@ -139,15 +139,7 @@ class PageComptes extends StatelessWidget {
                         ...dettesAutomatiques,
                       ];
 
-                      // Debug pour voir toutes les dettes
-                      print('DEBUG: Dettes affichées:');
-                      for (var item in dettesAfficher) {
-                        if (item is Compte) {
-                          print('  - Compte (manuelle): ${item.nom}');
-                        } else if (item is Dette) {
-                          print('  - Dette (auto): ${item.nomTiers}');
-                        }
-                      }
+                      // Debug silencieux
 
                       if (dettesAfficher.isNotEmpty) {
                         return Column(
@@ -478,10 +470,7 @@ class PageComptes extends StatelessWidget {
     final isDetteManuelle =
         dette.estManuelle; // Vérifier si c'est une dette manuelle
 
-    // Debug pour voir les valeurs
-    print(
-      'DEBUG: Dette ${dette.nomTiers} - estManuelle: $isDetteManuelle, type: ${dette.type}',
-    );
+    // Debug silencieux
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -493,10 +482,6 @@ class PageComptes extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: () {
             // Navigation conditionnelle selon le type de dette
-            print(
-              'DEBUG: Navigation pour dette ${dette.nomTiers} - estManuelle: $isDetteManuelle, type: ${dette.type}',
-            );
-
             if (isDetteManuelle) {
               // Dette manuelle → PageParametresDettes
               Navigator.of(context).push(

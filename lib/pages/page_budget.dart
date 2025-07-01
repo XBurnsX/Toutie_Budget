@@ -34,7 +34,6 @@ class _PageBudgetState extends State<PageBudget> {
   Future<void> _triggerRollover() async {
     final bool rolloverProcessed = await _rolloverService.processRollover();
     if (rolloverProcessed) {
-      print('Rollover mensuel effectué !');
       if (mounted) {
         setState(() {
           refreshKey++; // Force a refresh of the UI

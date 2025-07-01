@@ -505,23 +505,9 @@ class ArgentService {
     final categoriesRef = _firebaseService.categoriesRef;
     QuerySnapshot catSnap = await categoriesRef.get();
 
-    print("=== DEBUG PROVENANCES ===");
     for (var catDoc in catSnap.docs) {
-      final catData = catDoc.data() as Map<String, dynamic>;
-      final envs = (catData['enveloppes'] as List<dynamic>? ?? []);
-
-      for (var env in envs) {
-        final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
-        final provenances = env['provenances'] as List<dynamic>? ?? [];
-
-        if (provenances.isNotEmpty || solde <= 0.01) {
-          print("Enveloppe: ${env['nom']} | Solde: $solde");
-          print("Provenances: $provenances");
-          print("---");
-        }
-      }
+      // Debug silencieux - plus de logs console
     }
-    print("=== FIN DEBUG ===");
   }
 
   /// Méthode générique pour virer de l'argent entre comptes et/ou enveloppes

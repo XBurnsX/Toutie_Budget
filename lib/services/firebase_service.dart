@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
@@ -223,9 +222,7 @@ class FirebaseService {
         }
       } catch (e) {
         // Ne pas faire échouer toute la transaction si la mise à jour de la dette échoue.
-        print(
-          'Erreur lors de la tentative de synchronisation dette manuelle: $e',
-        );
+        // Erreur silencieuse
       }
     }
   }
@@ -575,7 +572,6 @@ class FirebaseService {
       // 4. Rollback des dettes/prêts si applicable
       await _rollbackDette(transaction);
     } catch (e) {
-      print('Erreur lors du rollback de la transaction: $e');
       rethrow;
     }
   }
@@ -786,9 +782,7 @@ class FirebaseService {
   Future<void> _rollbackDette(app_model.Transaction transaction) async {
     // Cette méthode sera implémentée plus tard si nécessaire
     // Pour l'instant, on se concentre sur les soldes de comptes et enveloppes
-    print(
-      'Rollback dette non implémenté pour la transaction ${transaction.id}',
-    );
+    // Rollback silencieux
   }
 
   Stream<List<app_model.Transaction>> lireTransactions(String compteId) {

@@ -157,17 +157,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
               }
               final transactions = snapshot.data!;
 
-              // DEBUG : Afficher l'id du compte, les compteId/userId des transactions et le userId courant
-              print('DEBUG: compte.id = \\${widget.compte.id}');
-              for (final t in transactions) {
-                print(
-                  'DEBUG: transaction compteId = \\${t.compteId}, userId = \\${t.userId}',
-                );
-              }
-              // Afficher le userId courant
-              print(
-                'DEBUG: userId courant = \\${FirebaseService().auth.currentUser?.uid}',
-              );
+              // Debug silencieux
 
               // Filtrer les transactions selon la recherche
               final transactionsFiltrees = filtrerTransactions(
@@ -388,14 +378,6 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                   if (t.estFractionnee == true &&
                                       t.sousItems != null &&
                                       t.sousItems!.isNotEmpty) {
-                                    // DEBUG: Afficher les données pour comprendre le problème
-                                    print('DEBUG Transaction fractionnée:');
-                                    print('  - tiers: ${t.tiers}');
-                                    print('  - sousItems: ${t.sousItems}');
-                                    print(
-                                      '  - enveloppeIdToNom: $enveloppeIdToNom',
-                                    );
-
                                     // Afficher la liste des enveloppes et montants avec format demandé
                                     final enveloppesFormatees = t.sousItems!.map((
                                       item,
@@ -407,9 +389,6 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                           (item['montant'] as num?)
                                               ?.toDouble() ??
                                           0.0;
-                                      print(
-                                        '  - Enveloppe: ${item['enveloppeId']} -> $nomEnv, Montant: $montant',
-                                      );
                                       return '$nomEnv - ${montant.toStringAsFixed(0)}\$';
                                     }).toList();
                                     sousTitre = enveloppesFormatees.join(' , ');
@@ -595,7 +574,6 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         );
       }
     } catch (e) {
-      print('Erreur lors de l\'annulation de la transaction: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

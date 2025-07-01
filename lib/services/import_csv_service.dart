@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart';
 import '../models/transaction_model.dart';
 import '../models/categorie.dart';
 import '../models/compte.dart';
@@ -62,14 +61,12 @@ class ImportCsvService {
     ];
 
     String? contents;
-    String? encodageUtilise;
 
     // Essayer chaque encodage
     for (var encodage in encodages) {
       try {
         final bytes = await file.readAsBytes();
         contents = encodage.decode(bytes);
-        encodageUtilise = encodage.name;
 
         // Validation basique : le contenu doit contenir des caractères CSV valides
         if (contents.contains(',') ||
@@ -706,159 +703,6 @@ class ImportCsvService {
         } else {
           enveloppesModifiees.add(enveloppe); // Pas de changement
         }
-      }
-
-      // Sauvegarder la catégorie modifiée
-      if (categorieModifiee) {
-        final categorieAvecNouveauxSoldes = Categorie(
-          id: categorie.id,
-          userId: categorie.userId,
-          nom: categorie.nom,
-          enveloppes: enveloppesModifiees,
-        );
-
-        await _firebaseService.ajouterCategorie(categorieAvecNouveauxSoldes);
-      }
-    }
-  }
-
-  /// Calcule et alloue l'argent nécessaire aux enveloppes pour un mois donné
-  Future<void> _calculerEtAllouerArgentPourMois(
-    String mois,
-    List<Transaction> depensesDuMois,
-  ) async {
-    // Calculer les dépenses par enveloppe pour ce mois
-    final depensesParEnveloppe = <String, double>{};
-
-    for (var depense in depensesDuMois) {
-      if (depense.enveloppeId != null) {
-        final enveloppeId = depense.enveloppeId!;
-        depensesParEnveloppe[enveloppeId] =
-            (depensesParEnveloppe[enveloppeId] ?? 0.0) + depense.montant;
-      }
-    }
-
-    if (depensesParEnveloppe.isEmpty) {
-      return;
-    }
-
-    // Récupérer les enveloppes et comptes actuels (après import des revenus)
-    final categories = await _obtenirCategories();
-    final comptes = await _obtenirComptes();
-    final comptesParId = {for (var compte in comptes) compte.id: compte};
-
-    // Allouer l'argent nécessaire à chaque enveloppe
-    for (var categorie in categories) {
-      bool categorieModifiee = false;
-      final enveloppesModifiees = <Enveloppe>[];
-
-      for (var enveloppe in categorie.enveloppes) {
-        final depenseNecessaire = depensesParEnveloppe[enveloppe.id] ?? 0.0;
-
-        if (depenseNecessaire > 0.0) {
-          final soldeActuel = enveloppe.solde;
-          final montantAAllouer = depenseNecessaire - soldeActuel;
-
-          if (montantAAllouer > 0.0) {
-            // Il faut allouer de l'argent depuis le prêt à placer
-            final compte = comptesParId[enveloppe.provenanceCompteId];
-            if (compte != null) {
-              // FORCER l'allocation même si pas assez d'argent (évite enveloppes négatives)
-              final nouveauPretAPlacer = compte.pretAPlacer - montantAAllouer;
-              final nouveauSoldeEnveloppe = soldeActuel + montantAAllouer;
-
-              // Mettre à jour le compte
-              final compteModifie = Compte(
-                id: compte.id,
-                userId: compte.userId,
-                nom: compte.nom,
-                type: compte.type,
-                solde: compte.solde,
-                couleur: compte.couleur,
-                pretAPlacer: nouveauPretAPlacer,
-                dateCreation: compte.dateCreation,
-                estArchive: compte.estArchive,
-                dateSuppression: compte.dateSuppression,
-              );
-              await _firebaseService.ajouterCompte(compteModifie);
-
-              // Mettre à jour l'enveloppe
-              enveloppesModifiees.add(
-                Enveloppe(
-                  id: enveloppe.id,
-                  nom: enveloppe.nom,
-                  solde: nouveauSoldeEnveloppe,
-                  provenanceCompteId: enveloppe.provenanceCompteId,
-                ),
-              );
-              categorieModifiee = true;
-            } else {
-              enveloppesModifiees.add(enveloppe); // Garder tel quel
-            }
-          } else {
-            enveloppesModifiees.add(enveloppe); // Assez d'argent déjà
-          }
-        } else {
-          enveloppesModifiees.add(enveloppe); // Pas de dépense
-        }
-      }
-
-      // Sauvegarder la catégorie modifiée
-      if (categorieModifiee) {
-        final categorieAvecNouvellesAllocations = Categorie(
-          id: categorie.id,
-          userId: categorie.userId,
-          nom: categorie.nom,
-          enveloppes: enveloppesModifiees,
-        );
-        await _firebaseService.ajouterCategorie(
-          categorieAvecNouvellesAllocations,
-        );
-      }
-    }
-  }
-
-  /// Ancienne méthode - remplacée par le traitement mois par mois
-  Future<void> _remettreAZeroSoldesEnveloppes(
-    Function(double progress) onProgress,
-  ) async {
-    final categories = await _obtenirCategories();
-    int totalEnveloppes = 0;
-    int enveloppesTraitees = 0;
-
-    // Compter le total d'enveloppes
-    for (var categorie in categories) {
-      totalEnveloppes += categorie.enveloppes.length;
-    }
-
-    if (totalEnveloppes == 0) {
-      return;
-    }
-
-    for (var categorie in categories) {
-      bool categorieModifiee = false;
-      final enveloppesModifiees = <Enveloppe>[];
-
-      for (var enveloppe in categorie.enveloppes) {
-        if (enveloppe.solde != 0.0) {
-          // Créer une nouvelle enveloppe avec solde = 0
-          enveloppesModifiees.add(
-            Enveloppe(
-              id: enveloppe.id,
-              nom: enveloppe.nom,
-              solde: 0.0, // Remise à zéro !
-              provenanceCompteId: enveloppe.provenanceCompteId,
-            ),
-          );
-          categorieModifiee = true;
-        } else {
-          enveloppesModifiees.add(enveloppe); // Pas de changement
-        }
-
-        enveloppesTraitees++;
-        onProgress(
-          0.75 + (enveloppesTraitees / totalEnveloppes) * 0.05,
-        ); // 75-80%
       }
 
       // Sauvegarder la catégorie modifiée

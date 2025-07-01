@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:developer';
 import 'pie_chart_with_legend.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes

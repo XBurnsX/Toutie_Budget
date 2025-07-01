@@ -124,11 +124,8 @@ class CalculPretService {
       final interetMensuel = solde * tauxMensuel;
       final capitalMensuel = paiementMensuel - interetMensuel;
       solde -= capitalMensuel;
-      print(
-        'Mois \\${i + 1}: Solde=\\${solde.toStringAsFixed(2)}, Intérêt=\\${interetMensuel.toStringAsFixed(2)}, Capital=\\${capitalMensuel.toStringAsFixed(2)}',
-      );
+      // Calcul silencieux
     }
-    print('Solde final (arrondi): \\${solde.toStringAsFixed(2)}');
     return double.parse(solde.toStringAsFixed(2));
   }
 }

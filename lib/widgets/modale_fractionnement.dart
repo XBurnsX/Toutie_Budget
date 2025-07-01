@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/fractionnement_model.dart';
 import '../widgets/numeric_keyboard.dart';
-import '../models/compte.dart';
 import '../themes/dropdown_theme_extension.dart';
 
 class ModaleFractionnement extends StatefulWidget {
@@ -44,7 +43,6 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
 
   Future<void> _chargerDonneesInitiales() async {
     // TEST : on simule un chargement rapide, sans Firebase
-    final comptes = <Compte>[];
     await Future.delayed(Duration(milliseconds: 100));
     if (mounted) {
       setState(() {

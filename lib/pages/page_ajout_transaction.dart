@@ -62,9 +62,7 @@ class _EcranAjoutTransactionRefactoredState
       // Gérer le fractionnement si la transaction était fractionnée
       if (t.estFractionnee == true && t.sousItems != null) {
         // TODO: Implémenter la restauration du fractionnement
-        print(
-          'DEBUG: Transaction fractionnée détectée, fractionnement à restaurer',
-        );
+        // Debug silencieux - fractionnement à restaurer
       }
     }
   }

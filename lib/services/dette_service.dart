@@ -16,9 +16,7 @@ class DetteService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
-    print(
-      'DEBUG: DetteService.creerDette appelé pour dette ID: ${dette.id}, nomTiers: ${dette.nomTiers}, type: ${dette.type}, creerCompteAutomatique: $creerCompteAutomatique',
-    );
+    // Debug silencieux
 
     final detteAvecUser = Dette(
       id: dette.id,
@@ -35,7 +33,6 @@ class DetteService {
 
     // Créer la dette dans Firestore
     await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
-    print('DEBUG: Dette sauvegardée dans Firestore: ${dette.id}');
 
     // Créer automatiquement une enveloppe pour cette dette
     await _creerEnveloppePourDette(detteAvecUser);
@@ -80,15 +77,6 @@ class DetteService {
       final prixAchat = detteData['prixAchat'] != null
           ? (detteData['prixAchat'] as num).toDouble()
           : null;
-      final dateDebut = detteData['dateDebut'] != null
-          ? (detteData['dateDebut'] as Timestamp).toDate()
-          : null;
-      final dateFin = detteData['dateFin'] != null
-          ? (detteData['dateFin'] as Timestamp).toDate()
-          : null;
-      final paiementsEffectues = detteData['paiementsEffectues'] != null
-          ? (detteData['paiementsEffectues'] as num).toInt()
-          : 0;
 
       double nouveauSolde;
 
@@ -191,7 +179,7 @@ class DetteService {
         }
       }
     } catch (e) {
-      print('Erreur lors du recalcul du solde: $e');
+      // Erreur silencieuse
     }
   }
 
@@ -223,7 +211,6 @@ class DetteService {
 
   Stream<List<Dette>> dettesActives() {
     final user = FirebaseAuth.instance.currentUser;
-    print('DEBUG - Utilisateur connecté: ${user?.uid}');
     if (user == null) return Stream.value([]);
 
     return dettesRef
@@ -231,12 +218,8 @@ class DetteService {
         .where('userId', isEqualTo: user.uid)
         .snapshots()
         .map((snap) {
-          print('DEBUG - Nombre de dettes trouvées: ${snap.docs.length}');
           final dettes = snap.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            print(
-              'DEBUG - Dette trouvée: ${doc.id}, userId: ${data['userId']}, nomTiers: ${data['nomTiers']}',
-            );
             return Dette.fromMap(data);
           }).toList();
           return dettes;
@@ -532,10 +515,6 @@ class DetteService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
-    print(
-      'DEBUG: DetteService.ajouterDette appelé pour dette ID: ${dette.id}, nomTiers: ${dette.nomTiers}, type: ${dette.type}, estManuelle: ${dette.estManuelle}',
-    );
-
     final detteAvecUser = Dette(
       id: dette.id,
       nomTiers: dette.nomTiers,
@@ -562,9 +541,6 @@ class DetteService {
 
     // Créer la dette dans Firestore
     await dettesRef.doc(dette.id).set(detteAvecUser.toMap());
-    print(
-      'DEBUG: Dette sauvegardée dans Firestore: ${dette.id} avec estManuelle: ${dette.estManuelle}',
-    );
 
     // Créer automatiquement une enveloppe pour cette dette
     await _creerEnveloppePourDette(detteAvecUser);
@@ -587,15 +563,12 @@ class DetteService {
         'montantMensuelCalcule': montantMensuelCalcule,
       });
 
-      print('DEBUG: Paramètres d\'intérêt sauvegardés pour dette: $detteId');
-
       // Mettre à jour l'objectif de l'enveloppe avec les nouveaux paramètres
       final dette = await getDette(detteId);
       if (dette != null) {
         await _mettreAJourObjectifEnveloppeDette(dette);
       }
     } catch (e) {
-      print('Erreur lors de la sauvegarde des paramètres d\'intérêt: $e');
       throw Exception('Erreur lors de la sauvegarde des paramètres d\'intérêt');
     }
   }
@@ -610,7 +583,6 @@ class DetteService {
     try {
       // 1. Mettre à jour l'intégralité du document dans la collection 'dettes'
       await docRef.set(dette.toMap());
-      print('DEBUG: Document de dette complet sauvegardé: ${dette.id}');
 
       // 2. Mettre à jour l'objectif de l'enveloppe correspondante
       await _mettreAJourObjectifEnveloppeDette(dette);
@@ -622,7 +594,6 @@ class DetteService {
           'archive': true,
           'dateArchivage': FieldValue.serverTimestamp(),
         });
-        print('DEBUG: Dette archivée: ${dette.id}');
 
         // Supprimer l'enveloppe correspondante
         await _supprimerEnveloppeDette(dette.nomTiers);
@@ -630,11 +601,7 @@ class DetteService {
 
       // Note: Les dettes manuelles n'ont pas de compte associé dans la collection 'comptes'
       // Elles sont affichées directement depuis la collection 'dettes' dans la page des comptes
-      print(
-        'DEBUG: Sauvegarde complète terminée pour la dette manuelle: ${dette.id}',
-      );
     } catch (e) {
-      print('Erreur lors de la sauvegarde complète de la dette: $e');
       throw Exception('Erreur lors de la sauvegarde complète de la dette');
     }
   }
@@ -655,16 +622,12 @@ class DetteService {
 
         // Si le champ estManuelle n'existe pas, l'ajouter
         if (!data.containsKey('estManuelle')) {
-          print('DEBUG: Mise à jour dette ${doc.id} - ajout estManuelle: true');
           await dettesRef.doc(doc.id).update({'estManuelle': true});
         }
 
         // Vérifier si le solde est proche de 0 et archiver si nécessaire
         final solde = (data['solde'] as num?)?.toDouble() ?? 0.0;
         if (solde.abs() <= 0.01) {
-          print(
-            'DEBUG: Dette ${doc.id} avec solde proche de 0 ($solde) - archivage automatique',
-          );
           await doc.reference.update({
             'archive': true,
             'dateArchivage': FieldValue.serverTimestamp(),
@@ -677,10 +640,8 @@ class DetteService {
           }
         }
       }
-
-      print('DEBUG: Mise à jour des dettes existantes terminée');
     } catch (e) {
-      print('Erreur lors de la mise à jour des dettes existantes: $e');
+      // Erreur silencieuse
     }
   }
 
@@ -690,9 +651,6 @@ class DetteService {
     try {
       // Ne créer une enveloppe que pour les dettes (pas les prêts)
       if (dette.type != 'dette') {
-        print(
-          'DEBUG: Pas de création d\'enveloppe pour le type: ${dette.type}',
-        );
         return;
       }
 
@@ -760,12 +718,7 @@ class DetteService {
       );
 
       await firebaseService.ajouterCategorie(categorieModifiee);
-
-      print(
-        'DEBUG: Enveloppe créée pour la dette ${dette.nomTiers} avec ID: $enveloppeId',
-      );
     } catch (e) {
-      print('Erreur lors de la création de l\'enveloppe pour la dette: $e');
       // Ne pas faire échouer la création de la dette si l'enveloppe échoue
     }
   }
@@ -798,7 +751,6 @@ class DetteService {
       // 3. Si plus d'enveloppes dans la catégorie "Dettes", supprimer la catégorie entière
       if (enveloppesRestantes.isEmpty) {
         await firebaseService.supprimerCategorie(categorieDettes.id);
-        print('DEBUG: Catégorie "Dettes" supprimée car plus d\'enveloppes');
       } else {
         // 4. Sinon, mettre à jour la catégorie avec les enveloppes restantes
         final categorieModifiee = Categorie(
@@ -810,10 +762,7 @@ class DetteService {
 
         await firebaseService.ajouterCategorie(categorieModifiee);
       }
-
-      print('DEBUG: Enveloppe supprimée pour la dette: $nomTiersDette');
     } catch (e) {
-      print('Erreur lors de la suppression de l\'enveloppe de la dette: $e');
       // Ne pas faire échouer l'archivage si la suppression d'enveloppe échoue
     }
   }
@@ -878,12 +827,7 @@ class DetteService {
       );
 
       await firebaseService.ajouterCategorie(categorieModifiee);
-
-      print(
-        'DEBUG: Objectif de l\'enveloppe mis à jour pour la dette: ${dette.nomTiers}',
-      );
     } catch (e) {
-      print('Erreur lors de la mise à jour de l\'objectif de l\'enveloppe: $e');
       // Ne pas faire échouer la sauvegarde si la mise à jour d'objectif échoue
     }
   }

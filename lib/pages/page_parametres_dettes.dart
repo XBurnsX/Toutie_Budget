@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
-import 'package:toutie_budget/widgets/month_picker.dart';
 import 'package:toutie_budget/services/calcul_pret_service.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -140,24 +138,16 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   void _chargerDonnees() {
-    print('=== Chargement des données de la dette ===');
-    print('Dette reçue: ${widget.dette.toString()}');
-
     if (widget.dette.tauxInteret != null) {
       _tauxController.text = widget.dette.tauxInteret!.toStringAsFixed(2);
-      print('Taux d\'intérêt chargé: ${_tauxController.text}');
-    } else {
-      print('Aucun taux d\'intérêt fourni');
     }
 
     // Date de début (par défaut aujourd'hui)
     final dateDebut = widget.dette.dateDebut ?? DateTime.now();
     _dateDebutController.text = _formaterDate(dateDebut);
-    print('Date de début: ${_dateDebutController.text}');
 
     if (widget.dette.dateFin != null) {
       _dateFinController.text = _formaterDate(widget.dette.dateFin!);
-      print('Date de fin: ${_dateFinController.text}');
     } else {
       _calculerDateFinParDefaut();
     }
@@ -165,42 +155,27 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     if (widget.dette.montantMensuel != null) {
       _montantMensuelController.text = widget.dette.montantMensuel!
           .toStringAsFixed(2);
-      print('Montant mensuel chargé: ${_montantMensuelController.text}');
-    } else {
-      print('Aucun montant mensuel fourni');
     }
 
     if (widget.dette.prixAchat != null) {
       _prixAchatController.text = widget.dette.prixAchat!.toStringAsFixed(2);
-      print('Prix d\'achat chargé: ${_prixAchatController.text}');
-    } else {
-      print('Aucun prix d\'achat fourni');
     }
 
     if (widget.dette.nombrePaiements != null) {
       _nombrePaiementsController.text = widget.dette.nombrePaiements!
           .toString();
-      print('Nombre de paiements chargé: ${_nombrePaiementsController.text}');
-    } else {
-      print('Aucun nombre de paiements fourni');
     }
 
     if (widget.dette.paiementsEffectues != null) {
       _paiementsEffectuesController.text = widget.dette.paiementsEffectues!
           .toString();
-      print(
-        'Paiements effectués chargé: ${_paiementsEffectuesController.text}',
-      );
     } else {
-      print('Calcul automatique des paiements effectués');
       _calculerPaiementsEffectues();
     }
 
     // Calculs initiaux après chargement
     _onParametresChanges();
     _calculerEtMettrAJour();
-
-    print('=== Fin du chargement des données ===');
   }
 
   void _calculerPaiementsEffectues() {
@@ -807,7 +782,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
   Widget _buildCalculsAutomatiques() {
     final calculs = _calculerValeursPret();
-    final solde = calculs['solde'];
 
     return Card(
       child: Padding(
@@ -828,8 +802,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                print('Bouton "Calculer le paiement mensuel" cliqué');
-
                 // Calcul du montant mensuel et remplissage automatique du champ
                 final prixAchat = _toDouble(_prixAchatController.text);
                 final tauxInteret = _toDouble(_tauxController.text);
@@ -1025,10 +997,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   Map<String, double?> _calculerValeursPret() {
-    print('--- NOUVEAU CALCUL DES VALEURS DU PRÊT ---');
     final prixAchat = _toDouble(_prixAchatController.text);
     final tauxInteret = _toDouble(_tauxController.text);
-    final paiementsEffectues = int.tryParse(_paiementsEffectuesController.text);
     final paiementMensuelSaisi = _toDouble(_montantMensuelController.text);
 
     final dateDebut = _parseDate(_dateDebutController.text);
@@ -1041,13 +1011,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           dateDebut.month +
           1;
     }
-
-    print('  Prix Achat: $prixAchat');
-    print('  Taux Intérêt: $tauxInteret');
-    print('  Durée (mois, depuis dates): $dureeMois');
-    print('  Paiements Effectués: $paiementsEffectues');
-    print('  Paiement Mensuel Saisi: $paiementMensuelSaisi');
-    print('  Solde Firestore: $_soldeFirestore');
 
     double? montantMensuel;
     double? coutTotal;
@@ -1115,11 +1078,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         }
       }
     }
-
-    print('  -> Montant Mensuel Calculé: $montantMensuel');
-    print('  -> Coût Total: $coutTotal');
-    print('  -> Solde: $solde');
-    print('  -> Intérêts Payés: $interetsPayes');
 
     return {
       'montantMensuel': montantMensuel,

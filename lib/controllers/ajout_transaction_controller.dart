@@ -69,25 +69,17 @@ class AjoutTransactionController extends ChangeNotifier {
       montantTexte += '.00';
     }
 
-    print('DEBUG: Validation - montantTexte final: "$montantTexte"');
     final montant = double.tryParse(montantTexte) ?? 0.0;
-    print('DEBUG: Validation - montant parsé: $montant');
 
     final tiersTexte = payeController.text.trim();
-    print('DEBUG: Validation - tiersTexte: "$tiersTexte"');
-    print('DEBUG: Validation - _compteSelectionne: $_compteSelectionne');
 
     if (montant <= 0 || tiersTexte.isEmpty || _compteSelectionne == null) {
-      print(
-        'DEBUG: Validation - ÉCHEC: montant=$montant, tiersTexte="$tiersTexte", compte=$_compteSelectionne',
-      );
       return false;
     }
 
     // Validation spécifique pour les transactions fractionnées
     if (_estFractionnee && _transactionFractionnee != null) {
       if (!_transactionFractionnee!.estValide) {
-        print('DEBUG: Validation - ÉCHEC: fractionnement invalide');
         return false;
       }
     }
@@ -96,11 +88,9 @@ class AjoutTransactionController extends ChangeNotifier {
     if (!_estFractionnee &&
         _typeMouvementSelectionne == TypeMouvementFinancier.depenseNormale &&
         (_enveloppeSelectionnee == null || _enveloppeSelectionnee!.isEmpty)) {
-      print('DEBUG: Validation - ÉCHEC: enveloppe manquante pour dépense');
       return false;
     }
 
-    print('DEBUG: Validation - SUCCÈS');
     return true;
   }
 
@@ -255,8 +245,6 @@ class AjoutTransactionController extends ChangeNotifier {
       final montant = double.tryParse(montantTexte.replaceAll(',', '.')) ?? 0.0;
 
       final tiersTexte = payeController.text.trim();
-      print('DEBUG: Validation - tiersTexte: "$tiersTexte"');
-      print('DEBUG: Validation - _compteSelectionne: $_compteSelectionne');
 
       final compte = _comptesFirebase.firstWhere(
         (c) => c.id == _compteSelectionne,
@@ -270,10 +258,6 @@ class AjoutTransactionController extends ChangeNotifier {
 
       // GESTION DU MODE MODIFICATION - Rollback de l'ancienne transaction
       if (_transactionExistante != null) {
-        print(
-          'DEBUG: Mode modification - Rollback de la transaction existante: ${_transactionExistante!.id}',
-        );
-
         try {
           // 1. Rollback de l'effet de l'ancienne transaction sur les soldes
           await firebaseService.rollbackTransaction(_transactionExistante!);
@@ -283,12 +267,7 @@ class AjoutTransactionController extends ChangeNotifier {
             'transactions',
             _transactionExistante!.id,
           );
-
-          print(
-            'DEBUG: Rollback et suppression de l\'ancienne transaction réussis',
-          );
         } catch (e) {
-          print('Erreur lors du rollback de l\'ancienne transaction: $e');
           rethrow;
         }
       }
@@ -350,7 +329,6 @@ class AjoutTransactionController extends ChangeNotifier {
       // Retourner l'information de finalisation si applicable
       return infoFinalisation;
     } catch (e) {
-      print('Erreur lors de la sauvegarde: $e');
       // Relancer l'exception pour qu'elle soit capturée par la page
       rethrow;
     }
@@ -366,10 +344,6 @@ class AjoutTransactionController extends ChangeNotifier {
     try {
       final user = FirebaseService().auth.currentUser;
       if (user == null) return;
-
-      print(
-        'DEBUG: Création de dette - nomTiers: $nomTiers, montant: $montant, typeMouvement: $typeMouvement',
-      );
 
       // Déterminer le type de dette selon le mouvement
       String typeDette;
@@ -396,8 +370,6 @@ class AjoutTransactionController extends ChangeNotifier {
         final detteExistante =
             dettesExistantes.first; // Prendre la première trouvée
 
-        print('DEBUG: Dette existante trouvée: ${detteExistante.id}');
-
         // Créer un mouvement pour ajouter le montant à la dette existante
         final mouvement = MouvementDette(
           id: '${DateTime.now().millisecondsSinceEpoch}_ajout',
@@ -409,16 +381,11 @@ class AjoutTransactionController extends ChangeNotifier {
 
         // Ajouter le mouvement à la dette existante
         await detteService.ajouterMouvement(detteExistante.id, mouvement);
-        print(
-          'DEBUG: Montant ajouté à la dette existante: ${detteExistante.id}',
-        );
         return;
       }
 
       // Si aucune dette existante, créer une nouvelle dette
       final String detteId = DateTime.now().millisecondsSinceEpoch.toString();
-
-      print('DEBUG: Type de dette déterminé: $typeDette, ID: $detteId');
 
       // Créer la dette
       final nouvelleDette = Dette(
@@ -447,19 +414,15 @@ class AjoutTransactionController extends ChangeNotifier {
         estManuelle: false,
       );
 
-      print(
-        'DEBUG: Appel de detteService.creerDette pour la dette: ${nouvelleDette.id}',
-      );
       await detteService.creerDette(
         nouvelleDette,
         creerCompteAutomatique: false,
       );
-      print('DEBUG: Dette créée avec succès: ${nouvelleDette.id}');
 
       // Plus besoin de créer un compte de dette automatique
       // Les dettes sont maintenant affichées directement dans la page comptes
     } catch (e) {
-      print('Erreur lors de la création de la dette: $e');
+      // Erreur silencieuse
     }
   }
 
@@ -515,9 +478,6 @@ class AjoutTransactionController extends ChangeNotifier {
       }
 
       if (dettesATiers.isEmpty) {
-        print(
-          'Aucune dette trouvée pour "$nomTiers" de type "$typeDetteRecherche"',
-        );
         return null;
       }
 
@@ -590,7 +550,6 @@ class AjoutTransactionController extends ChangeNotifier {
 
       return null;
     } catch (e) {
-      print('Erreur lors du traitement du remboursement: $e');
       rethrow; // Relancer l'exception pour qu'elle soit capturée par la fonction appelante
     }
   }
@@ -613,7 +572,7 @@ class AjoutTransactionController extends ChangeNotifier {
         'pretAPlacer': nouveauPretAPlacer,
       });
     } catch (e) {
-      print('Erreur lors du traitement du revenu normal: $e');
+      // Erreur silencieuse
     }
   }
 

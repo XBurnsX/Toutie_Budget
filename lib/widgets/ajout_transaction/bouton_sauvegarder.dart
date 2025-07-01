@@ -23,8 +23,6 @@ class BoutonSauvegarder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AjoutTransactionController>(
       builder: (context, controller, child) {
-        final messageAide = _getMessageAide(controller);
-
         return Column(
           children: [
             // Le bandeau d'aide a été supprimé (design épuré)
@@ -146,10 +144,5 @@ class BoutonSauvegarder extends StatelessWidget {
 
     // Pour fractionner, il faut un montant valide ET ne pas être un prêt personnel
     return montant > 0 && !estPretPersonnel;
-  }
-
-  String _getMessageAide(AjoutTransactionController controller) {
-    // Désactivé : on ne veut plus afficher ce bandeau d'aide.
-    return '';
   }
 }

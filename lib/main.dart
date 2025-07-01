@@ -283,5 +283,3 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
-
-// debugPaintSizeEnabled = true; // Pour le debug visuel, à désactiver en prod
