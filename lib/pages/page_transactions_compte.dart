@@ -178,13 +178,32 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
               // Regrouper les transactions par date (formatée)
               final Map<String, List<app_model.Transaction>>
               transactionsParDate = {};
+              final Map<String, DateTime> dateStringToDateTime = {};
+
               for (final t in transactionsFiltrees) {
                 final dateStr =
                     '${t.date.day.toString().padLeft(2, '0')}/${t.date.month.toString().padLeft(2, '0')}/${t.date.year}';
                 transactionsParDate.putIfAbsent(dateStr, () => []).add(t);
+                // Garder la référence de la vraie date pour le tri
+                dateStringToDateTime[dateStr] = DateTime(
+                  t.date.year,
+                  t.date.month,
+                  t.date.day,
+                );
               }
+
+              // Trier les transactions dans chaque date par heure (plus récentes en premier)
+              transactionsParDate.forEach((date, transactions) {
+                transactions.sort((a, b) => b.date.compareTo(a.date));
+              });
+
+              // Trier les dates par ordre chronologique décroissant (plus récentes en premier)
               final datesTriees = transactionsParDate.keys.toList()
-                ..sort((a, b) => b.compareTo(a)); // dates descendantes
+                ..sort(
+                  (a, b) => dateStringToDateTime[b]!.compareTo(
+                    dateStringToDateTime[a]!,
+                  ),
+                );
 
               return Column(
                 children: [
