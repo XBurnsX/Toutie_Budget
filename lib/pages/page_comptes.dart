@@ -535,7 +535,7 @@ class PageComptes extends StatelessWidget {
                     children: [
                       Text(
                         dette.type == 'dette'
-                            ? 'Dette à ${dette.nomTiers}'
+                            ? 'Dette : ${dette.nomTiers}'
                             : 'Prêt à ${dette.nomTiers}',
                         style: const TextStyle(
                           fontSize: 16,
