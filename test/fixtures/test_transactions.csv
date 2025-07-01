@@ -1,0 +1,10 @@
+Date,Montant,Type,Tiers,Compte,Enveloppe,Categorie,Note,Marqueur
+01/12/2024,-45.50,depense,IGA Metro,Compte Chèques Test,Alimentation,Besoins essentiels,Épicerie semaine,essentiel
+05/12/2024,2800.00,revenu,Employeur XYZ,Compte Chèques Test,,,Salaire mensuel,revenu
+10/12/2024,-25.00,depense,Tim Hortons,Compte Chèques Test,Restaurants,Loisirs,Café matin,plaisir
+15/12/2024,-120.00,depense,Shell Canada,Compte Chèques Test,Transport,Besoins essentiels,Essence voiture,transport
+20/12/2024,-500.00,depense,Visa Paiement,Compte Chèques Test,Carte Visa,Dettes,Remboursement carte,dette
+22/12/2024,-75.00,depense,Pharmaprix,Compte Chèques Test,Santé,Besoins essentiels,Médicaments,santé
+25/12/2024,-200.00,depense,Walmart,Compte Chèques Test,Cadeaux,Loisirs,Cadeaux Noël,cadeau
+28/12/2024,1500.00,revenu,Bonus Noël,Épargne Test,,,Prime de fin d'année,bonus
+30/12/2024,-300.00,depense,Hydro-Québec,Compte Chèques Test,Électricité,Besoins essentiels,Facture électricité,facture 
