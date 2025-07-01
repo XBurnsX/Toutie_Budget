@@ -320,17 +320,40 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                   return '${solde.toStringAsFixed(2)} \$';
                 }
 
+                // Couleur basée sur le compte de provenance
                 Color getSoldeColor(dynamic obj) {
-                  double solde = 0;
+                  // Si c'est un compte, on prend directement sa couleur
                   if (obj is Compte) {
-                    solde = obj.pretAPlacer;
-                  } else if (obj is Enveloppe) {
-                    solde = obj.solde;
+                    return Color(obj.couleur);
                   }
 
-                  if (solde < 0) return Colors.red;
-                  if (solde == 0) return Colors.grey;
-                  return Colors.green;
+                  // Si c'est une enveloppe, essayer de trouver le compte d'origine
+                  if (obj is Enveloppe) {
+                    // 1) Nouveau système multi-provenances (non exposé dans le modèle)
+                    //    -> on ignore pour l'instant faute d'info
+
+                    // 2) Ancien champ unique provenanceCompteId
+                    final compId = obj.provenanceCompteId;
+                    if (compId.isNotEmpty) {
+                      final compteProv = comptes.firstWhere(
+                        (c) => c.id == compId,
+                        orElse: () => Compte(
+                          id: '',
+                          nom: '',
+                          type: 'Chèque',
+                          solde: 0,
+                          couleur: Colors.grey.value,
+                          pretAPlacer: 0,
+                          dateCreation: DateTime.now(),
+                          estArchive: false,
+                        ),
+                      );
+                      return Color(compteProv.couleur);
+                    }
+                  }
+
+                  // Couleur par défaut
+                  return Colors.grey;
                 }
 
                 return Column(
