@@ -42,6 +42,16 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
     }
   }
 
+  void _updateObjectsFromSelection(List<dynamic> tout) {
+    // Met à jour les objets source et destination quand les données changent
+    if (sourceId != null) {
+      source = getSelectedById(sourceId, tout);
+    }
+    if (destinationId != null) {
+      destination = getSelectedById(destinationId, tout);
+    }
+  }
+
   void _afficherMessageErreurMelangeFonds(
     BuildContext context, {
     bool isEnveloppeVersEnveloppe = false,
@@ -86,7 +96,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
             color: Colors.white70,
             height: 1.5,
           ),
-          textAlign: TextAlign.left,
+          textAlign: TextAlign.center,
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
@@ -135,24 +145,26 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   String getId(dynamic obj) => obj is Compte ? obj.id : (obj as Enveloppe).id;
 
   bool _peutVirer() {
-    if (sourceId == null || destinationId == null || montant.isEmpty) {
-      return false;
-    }
-
-    double montantDouble = double.tryParse(montant.replaceAll(',', '.')) ?? 0;
-    if (montantDouble <= 0) {
-      return false;
-    }
-
-    return true;
+    // Le bouton est cliquable dès que source et destination sont sélectionnées
+    return sourceId != null && destinationId != null;
   }
 
   Future<void> _effectuerVirement() async {
     if (!_peutVirer()) return;
 
-    try {
-      double montantDouble = double.parse(montant.replaceAll(',', '.'));
+    // Vérifier d'abord le montant
+    if (montant.isEmpty) {
+      _afficherErreur('Veuillez saisir un montant.');
+      return;
+    }
 
+    double montantDouble = double.tryParse(montant.replaceAll(',', '.')) ?? 0;
+    if (montantDouble <= 0) {
+      _afficherErreur('Le montant doit être supérieur à 0.');
+      return;
+    }
+
+    try {
       // Vérifier les soldes
       if (source is Compte && (source as Compte).pretAPlacer < montantDouble) {
         _afficherErreur('Solde insuffisant dans le compte source.');
@@ -170,22 +182,71 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            backgroundColor: Colors.grey[900],
+            title: const Text(
+              'Succès',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 20,
+              ),
+              textAlign: TextAlign.center,
+            ),
             content: Text(
               'Virement de ${montantDouble.toStringAsFixed(2)} \$ effectué avec succès',
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.white70,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
             ),
-            backgroundColor: Colors.green,
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.check, size: 20, color: Colors.white),
+                label: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 12,
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop(); // Ferme le popup
+                  Navigator.of(context).pop(); // Ferme la page
+                },
+              ),
+            ],
           ),
         );
-        Navigator.of(context).pop();
       }
     } catch (e) {
       // Gestion spécifique des erreurs de mélange de fonds
       String errorMessage = e.toString();
 
-      if (errorMessage.contains('mélanger des fonds') ||
-          errorMessage.contains('provient déjà d\'un autre compte')) {
+      if (errorMessage.contains('mélanger') ||
+          errorMessage.contains('provient') ||
+          errorMessage.contains('autre compte')) {
         // Déterminer le type d'erreur pour afficher la bonne modale
         if (source is Enveloppe && destination is Compte) {
           _afficherMessageErreurMelangeFonds(
@@ -209,8 +270,59 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
   void _afficherErreur(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          backgroundColor: Colors.grey[900],
+          title: const Text(
+            'Erreur',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 20,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.check, size: 20, color: Colors.white),
+              label: const Text(
+                'OK',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 12,
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
       );
     }
   }
@@ -260,6 +372,9 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                     ),
                   );
                 }
+
+                // Mettre à jour les objets source et destination
+                _updateObjectsFromSelection(tout);
                 String getNom(dynamic obj) {
                   if (obj is Compte) {
                     return "${obj.nom} -> Prêt à placer";
