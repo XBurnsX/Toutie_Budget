@@ -441,50 +441,31 @@ class ImportCsvService {
     // Étape 2 : Trier les mois par ordre chronologique
     final moisOrdonnes = transactionsParMois.keys.toList()..sort();
 
-    // Étape 3 : Remise à zéro UNIQUE au début (pas à chaque mois !)
+    // Étape 3 : Remise à zéro UNIQUE au début
     await _remettreAZeroEtTransfererVersPretAPlacer(
       'DEBUT_IMPORT',
-      (subProgress) => onProgress(subProgress * 0.2), // 0-20%
+      (subProgress) => onProgress(subProgress * 0.1), // 0-10%
     );
 
-    // Étape 4 : Traiter chaque mois avec allocation intelligente
-    int totalTransactions = transactions.length;
-    int transactionsTraitees = 0;
+    // Étape 4 : Traiter chaque mois séquentiellement avec la logique correcte
+    int totalMois = moisOrdonnes.length;
 
     for (int i = 0; i < moisOrdonnes.length; i++) {
       final mois = moisOrdonnes[i];
       final transactionsDuMois = transactionsParMois[mois]!;
 
-      // Sous-étape 1 : Séparer revenus et dépenses
-      final revenus = transactionsDuMois
-          .where((t) => t.type == TypeTransaction.revenu)
-          .toList();
-      final depenses = transactionsDuMois
-          .where((t) => t.type == TypeTransaction.depense)
-          .toList();
+      await _traiterMoisAvecCompensation(mois, transactionsDuMois);
 
-      // Sous-étape 2 : Importer d'abord tous les REVENUS (augmente le prêt à placer)
-      for (var revenu in revenus) {
-        await _firebaseService.ajouterTransaction(revenu);
-        transactionsTraitees++;
-        onProgress(0.2 + (transactionsTraitees / totalTransactions) * 0.8);
-      }
+      // Compensation IMMÉDIATE après chaque mois (même le mois en cours)
+      await _compenserEnveloppesNegatives();
 
-      // Sous-étape 3 : Allouer l'argent nécessaire aux enveloppes depuis le prêt à placer
-      await _calculerEtAllouerArgentPourMois(mois, depenses);
-
-      // Sous-étape 4 : Importer ensuite toutes les DÉPENSES (utilise l'argent des enveloppes)
-      for (var depense in depenses) {
-        await _firebaseService.ajouterTransaction(depense);
-        transactionsTraitees++;
-        onProgress(0.2 + (transactionsTraitees / totalTransactions) * 0.8);
-      }
+      onProgress(0.1 + ((i + 1) / totalMois) * 0.8); // 10-90%
     }
 
     // Étape 5 : Remise à zéro finale des enveloppes (comme demandé)
     await _remettreAZeroEtTransfererVersPretAPlacer(
       'FIN_IMPORT',
-      (subProgress) => onProgress(0.95 + subProgress * 0.05), // 95-100%
+      (subProgress) => onProgress(0.9 + subProgress * 0.1), // 90-100%
     );
   }
 
@@ -554,6 +535,177 @@ class ImportCsvService {
 
         enveloppesTraitees++;
         onProgress(enveloppesTraitees / totalEnveloppes);
+      }
+
+      // Sauvegarder la catégorie modifiée
+      if (categorieModifiee) {
+        final categorieAvecNouveauxSoldes = Categorie(
+          id: categorie.id,
+          userId: categorie.userId,
+          nom: categorie.nom,
+          enveloppes: enveloppesModifiees,
+        );
+
+        await _firebaseService.ajouterCategorie(categorieAvecNouveauxSoldes);
+      }
+    }
+  }
+
+  /// Traite un mois avec compensation intelligente selon la logique :
+  /// 1. Créer les enveloppes manquantes
+  /// 2. Ajouter les DÉPENSES (enveloppes négatives + baisse du solde compte)
+  /// 3. Compenser avec le prêt à placer (remettre enveloppes à 0)
+  /// 4. Ajouter les REVENUS (augmenter solde compte + prêt à placer)
+  Future<void> _traiterMoisAvecCompensation(
+    String mois,
+    List<Transaction> transactionsDuMois,
+  ) async {
+    // Séparer revenus et dépenses
+    final revenus = transactionsDuMois
+        .where((t) => t.type == TypeTransaction.revenu)
+        .toList();
+    final depenses = transactionsDuMois
+        .where((t) => t.type == TypeTransaction.depense)
+        .toList();
+
+    // Étape 1 : Créer les enveloppes manquantes pour les dépenses
+    await _creerEnveloppesManquantes(depenses);
+
+    // Étape 2 : Ajouter toutes les DÉPENSES
+    // Cela va mettre les enveloppes en négatif et baisser le solde du compte
+    for (var depense in depenses) {
+      await _firebaseService.ajouterTransaction(depense);
+    }
+
+    // Étape 3 : Ajouter tous les REVENUS
+    // Cela va augmenter le solde du compte et le prêt à placer
+    for (var revenu in revenus) {
+      await _firebaseService.ajouterTransaction(revenu);
+    }
+
+    // Note : La compensation des enveloppes négatives se fait maintenant
+    // dans la boucle principale après chaque mois traité
+  }
+
+  /// Crée les enveloppes manquantes pour les dépenses
+  Future<void> _creerEnveloppesManquantes(List<Transaction> depenses) async {
+    final categories = await _obtenirCategories();
+    final enveloppesExistantes = <String>{};
+
+    // Recenser toutes les enveloppes existantes
+    for (var categorie in categories) {
+      for (var enveloppe in categorie.enveloppes) {
+        enveloppesExistantes.add(enveloppe.id);
+      }
+    }
+
+    // Créer les enveloppes manquantes
+    for (var depense in depenses) {
+      if (depense.enveloppeId != null &&
+          !enveloppesExistantes.contains(depense.enveloppeId)) {
+        // L'enveloppe n'existe pas, on doit la créer
+        // Pour l'instant, on crée une enveloppe générique
+        await _creerEnveloppeGenerique(depense.enveloppeId!, depense.compteId);
+        enveloppesExistantes.add(depense.enveloppeId!);
+      }
+    }
+  }
+
+  /// Crée une enveloppe générique pour l'import
+  Future<void> _creerEnveloppeGenerique(
+    String enveloppeId,
+    String compteId,
+  ) async {
+    final categories = await _obtenirCategories();
+
+    // Chercher une catégorie "Import" ou créer une nouvelle
+    Categorie? categorieImport;
+    for (var categorie in categories) {
+      if (categorie.nom.toLowerCase() == 'import' ||
+          categorie.nom.toLowerCase() == 'importé') {
+        categorieImport = categorie;
+        break;
+      }
+    }
+
+    if (categorieImport == null) {
+      // Créer la catégorie "Import"
+      categorieImport = Categorie(
+        id: '${DateTime.now().millisecondsSinceEpoch}_import',
+        nom: 'Import',
+        enveloppes: [],
+      );
+      await _firebaseService.ajouterCategorie(categorieImport);
+    }
+
+    // Ajouter l'enveloppe à la catégorie
+    final nouvelleEnveloppe = Enveloppe(
+      id: enveloppeId,
+      nom: 'Enveloppe $enveloppeId',
+      provenanceCompteId: compteId,
+      solde: 0.0,
+    );
+
+    final categorieModifiee = Categorie(
+      id: categorieImport.id,
+      userId: categorieImport.userId,
+      nom: categorieImport.nom,
+      enveloppes: [...categorieImport.enveloppes, nouvelleEnveloppe],
+    );
+
+    await _firebaseService.ajouterCategorie(categorieModifiee);
+  }
+
+  /// Compense les enveloppes négatives avec le prêt à placer
+  Future<void> _compenserEnveloppesNegatives() async {
+    final categories = await _obtenirCategories();
+    final comptes = await _obtenirComptes();
+    final comptesParId = {for (var compte in comptes) compte.id: compte};
+
+    for (var categorie in categories) {
+      bool categorieModifiee = false;
+      final enveloppesModifiees = <Enveloppe>[];
+
+      for (var enveloppe in categorie.enveloppes) {
+        if (enveloppe.solde < 0) {
+          // Enveloppe négative, on compense avec le prêt à placer
+          final montantACompenser = -enveloppe.solde; // Montant positif
+          final compte = comptesParId[enveloppe.provenanceCompteId];
+
+          if (compte != null) {
+            // Diminuer le prêt à placer
+            final nouveauPretAPlacer = compte.pretAPlacer - montantACompenser;
+            final compteModifie = Compte(
+              id: compte.id,
+              userId: compte.userId,
+              nom: compte.nom,
+              type: compte.type,
+              solde: compte.solde,
+              couleur: compte.couleur,
+              pretAPlacer: nouveauPretAPlacer < 0 ? 0 : nouveauPretAPlacer,
+              dateCreation: compte.dateCreation,
+              estArchive: compte.estArchive,
+              dateSuppression: compte.dateSuppression,
+            );
+
+            // Sauvegarder le compte modifié
+            await _firebaseService.ajouterCompte(compteModifie);
+            comptesParId[compte.id] = compteModifie; // Mettre à jour le cache
+          }
+
+          // Remettre l'enveloppe à 0
+          enveloppesModifiees.add(
+            Enveloppe(
+              id: enveloppe.id,
+              nom: enveloppe.nom,
+              solde: 0.0,
+              provenanceCompteId: enveloppe.provenanceCompteId,
+            ),
+          );
+          categorieModifiee = true;
+        } else {
+          enveloppesModifiees.add(enveloppe); // Pas de changement
+        }
       }
 
       // Sauvegarder la catégorie modifiée

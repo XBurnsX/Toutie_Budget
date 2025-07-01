@@ -303,11 +303,9 @@ class FirebaseService {
             break;
 
           case app_model.TypeMouvementFinancier.depenseNormale:
-            // Dépense normale (import CSV) : diminuer le prêt à placer
-            // Dans l'import CSV, on simule l'assignment + la dépense en une seule opération
-            // Donc on doit diminuer le prêt à placer pour refléter l'argent utilisé
-            nouveauPretAPlacer = pretAPlacerActuel - montant;
-            if (nouveauPretAPlacer < 0) nouveauPretAPlacer = 0;
+            // Dépense normale (import CSV) : NE PAS toucher au prêt à placer
+            // Le prêt à placer sera ajusté à la fin par la remise à zéro des enveloppes
+            // Ici on ne modifie que le solde du compte
             break;
 
           case app_model.TypeMouvementFinancier.remboursementRecu:
