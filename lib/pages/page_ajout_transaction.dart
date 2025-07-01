@@ -97,6 +97,13 @@ class _EcranAjoutTransactionRefactoredState
     for (var cat in _controller.categoriesFirebase) {
       final List<dynamic> enveloppes = cat['enveloppes'] ?? [];
       for (var env in enveloppes) {
+        // Exclure les pseudo-enveloppes correspondant au « Prêt à placer »
+        final nomEnv = (env['nom'] as String?)?.toLowerCase() ?? '';
+        final idEnv = env['id']?.toString() ?? '';
+        if (nomEnv.contains('prêt à placer') || idEnv.startsWith('pret_')) {
+          continue; // On saute cette enveloppe
+        }
+
         toutesEnveloppes.add({
           'id': env['id'],
           'nom': env['nom'],

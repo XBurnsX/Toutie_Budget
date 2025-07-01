@@ -256,35 +256,49 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                                 ? null
                                 : sousItem.enveloppeId,
                             dropdownColor: Theme.of(context).dropdownColor,
-                            items: widget.enveloppes.map((enveloppe) {
-                              final solde =
-                                  (enveloppe['solde'] as num?)?.toDouble() ??
-                                  0.0;
-                              final couleurCompte = _getCouleurCompteEnveloppe(
-                                enveloppe,
-                              );
-                              return DropdownMenuItem<String>(
-                                value: enveloppe['id'],
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      enveloppe['nom'] ?? 'Enveloppe',
-                                      overflow: TextOverflow.ellipsis,
+                            items: widget.enveloppes
+                                .where((env) {
+                                  final nom =
+                                      (env['nom'] as String?)?.toLowerCase() ??
+                                      '';
+                                  final id = env['id']?.toString() ?? '';
+                                  final estPret =
+                                      ((nom.contains('prêt') ||
+                                              nom.contains('pret')) &&
+                                          nom.contains('placer')) ||
+                                      id.startsWith('pret_');
+                                  return !estPret;
+                                })
+                                .map((enveloppe) {
+                                  final solde =
+                                      (enveloppe['solde'] as num?)
+                                          ?.toDouble() ??
+                                      0.0;
+                                  final couleurCompte =
+                                      _getCouleurCompteEnveloppe(enveloppe);
+                                  return DropdownMenuItem<String>(
+                                    value: enveloppe['id'],
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          enveloppe['nom'] ?? 'Enveloppe',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          '${solde.toStringAsFixed(2)} \$',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: couleurCompte,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    Text(
-                                      '${solde.toStringAsFixed(2)} \$',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color: couleurCompte,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                })
+                                .toList(),
                             onChanged: (value) {
                               final enveloppe = widget.enveloppes.firstWhere(
                                 (env) => env['id'] == value,
