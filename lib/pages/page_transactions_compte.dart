@@ -412,7 +412,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                       );
                                       return '$nomEnv - ${montant.toStringAsFixed(0)}\$';
                                     }).toList();
-                                    sousTitre = enveloppesFormatees.join(', ');
+                                    sousTitre = enveloppesFormatees.join(' , ');
                                   } else if (t.typeMouvement ==
                                       app_model
                                           .TypeMouvementFinancier
@@ -536,10 +536,11 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                                 ),
                                                 Text(
                                                   sousTitre,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey,
-                                                    height: 1.1,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.grey.shade600,
+                                                    height: 1.2,
+                                                    fontWeight: FontWeight.w500,
                                                   ),
                                                   overflow:
                                                       TextOverflow.ellipsis,
