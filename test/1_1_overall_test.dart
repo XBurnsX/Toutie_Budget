@@ -24,7 +24,7 @@ void main() {
   List<app_model.Transaction> transactionsFake = [];
   List<Dette> dettesFake = [];
 
-  Future<void> _preparerDonneesFake() async {
+  Future<void> preparerDonneesFake() async {
     print('📦 Préparation des données fake locales...');
 
     // Créer des comptes fake
@@ -82,7 +82,7 @@ void main() {
     print('✅ Données fake préparées');
   }
 
-  Future<void> _nettoyerFichiersTemporaires() async {
+  Future<void> nettoyerFichiersTemporaires() async {
     print('🧹 Nettoyage des fichiers temporaires...');
     comptesFake.clear();
     categoriesFake.clear();
@@ -104,7 +104,7 @@ void main() {
       // Pas de chargement du thème pour éviter SharedPreferences dans les tests
 
       // Préparer les données fake locales
-      await _preparerDonneesFake();
+      await preparerDonneesFake();
 
       print('✅ Initialisation fake terminée - aucune connexion externe');
     } catch (e) {
@@ -129,7 +129,7 @@ void main() {
     }
 
     // Nettoyer les fichiers temporaires
-    await _nettoyerFichiersTemporaires();
+    await nettoyerFichiersTemporaires();
     print('\n🎯 TEST GLOBAL TERMINÉ');
   });
 
@@ -714,7 +714,7 @@ void main() {
           pretsValides++;
 
           print(
-            '✅ Prêt $i: $nomTiers - ${principal.toStringAsFixed(0)}\$ à ${tauxAnnuel}% sur ${dureeAnnees.toInt()} ans = ${dette.montantMensuel}\$/mois',
+            '✅ Prêt $i: $nomTiers - ${principal.toStringAsFixed(0)}\$ à $tauxAnnuel% sur ${dureeAnnees.toInt()} ans = ${dette.montantMensuel}\$/mois',
           );
         }
 

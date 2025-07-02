@@ -76,8 +76,9 @@ class ArgentService {
         if (enveloppes.any((e) => e['id'] == source.id)) catSource = doc;
         if (enveloppes.any((e) => e['id'] == destination.id)) catDest = doc;
       }
-      if (catSource == null || catDest == null)
+      if (catSource == null || catDest == null) {
         throw Exception('Catégorie non trouvée');
+      }
 
       // Source
       final srcData = catSource.data() as Map<String, dynamic>;
@@ -217,8 +218,9 @@ class ArgentService {
         }
       }
 
-      if (catDoc == null)
+      if (catDoc == null) {
         throw Exception('Catégorie pour l\'enveloppe $enveloppeId non trouvée');
+      }
 
       final catData = catDoc.data() as Map<String, dynamic>;
       final envs = (catData['enveloppes'] as List<dynamic>)
@@ -226,8 +228,9 @@ class ArgentService {
           .toList();
       final idx = envs.indexWhere((e) => e['id'] == enveloppeId);
 
-      if (idx == -1)
+      if (idx == -1) {
         throw Exception('Enveloppe $enveloppeId non trouvée dans la catégorie');
+      }
 
       var env = envs[idx];
       final oldSolde = (env['solde'] as num? ?? 0.0).toDouble();

@@ -86,8 +86,11 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     }
 
     // Trier et prendre le top 5
-    final sortedEnveloppes = enveloppesUtilisation.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final sortedEnveloppes =
+        enveloppesUtilisation.entries
+            .where((entry) => entry.key != 'Enveloppe inconnue')
+            .toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
     final sortedTiers = tiersUtilisation.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 

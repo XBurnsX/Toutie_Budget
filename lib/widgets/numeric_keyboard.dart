@@ -72,9 +72,7 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
 
       if (key == '.') {
         if (!currentText.contains('.')) {
-          widget.controller.text = currentText.isEmpty
-              ? '0.'
-              : currentText + '.';
+          widget.controller.text = currentText.isEmpty ? '0.' : '$currentText.';
         }
       } else {
         if (currentText == '0') {

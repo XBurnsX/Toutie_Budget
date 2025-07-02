@@ -14,11 +14,35 @@
       },
       "oauth_client": [
         {
+          "client_id": "127120738889-0p678idcjop0h7naclprg6t4svkhmrr1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xburnsx.toutie_budget",
+            "certificate_hash": "ad9fef76412c38eb0f792f3d135660073b3b6029"
+          }
+        },
+        {
+          "client_id": "127120738889-dka1lh36p0fi42rfm86vctkbiuoknln1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xburnsx.toutie_budget",
+            "certificate_hash": "3b4977291cbcbfd59a302a43d8480733d8dff9fe"
+          }
+        },
+        {
           "client_id": "127120738889-n68nc3mjbjmb8st3vaq20vmfn35gjndm.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.xburnsx.toutie_budget",
             "certificate_hash": "361e7a026a7f43b175f04be48845e86e57387cd5"
+          }
+        },
+        {
+          "client_id": "127120738889-vlnscfc3g9u5q4l0e0u670vn4ngmch4m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xburnsx.toutie_budget",
+            "certificate_hash": "ff71ade8783a79da92c9ab661e2e3ed2f81cff5e"
           }
         },
         {

@@ -592,10 +592,46 @@ class _PageImportCsvState extends State<PageImportCsv> {
         _cheminFichier = fichier.path!;
         final donnees = await _importService.lireFichierCsv(_cheminFichier!);
 
+        // Tentative de mapping automatique basé sur les en-têtes
+        final Map<String, int?> nouveauMapping = {};
+        nouveauMapping.addAll(_mapping); // Copier la structure
+        nouveauMapping.updateAll((key, value) => null); // Vider les valeurs
+
+        if (_premiereLigneEntetes && donnees.isNotEmpty) {
+          final entetes = donnees[0]
+              .map((h) => h.toLowerCase().trim())
+              .toList();
+
+          const correspondances = {
+            'date': ['date'],
+            'compte': ['account', 'compte'],
+            'tiers': ['payee', 'tiers/payeur', 'tiers'],
+            'enveloppe': ['category group', 'groupe de catégorie', 'enveloppe'],
+            'categorie': ['category', 'catégorie'],
+            'note': ['memo', 'note', 'description'],
+            'outflow': ['outflow', 'dépense'],
+            'inflow': ['inflow', 'revenu'],
+            'montant': ['montant', 'amount'],
+            'type': ['type'],
+            'marqueur': ['marqueur', 'flag'],
+          };
+
+          for (final champ in correspondances.keys) {
+            for (final possibilite in correspondances[champ]!) {
+              final index = entetes.indexOf(possibilite);
+              if (index != -1) {
+                nouveauMapping[champ] = index;
+                break;
+              }
+            }
+          }
+        }
+
         setState(() {
           _donneesCsv = donnees;
-          // Réinitialiser le mapping
-          _mapping.updateAll((key, value) => null);
+          // Appliquer le mapping automatique ou réinitialiser
+          _mapping.clear();
+          _mapping.addAll(nouveauMapping);
           _erreurs.clear();
         });
       }

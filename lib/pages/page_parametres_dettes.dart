@@ -90,7 +90,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           }
         });
 
-    void _updateAssocie(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    void updateAssocie(QuerySnapshot<Map<String, dynamic>> snapshot) {
       double total = 0.0;
       for (final doc in snapshot.docs) {
         final data = doc.data();
@@ -112,7 +112,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         .collection('transactions')
         .where('compteDePassifAssocie', isEqualTo: widget.dette.id)
         .snapshots()
-        .listen(_updateAssocie);
+        .listen(updateAssocie);
 
     FirebaseFirestore.instance
         .collection('transactions')
@@ -864,27 +864,27 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             if (calculs['paiementMensuelSaisi'] != null)
               _buildResultatCalcul(
                 'Paiement mensuel saisi',
-                calculs['paiementMensuelSaisi']!.toStringAsFixed(2) + ' \$',
+                '${calculs['paiementMensuelSaisi']!.toStringAsFixed(2)} \$',
               )
             else if (calculs['montantMensuel'] != null)
               _buildResultatCalcul(
                 'Paiement mensuel (calculé)',
-                calculs['montantMensuel']!.toStringAsFixed(2) + ' \$',
+                '${calculs['montantMensuel']!.toStringAsFixed(2)} \$',
               ),
             if (calculs['coutTotal'] != null)
               _buildResultatCalcul(
                 'Coût total',
-                calculs['coutTotal']!.toStringAsFixed(2) + ' \$',
+                '${calculs['coutTotal']!.toStringAsFixed(2)} \$',
               ),
             if (calculs['solde'] != null)
               _buildResultatCalcul(
                 'Solde restant',
-                calculs['solde']!.toStringAsFixed(2) + ' \$',
+                '${calculs['solde']!.toStringAsFixed(2)} \$',
               ),
             if (calculs['interetsPayes'] != null)
               _buildResultatCalcul(
                 'Intérêts payés',
-                calculs['interetsPayes']!.toStringAsFixed(2) + ' \$',
+                '${calculs['interetsPayes']!.toStringAsFixed(2)} \$',
               ),
           ],
         ),
