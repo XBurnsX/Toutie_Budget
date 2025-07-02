@@ -11,6 +11,7 @@ class Enveloppe {
   final DateTime? dateDernierAjout;
   final int? objectifJour;
   final Map<String, dynamic>? historique;
+  final int? ordre;
 
   Enveloppe({
     required this.id,
@@ -25,6 +26,7 @@ class Enveloppe {
     this.dateDernierAjout,
     this.objectifJour,
     this.historique,
+    this.ordre,
   });
 
   Map<String, dynamic> toMap() => {
@@ -40,6 +42,7 @@ class Enveloppe {
     'date_dernier_ajout': dateDernierAjout?.toIso8601String(),
     'objectif_jour': objectifJour,
     'historique': historique,
+    'ordre': ordre,
   };
 
   factory Enveloppe.fromMap(Map<String, dynamic> map) => Enveloppe(
@@ -52,9 +55,14 @@ class Enveloppe {
     archivee: map['archivee'] ?? false,
     provenanceCompteId: map['provenance_compte_id'] ?? '',
     frequenceObjectif: map['frequence_objectif'] ?? 'mensuel',
-    dateDernierAjout: map['date_dernier_ajout'] != null ? DateTime.tryParse(map['date_dernier_ajout']) : null,
+    dateDernierAjout: map['date_dernier_ajout'] != null
+        ? DateTime.tryParse(map['date_dernier_ajout'])
+        : null,
     objectifJour: map['objectif_jour'],
-    historique: map['historique'] != null ? Map<String, dynamic>.from(map['historique']) : null,
+    historique: map['historique'] != null
+        ? Map<String, dynamic>.from(map['historique'])
+        : null,
+    ordre: map['ordre'],
   );
 }
 
@@ -63,12 +71,14 @@ class Categorie {
   final String? userId; // Rendu optionnel
   final String nom;
   final List<Enveloppe> enveloppes;
+  final int? ordre;
 
   Categorie({
     required this.id,
     this.userId, // Rendu optionnel
     required this.nom,
     required this.enveloppes,
+    this.ordre,
   });
 
   Map<String, dynamic> toMap() => {
@@ -76,6 +86,7 @@ class Categorie {
     'userId': userId,
     'nom': nom,
     'enveloppes': enveloppes.map((e) => e.toMap()).toList(),
+    'ordre': ordre,
   };
 
   factory Categorie.fromMap(Map<String, dynamic> map) => Categorie(
@@ -83,6 +94,8 @@ class Categorie {
     userId: map['userId'], // Lecture du champ optionnel
     nom: map['nom'] ?? '',
     enveloppes: (map['enveloppes'] as List<dynamic>? ?? [])
-        .map((e) => Enveloppe.fromMap(e as Map<String, dynamic>)).toList(),
+        .map((e) => Enveloppe.fromMap(e as Map<String, dynamic>))
+        .toList(),
+    ordre: map['ordre'],
   );
 }

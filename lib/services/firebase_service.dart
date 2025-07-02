@@ -97,18 +97,11 @@ class FirebaseService {
               )
               .toList();
 
-          // Trier les catégories : "Dettes" en premier, puis les autres
+          // Trier les catégories : Dette toujours en premier, puis par ordre
           categories.sort((a, b) {
-            final aEstDettes =
-                a.nom.toLowerCase() == 'dettes' ||
-                a.nom.toLowerCase() == 'dette';
-            final bEstDettes =
-                b.nom.toLowerCase() == 'dettes' ||
-                b.nom.toLowerCase() == 'dette';
-
-            if (aEstDettes && !bEstDettes) return -1;
-            if (!aEstDettes && bEstDettes) return 1;
-            return a.nom.compareTo(b.nom);
+            if (a.nom.toLowerCase() == 'dette') return -1;
+            if (b.nom.toLowerCase() == 'dette') return 1;
+            return (a.ordre ?? 0).compareTo(b.ordre ?? 0);
           });
 
           return categories;
