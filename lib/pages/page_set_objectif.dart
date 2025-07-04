@@ -252,7 +252,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                               ? Colors.black
                               : Colors.white,
                         ),
-                        child: const Text('Date Fixe'),
+                        child: const Text('Échéance'),
                       ),
                     ),
                     const SizedBox(width: 8),
