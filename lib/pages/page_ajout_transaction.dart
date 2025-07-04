@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../controllers/ajout_transaction_controller.dart';
 import '../models/transaction_model.dart';
 import '../models/fractionnement_model.dart';
+import '../services/color_service.dart';
 import '../widgets/ajout_transaction/selecteur_type_transaction.dart';
 import '../widgets/ajout_transaction/champ_montant.dart';
 import '../widgets/ajout_transaction/section_informations_cles.dart';
@@ -243,6 +244,12 @@ class _EcranAjoutTransactionRefactoredState
   }
 
   Color _getCouleurCompteEnveloppe(Map<String, dynamic> enveloppe) {
+    // Obtenir le solde de l'enveloppe
+    final double solde = (enveloppe['solde'] as num?)?.toDouble() ?? 0.0;
+
+    // Déterminer la couleur par défaut du compte de provenance
+    Color couleurDefaut = Colors.grey;
+
     // D'abord essayer avec les provenances multi-comptes
     final List<dynamic>? provenances = enveloppe['provenances'];
     if (provenances != null && provenances.isNotEmpty) {
@@ -255,21 +262,21 @@ class _EcranAjoutTransactionRefactoredState
         (c) => c.id == compteId,
         orElse: () => _controller.listeComptesAffichables.first,
       );
-      return Color(compte.couleur);
+      couleurDefaut = Color(compte.couleur);
+    } else {
+      // Fallback avec l'ancien système de provenance unique
+      final String? provenanceCompteId = enveloppe['provenance_compte_id'];
+      if (provenanceCompteId != null && provenanceCompteId.isNotEmpty) {
+        final compte = _controller.listeComptesAffichables.firstWhere(
+          (c) => c.id == provenanceCompteId,
+          orElse: () => _controller.listeComptesAffichables.first,
+        );
+        couleurDefaut = Color(compte.couleur);
+      }
     }
 
-    // Fallback avec l'ancien système de provenance unique
-    final String? provenanceCompteId = enveloppe['provenance_compte_id'];
-    if (provenanceCompteId != null && provenanceCompteId.isNotEmpty) {
-      final compte = _controller.listeComptesAffichables.firstWhere(
-        (c) => c.id == provenanceCompteId,
-        orElse: () => _controller.listeComptesAffichables.first,
-      );
-      return Color(compte.couleur);
-    }
-
-    // Couleur par défaut si aucune provenance
-    return Colors.grey;
+    // Utiliser le service de couleur pour appliquer les règles
+    return ColorService.getCouleurMontant(solde, couleurDefaut);
   }
 
   @override

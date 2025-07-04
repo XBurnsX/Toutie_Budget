@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/fractionnement_model.dart';
+import '../services/color_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
 
@@ -324,6 +325,12 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
 
   // Fonction utilitaire pour obtenir la couleur du compte d'origine d'une enveloppe
   Color _getCouleurCompteEnveloppe(Map<String, dynamic> enveloppe) {
+    // Obtenir le solde de l'enveloppe
+    final double solde = (enveloppe['solde'] as num?)?.toDouble() ?? 0.0;
+
+    // Déterminer la couleur par défaut du compte de provenance
+    Color couleurDefaut = Colors.grey;
+
     try {
       final List<dynamic>? provenances = enveloppe['provenances'];
       if (provenances != null && provenances.isNotEmpty) {
@@ -338,7 +345,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
               (c) => c != null && c['id'] == compteId,
             );
             if (compte != null && compte['couleur'] != null) {
-              return Color(compte['couleur'] as int);
+              couleurDefaut = Color(compte['couleur'] as int);
             }
           } catch (e) {
             // Compte non trouvé, continuer avec le fallback
@@ -356,17 +363,18 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
             (c) => c != null && c['id'] == provenanceCompteId,
           );
           if (compte != null && compte['couleur'] != null) {
-            return Color(compte['couleur'] as int);
+            couleurDefaut = Color(compte['couleur'] as int);
           }
         } catch (e) {
-          // Compte non trouvé, retourner couleur par défaut
+          // Compte non trouvé, utiliser couleur par défaut
         }
       }
     } catch (e) {
       // Ignorer les erreurs de couleur
     }
 
-    return Colors.grey;
+    // Utiliser le service de couleur pour appliquer les règles
+    return ColorService.getCouleurMontant(solde, couleurDefaut);
   }
 
   @override

@@ -3,6 +3,7 @@ import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../services/argent_service.dart';
 import '../services/firebase_service.dart';
+import '../services/color_service.dart';
 import '../widgets/numeric_keyboard.dart';
 
 class PageVirerArgent extends StatefulWidget {
@@ -426,19 +427,22 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                   return '${solde.toStringAsFixed(2)} \$';
                 }
 
-                // Couleur basée sur le compte de provenance
+                // Couleur basée sur le montant et le compte de provenance
                 Color getSoldeColor(dynamic obj) {
-                  // Si c'est un compte, on prend directement sa couleur
+                  // Obtenir le solde de l'objet
+                  double solde = 0.0;
                   if (obj is Compte) {
-                    return Color(obj.couleur);
+                    solde = obj.solde;
+                  } else if (obj is Enveloppe) {
+                    solde = obj.solde;
                   }
 
-                  // Si c'est une enveloppe, essayer de trouver le compte d'origine
-                  if (obj is Enveloppe) {
-                    // 1) Nouveau système multi-provenances (non exposé dans le modèle)
-                    //    -> on ignore pour l'instant faute d'info
-
-                    // 2) Ancien champ unique provenanceCompteId
+                  // Déterminer la couleur par défaut du compte de provenance
+                  Color couleurDefaut = Colors.grey;
+                  if (obj is Compte) {
+                    couleurDefaut = Color(obj.couleur);
+                  } else if (obj is Enveloppe) {
+                    // Si c'est une enveloppe, essayer de trouver le compte d'origine
                     final compId = obj.provenanceCompteId;
                     if (compId.isNotEmpty) {
                       final compteProv = comptes.firstWhere(
@@ -454,12 +458,12 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                           estArchive: false,
                         ),
                       );
-                      return Color(compteProv.couleur);
+                      couleurDefaut = Color(compteProv.couleur);
                     }
                   }
 
-                  // Couleur par défaut
-                  return Colors.grey;
+                  // Utiliser le service de couleur pour appliquer les règles
+                  return ColorService.getCouleurMontant(solde, couleurDefaut);
                 }
 
                 return Column(
