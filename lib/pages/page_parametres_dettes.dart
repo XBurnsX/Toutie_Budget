@@ -146,15 +146,15 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   void _chargerDonnees() {
-    if (widget.dette.tauxInteret != null) {
-      _tauxController.text = widget.dette.tauxInteret!.toStringAsFixed(2);
+    if (_detteActuelle.tauxInteret != null) {
+      _tauxController.text = _detteActuelle.tauxInteret!.toStringAsFixed(2);
     }
 
-    final dateDebut = widget.dette.dateDebut ?? DateTime.now();
+    final dateDebut = _detteActuelle.dateDebut ?? DateTime.now();
     _dateDebutController.text = _formaterDate(dateDebut);
 
-    if (widget.dette.dateFin != null) {
-      _dateFinController.text = _formaterDate(widget.dette.dateFin!);
+    if (_detteActuelle.dateFin != null) {
+      _dateFinController.text = _formaterDate(_detteActuelle.dateFin!);
     } else {
       _calculerDateFinParDefaut();
     }
@@ -172,20 +172,20 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           _detteActuelle.montantInitial.toStringAsFixed(2);
     }
 
-    if (widget.dette.nombrePaiements != null) {
+    if (_detteActuelle.nombrePaiements != null) {
       _nombrePaiementsController.text =
-          widget.dette.nombrePaiements!.toString();
+          _detteActuelle.nombrePaiements!.toString();
     }
 
-    if (widget.dette.paiementsEffectues != null) {
+    if (_detteActuelle.paiementsEffectues != null) {
       _paiementsEffectuesController.text =
-          widget.dette.paiementsEffectues!.toString();
+          _detteActuelle.paiementsEffectues!.toString();
     } else {
       _calculerPaiementsEffectues();
     }
 
-    _onParametresChanges();
-    _calculerEtMettrAJour();
+    _calculerEtMettrAJour(); // On fait un seul calcul initial
+    _onParametresChanges(); // On s'assure que tout est synchronisé
   }
 
   void _calculerPaiementsEffectues() {
@@ -209,31 +209,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       return;
     }
 
-    _calculerDateFinParDefaut();
+    _calculerDateFinParDefaut(); // Met à jour la date de fin si la durée change
 
-    final dateDebut = _parseDate(_dateDebutController.text);
-    final dureeMois = int.tryParse(_nombrePaiementsController.text);
-    final dateFinMax = (dateDebut != null && dureeMois != null && dureeMois > 0)
-        ? DateTime(
-            dateDebut.year,
-            dateDebut.month + dureeMois - 1,
-            dateDebut.day,
-          )
-        : null;
-
-    final dateFinCourante = _parseDate(_dateFinController.text);
-
-    if (dateFinMax != null &&
-        dateFinCourante != null &&
-        dateFinCourante.isAfter(dateFinMax)) {
-      setState(() {
-        _dateFinController.text = _formaterDate(dateFinMax);
-      });
-    }
-
-    setState(() {
-      _calculerEtMettrAJour();
-    });
+    // On ne fait rien d'autre ici pour ne pas causer de recalculs non désirés.
   }
 
   void _calculerDateFinParDefaut() {
@@ -249,7 +227,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       if (_dateFinController.text != _formaterDate(dateFin)) {
         setState(() {
           _dateFinController.text = _formaterDate(dateFin);
-          _recalculerPaiementMensuel();
+          // ON NE RECALCULE PAS LE PAIEMENT ICI
         });
       }
     }
