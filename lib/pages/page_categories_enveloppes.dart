@@ -111,7 +111,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       // Mettre à jour chaque catégorie individuellement avec son nouvel ordre
       for (int i = 0; i < updatedCategories.length; i++) {
         final cat = updatedCategories[i];
-        await FirebaseService().firestore
+        await FirebaseService()
+            .firestore
             .collection('categories')
             .doc(cat.id)
             .update({'ordre': i});
@@ -447,7 +448,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                   // Mettre à jour l'ordre de toutes les catégories
                   for (int i = 0; i < _categories.length; i++) {
                     final cat = _categories[i];
-                    await FirebaseService().firestore
+                    await FirebaseService()
+                        .firestore
                         .collection('categories')
                         .doc(cat.id)
                         .update({'ordre': i});
@@ -547,26 +549,26 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _editionMode
-                        ? ReorderableListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _categories.length,
-                            onReorder: _reorderCategories,
-                            itemBuilder: (context, index) {
-                              final categorie = _categories[index];
-                              return _buildCategorieItem(
-                                categorie,
-                                key: ValueKey(categorie.id),
-                              );
-                            },
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _categories.length,
-                            itemBuilder: (context, index) {
-                              final categorie = _categories[index];
-                              return _buildCategorieItem(categorie);
-                            },
-                          ),
+                            ? ReorderableListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _categories.length,
+                                onReorder: _reorderCategories,
+                                itemBuilder: (context, index) {
+                                  final categorie = _categories[index];
+                                  return _buildCategorieItem(
+                                    categorie,
+                                    key: ValueKey(categorie.id),
+                                  );
+                                },
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _categories.length,
+                                itemBuilder: (context, index) {
+                                  final categorie = _categories[index];
+                                  return _buildCategorieItem(categorie);
+                                },
+                              ),
                   ),
                 ],
               ),
@@ -726,7 +728,6 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                             ),
                           ),
                         );
-                        // TODO: gérer la mise à jour de l'objectif si besoin
                       },
                       child: Text(
                         (enveloppe.objectif > 0)

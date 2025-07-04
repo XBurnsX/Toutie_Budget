@@ -62,8 +62,24 @@ class _EcranAjoutTransactionRefactoredState
 
       // Gérer le fractionnement si la transaction était fractionnée
       if (t.estFractionnee == true && t.sousItems != null) {
-        // TODO: Implémenter la restauration du fractionnement
-        // Debug silencieux - fractionnement à restaurer
+        // Créer une nouvelle instance de TransactionFractionnee
+        final sousItems = t.sousItems!
+            .map((item) => SousItemFractionnement(
+                  id: item['id'] as String,
+                  description: item['description'] as String? ?? '',
+                  montant: (item['montant'] as num).toDouble(),
+                  enveloppeId: item['enveloppeId'] as String,
+                  transactionParenteId: t.id,
+                ))
+            .toList();
+
+        final transactionFractionnee = TransactionFractionnee(
+          transactionParenteId: t.id,
+          sousItems: sousItems,
+          montantTotal: t.montant,
+        );
+
+        _controller.setFractionnement(transactionFractionnee);
       }
     }
   }
@@ -150,9 +166,8 @@ class _EcranAjoutTransactionRefactoredState
 
         // Différencier les messages selon le mode (ajout ou modification)
         final estModification = widget.transactionExistante != null;
-        final prefix = estModification
-            ? 'Transaction modifiée'
-            : 'Transaction ajoutée';
+        final prefix =
+            estModification ? 'Transaction modifiée' : 'Transaction ajoutée';
 
         switch (_controller.typeMouvementSelectionne) {
           case TypeMouvementFinancier.depenseNormale:
