@@ -190,80 +190,92 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
               ),
             ),
             const SizedBox(height: 32),
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _objectifType = 'mois';
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _objectifType == 'mois'
-                          ? Theme.of(context).colorScheme.secondary
-                          : Colors.grey[800],
-                      foregroundColor:
-                          _objectifType == 'mois' ? Colors.black : Colors.white,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _objectifType = 'mois';
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _objectifType == 'mois'
+                              ? Theme.of(context).colorScheme.secondary
+                              : Colors.grey[800],
+                          foregroundColor: _objectifType == 'mois'
+                              ? Colors.black
+                              : Colors.white,
+                        ),
+                        child: const Text('Mois'),
+                      ),
                     ),
-                    child: const Text('Mois'),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _objectifType = '2sem';
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _objectifType == '2sem'
+                              ? Theme.of(context).colorScheme.secondary
+                              : Colors.grey[800],
+                          foregroundColor: _objectifType == '2sem'
+                              ? Colors.black
+                              : Colors.white,
+                        ),
+                        child: const Text('2 semaines'),
+                      ),
+                    ),
+                  ],
                 ),
-                // Bouton "2 semaines"
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _objectifType = '2sem';
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _objectifType == '2sem'
-                          ? Theme.of(context).colorScheme.secondary
-                          : Colors.grey[800],
-                      foregroundColor:
-                          _objectifType == '2sem' ? Colors.black : Colors.white,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _objectifType = 'date';
+                            _selectedDate ??= DateTime.now();
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _objectifType == 'date'
+                              ? Theme.of(context).colorScheme.secondary
+                              : Colors.grey[800],
+                          foregroundColor: _objectifType == 'date'
+                              ? Colors.black
+                              : Colors.white,
+                        ),
+                        child: const Text('Date Fixe'),
+                      ),
                     ),
-                    child: const Text('2 semaines'),
-                  ),
-                ),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _objectifType = 'date';
-                        _selectedDate ??= DateTime.now();
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _objectifType == 'date'
-                          ? Theme.of(context).colorScheme.secondary
-                          : Colors.grey[800],
-                      foregroundColor:
-                          _objectifType == 'date' ? Colors.black : Colors.white,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _objectifType = 'annee';
+                            _selectedDate ??= DateTime.now();
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _objectifType == 'annee'
+                              ? Theme.of(context).colorScheme.secondary
+                              : Colors.grey[800],
+                          foregroundColor: _objectifType == 'annee'
+                              ? Colors.black
+                              : Colors.white,
+                        ),
+                        child: const Text('Année'),
+                      ),
                     ),
-                    child: const Text('Date Fixe'),
-                  ),
-                ),
-                // Bouton "Année"
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _objectifType = 'annee';
-                        _selectedDate ??= DateTime.now();
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _objectifType == 'annee'
-                          ? Theme.of(context).colorScheme.secondary
-                          : Colors.grey[800],
-                      foregroundColor: _objectifType == 'annee'
-                          ? Colors.black
-                          : Colors.white,
-                    ),
-                    child: const Text('Année'),
-                  ),
+                  ],
                 ),
               ],
             ),
