@@ -17,6 +17,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   List<Categorie> _categories = [];
   bool _isLoading = true;
   StreamSubscription<List<Categorie>>? _categoriesSubscription;
+  bool _isReordering = false;
 
   @override
   void initState() {
@@ -138,6 +139,10 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         );
       }
     }
+    // Finalement, on remet le flag à false pour réafficher les enveloppes
+    setState(() {
+      _isReordering = false;
+    });
   }
 
   Future<void> _reorderEnveloppes(
@@ -558,27 +563,26 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                   Expanded(
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : _editionMode
-                            ? ReorderableListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _categories.length,
-                                onReorder: _reorderCategories,
-                                itemBuilder: (context, index) {
-                                  final categorie = _categories[index];
-                                  return _buildCategorieItem(
-                                    categorie,
-                                    key: ValueKey(categorie.id),
-                                  );
-                                },
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _categories.length,
-                                itemBuilder: (context, index) {
-                                  final categorie = _categories[index];
-                                  return _buildCategorieItem(categorie);
-                                },
-                              ),
+                        : ReorderableListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _categories.length,
+                            onReorder: _reorderCategories,
+                            onReorderStart: (index) {
+                              setState(() {
+                                _isReordering = true;
+                              });
+                            },
+                            buildDefaultDragHandles:
+                                false, // On utilise une poignée personnalisée
+                            itemBuilder: (context, index) {
+                              final categorie = _categories[index];
+                              return _buildCategorieItem(
+                                categorie,
+                                index: index,
+                                key: ValueKey(categorie.id),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -586,13 +590,14 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     );
   }
 
-  Widget _buildCategorieItem(Categorie categorie, {Key? key}) {
+  Widget _buildCategorieItem(Categorie categorie, {Key? key, int? index}) {
     final enveloppes = List<Enveloppe>.from(categorie.enveloppes);
     if (_editionMode) {
       enveloppes.sort((a, b) => (a.ordre ?? 0).compareTo(b.ordre ?? 0));
     }
 
-    final isDette = categorie.nom.toLowerCase() == 'dette';
+    final isDette = categorie.nom.toLowerCase() == 'dette' ||
+        categorie.nom.toLowerCase() == 'dettes';
 
     return Column(
       key: key,
@@ -600,15 +605,6 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       children: [
         Row(
           children: [
-            if (_editionMode)
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Icon(
-                  isDette ? Icons.lock : Icons.drag_handle,
-                  color: isDette ? Colors.grey : Colors.white54,
-                  size: 20,
-                ),
-              ),
             Expanded(
               child: Text(
                 categorie.nom,
@@ -623,7 +619,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.white70, size: 22),
                 tooltip: 'Renommer la catégorie',
-                onPressed: () => _renommerCategorie(categorie),
+                onPressed: isDette ? null : () => _renommerCategorie(categorie),
               ),
               IconButton(
                 icon: const Icon(
@@ -632,7 +628,19 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                   size: 22,
                 ),
                 tooltip: 'Supprimer la catégorie',
-                onPressed: () => _supprimerCategorie(categorie),
+                onPressed:
+                    isDette ? null : () => _supprimerCategorie(categorie),
+              ),
+              ReorderableDragStartListener(
+                index: index!,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Icon(
+                    isDette ? Icons.lock : Icons.drag_handle,
+                    color: isDette ? Colors.grey : Colors.white54,
+                    size: 24,
+                  ),
+                ),
               ),
             ] else ...[
               IconButton(
@@ -647,27 +655,43 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
             ],
           ],
         ),
-        if (_editionMode && !isDette)
-          ReorderableListView(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: enveloppes
-                .map(
-                  (enveloppe) => _buildEnveloppeItem(
-                    categorie,
-                    enveloppe,
-                    key: ValueKey(enveloppe.id),
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: _isReordering ? 0.0 : 1.0,
+          child: IgnorePointer(
+            ignoring: _isReordering,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_editionMode)
+                  ReorderableListView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    onReorder: (oldIndex, newIndex) =>
+                        _reorderEnveloppes(categorie, oldIndex, newIndex),
+                    children: enveloppes
+                        .asMap()
+                        .entries
+                        .map(
+                          (entry) => _buildEnveloppeItem(
+                            categorie,
+                            entry.value,
+                            index: entry.key,
+                            key: ValueKey(entry.value.id),
+                          ),
+                        )
+                        .toList(),
+                  )
+                else
+                  ...enveloppes.map(
+                    (enveloppe) => _buildEnveloppeItem(categorie, enveloppe),
                   ),
-                )
-                .toList(),
-            onReorder: (oldIndex, newIndex) =>
-                _reorderEnveloppes(categorie, oldIndex, newIndex),
-          )
-        else
-          ...enveloppes.map(
-            (enveloppe) => _buildEnveloppeItem(categorie, enveloppe),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
-        const SizedBox(height: 24),
+        ),
       ],
     );
   }
@@ -676,8 +700,10 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     Categorie categorie,
     Enveloppe enveloppe, {
     Key? key,
+    int? index,
   }) {
-    final isDette = categorie.nom.toLowerCase() == 'dette';
+    final isDette = categorie.nom.toLowerCase() == 'dette' ||
+        categorie.nom.toLowerCase() == 'dettes';
 
     return Card(
       key: key,
@@ -689,15 +715,6 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
           height: 40,
           child: Row(
             children: [
-              if (_editionMode)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Icon(
-                    isDette ? Icons.lock : Icons.drag_handle,
-                    color: isDette ? Colors.grey : Colors.white38,
-                    size: 16,
-                  ),
-                ),
               Expanded(
                 child: Text(
                   enveloppe.nom,
@@ -709,7 +726,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.white70, size: 18),
                   tooltip: 'Renommer l\'enveloppe',
-                  onPressed: () => _renommerEnveloppe(categorie, enveloppe),
+                  onPressed: isDette
+                      ? null
+                      : () => _renommerEnveloppe(categorie, enveloppe),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -719,37 +738,34 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                     color: Colors.redAccent,
                     size: 18,
                   ),
-                  tooltip: 'Supprimer l\'enveloppe',
-                  onPressed: () => _supprimerEnveloppe(categorie, enveloppe),
+                  tooltip: 'Archiver l\'enveloppe',
+                  onPressed: isDette
+                      ? null
+                      : () => _supprimerEnveloppe(categorie, enveloppe),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                ),
+                ReorderableDragStartListener(
+                  index: index!,
+                  enabled: !isDette,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Icon(
+                      isDette ? Icons.lock : Icons.drag_handle,
+                      color: isDette ? Colors.grey : Colors.white38,
+                      size: 20,
+                    ),
+                  ),
                 ),
               ] else ...[
                 Builder(
                   builder: (context) {
                     return GestureDetector(
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PageSetObjectif(
-                              categorie: categorie,
-                              enveloppe: enveloppe,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        (enveloppe.objectif > 0)
-                            ? '${enveloppe.objectif.toStringAsFixed(2)} \$'
-                            : 'Objectif',
-                        style: TextStyle(
-                          color: (enveloppe.objectif > 0)
-                              ? Colors.greenAccent
-                              : Theme.of(context).colorScheme.primary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      onTap: () => _ajouterEnveloppe(categorie),
+                      child: Icon(
+                        Icons.add_circle_outline,
+                        color: Colors.white70,
+                        size: 22,
                       ),
                     );
                   },
