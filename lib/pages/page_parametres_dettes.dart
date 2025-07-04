@@ -228,7 +228,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
     _calculerDateFinParDefaut(); // Met à jour la date de fin si la durée change
 
-    // On ne fait rien d'autre ici pour ne pas causer de recalculs non désirés.
+    setState(() {
+      _calculerEtMettrAJour(); // On met à jour les calculs à chaque changement
+    });
   }
 
   void _calculerDateFinParDefaut() {
@@ -691,26 +693,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _montantMensuelController,
-                        decoration: const InputDecoration(
-                          labelText: 'Paiement mensuel',
-                          border: OutlineInputBorder(),
-                          suffixText: '\$',
-                        ),
-                        readOnly: true,
-                        onTap: () => _ouvrirClavierNumerique(
-                          _montantMensuelController,
-                          isMoney: true,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -815,90 +797,22 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
               ],
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                final prixAchat = _toDouble(_prixAchatController.text);
-                final tauxInteret = _toDouble(_tauxController.text);
-                final dateDebut = _parseDate(_dateDebutController.text);
-                final dateFin = _parseDate(_dateFinController.text);
-
-                if (prixAchat != null &&
-                    tauxInteret != null &&
-                    dateDebut != null &&
-                    dateFin != null &&
-                    prixAchat > 0 &&
-                    tauxInteret >= 0 &&
-                    dateFin.isAfter(dateDebut)) {
-                  final dureeMois = (dateFin.year - dateDebut.year) * 12 +
-                      dateFin.month -
-                      dateDebut.month +
-                      1;
-
-                  final montantMensuel =
-                      CalculPretService.calculerPaiementMensuel(
-                    principal: prixAchat,
-                    tauxAnnuel: tauxInteret,
-                    dureeMois: dureeMois,
-                  );
-
-                  setState(() {
-                    _montantMensuelController.text =
-                        montantMensuel.toStringAsFixed(2);
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Paiement mensuel calculé automatiquement'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Veuillez remplir tous les champs requis'),
-                      backgroundColor: Colors.orange,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.calculate),
-              label: const Text('Calculer le paiement mensuel'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
+            _buildResultatCalcul(
+              'Paiement mensuel (calculé)',
+              '${calculs['montantMensuel']?.toStringAsFixed(2) ?? '0.00'} \$',
             ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: SizedBox.shrink(),
+            _buildResultatCalcul(
+              'Coût total',
+              '${calculs['coutTotal']?.toStringAsFixed(2) ?? '0.00'} \$',
             ),
-            if (calculs['paiementMensuelSaisi'] != null)
-              _buildResultatCalcul(
-                'Paiement mensuel saisi',
-                '${calculs['paiementMensuelSaisi']!.toStringAsFixed(2)} \$',
-              )
-            else if (calculs['montantMensuel'] != null)
-              _buildResultatCalcul(
-                'Paiement mensuel (calculé)',
-                '${calculs['montantMensuel']!.toStringAsFixed(2)} \$',
-              ),
-            if (calculs['coutTotal'] != null)
-              _buildResultatCalcul(
-                'Coût total',
-                '${calculs['coutTotal']!.toStringAsFixed(2)} \$',
-              ),
-            if (calculs['solde'] != null)
-              _buildResultatCalcul(
-                'Solde restant',
-                '${calculs['solde']!.toStringAsFixed(2)} \$',
-              ),
-            if (calculs['interetsPayes'] != null)
-              _buildResultatCalcul(
-                'Intérêts payés',
-                '${calculs['interetsPayes']!.toStringAsFixed(2)} \$',
-              ),
+            _buildResultatCalcul(
+              'Solde restant',
+              '${calculs['solde']?.toStringAsFixed(2) ?? '0.00'} \$',
+            ),
+            _buildResultatCalcul(
+              'Intérêts payés',
+              '${calculs['interetsPayes']?.toStringAsFixed(2) ?? '0.00'} \$',
+            ),
           ],
         ),
       ),
