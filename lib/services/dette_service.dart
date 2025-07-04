@@ -76,6 +76,13 @@ class DetteService {
           .map((item) => MouvementDette.fromMap(item as Map<String, dynamic>))
           .toList();
 
+      // Compter les paiements effectués directement depuis l'historique
+      final paiementsCompteur = historique
+          .where((m) =>
+              m.type == 'remboursement_recu' ||
+              m.type == 'remboursement_effectue')
+          .length;
+
       // Vérifier si c'est un prêt amortissable (avec taux d'intérêt)
       final tauxInteret = detteData['tauxInteret'] != null
           ? (detteData['tauxInteret'] as num).toDouble()
@@ -84,42 +91,14 @@ class DetteService {
           ? (detteData['prixAchat'] as num).toDouble()
           : null;
 
-      double nouveauSolde;
-
-      // Nouveau calcul : coutTotal - transactions
-      final coutTotal = detteData['coutTotal'] != null
-          ? (detteData['coutTotal'] as num).toDouble()
-          : null;
-
-      if (coutTotal != null) {
-        // Utiliser le coût total stocké dans Firebase
-        double totalRemboursements = 0.0;
-
-        for (MouvementDette mouvement in historique) {
-          if (mouvement.type == 'remboursement_recu' ||
-              mouvement.type == 'remboursement_effectue') {
-            totalRemboursements += mouvement.montant.abs(); // Montant positif
-          }
-        }
-
-        // Calcul : coutTotal - remboursements
-        nouveauSolde = coutTotal - totalRemboursements;
-
-        // S'assurer que le solde ne devient pas négatif
-        if (nouveauSolde < 0) nouveauSolde = 0;
-      } else {
-        // Fallback : ancien calcul pour compatibilité
-        nouveauSolde = montantInitial;
-
-        for (MouvementDette mouvement in historique) {
-          if (mouvement.type == 'remboursement_recu' ||
-              mouvement.type == 'remboursement_effectue') {
-            nouveauSolde += mouvement.montant; // montant est déjà négatif
-          }
-        }
-
-        nouveauSolde = nouveauSolde < 0 ? 0 : nouveauSolde;
+      // Calcul du nouveau solde : Montant initial + la somme de TOUS les mouvements
+      double nouveauSolde = montantInitial;
+      for (final mouvement in historique) {
+        nouveauSolde += mouvement.montant;
       }
+
+      // S'assurer que le solde ne devient pas négatif
+      if (nouveauSolde < 0) nouveauSolde = 0;
 
       // Calculer et mettre à jour les intérêts payés si c'est un prêt avec intérêts
       double? interetsPayesCalcules;
@@ -165,8 +144,11 @@ class DetteService {
         }
       }
 
-      // Mettre à jour le solde et les intérêts payés dans Firestore
-      Map<String, dynamic> updates = {'solde': nouveauSolde};
+      // Mettre à jour le solde, les paiements effectués et les intérêts payés dans Firestore
+      Map<String, dynamic> updates = {
+        'solde': nouveauSolde,
+        'paiementsEffectues': paiementsCompteur,
+      };
       if (interetsPayesCalcules != null) {
         updates['interetsPayes'] = interetsPayesCalcules;
       }
@@ -831,5 +813,22 @@ class DetteService {
     } catch (e) {
       // Ne pas faire échouer la sauvegarde si la mise à jour d'objectif échoue
     }
+  }
+
+  /// Ajoute une série de paiements passés à une dette
+  Future<void> ajouterPaiementsPasses(
+    String detteId,
+    List<MouvementDette> mouvements,
+  ) async {
+    final doc = dettesRef.doc(detteId);
+
+    // Mettre à jour en une seule opération
+    await doc.update({
+      'historique':
+          FieldValue.arrayUnion(mouvements.map((m) => m.toMap()).toList()),
+    });
+
+    // Recalculer le solde une seule fois après l'ajout de tous les mouvements
+    await _recalculerSolde(detteId);
   }
 }

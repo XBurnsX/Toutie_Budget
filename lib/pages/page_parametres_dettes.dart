@@ -42,6 +42,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   String? _erreurSimulateur;
   Map<String, double?> calculs = {};
 
+  // Nouveaux contrôleurs pour les paiements passés
+  final _paiementsPassesNombreController = TextEditingController();
+  final _paiementsPassesMontantController = TextEditingController();
+  bool _paiementsPassesAppliques = false;
+
   // Total des paiements réellement enregistrés dans les transactions
   double _totalRemboursements = 0.0;
   double _totalAssocie = 0.0;
@@ -346,6 +351,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     const SizedBox(height: 16),
                     _buildCalculsAutomatiques(),
                     const SizedBox(height: 24),
+                    _buildPaiementsPassesSection(),
                     Center(
                       child: ElevatedButton.icon(
                         onPressed: _sauvegarder,
@@ -1108,17 +1114,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
   @override
   void dispose() {
-    _tauxController.dispose();
-    _dateDebutController.dispose();
-    _dateFinController.dispose();
-    _montantMensuelController.dispose();
-    _prixAchatController.dispose();
-    _nombrePaiementsController.dispose();
-    _paiementsEffectuesController.dispose();
-    _simulateurTauxController.dispose();
-    _simulateurPaiementController.dispose();
-    _simulateurPrincipalController.dispose();
-    _simulateurDureeController.dispose();
     // Retirer tous les listeners
     _nombrePaiementsController.removeListener(_onParametresChanges);
     _dateDebutController.removeListener(_onParametresChanges);
@@ -1131,6 +1126,23 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     // Annuler l'abonnement Firestore
     _detteListener?.cancel();
     _txListener?.cancel();
+
+    _tauxController.dispose();
+    _dateDebutController.dispose();
+    _dateFinController.dispose();
+    _montantMensuelController.dispose();
+    _prixAchatController.dispose();
+    _nombrePaiementsController.dispose();
+    _paiementsEffectuesController.dispose();
+
+    _simulateurTauxController.dispose();
+    _simulateurPaiementController.dispose();
+    _simulateurPrincipalController.dispose();
+    _simulateurDureeController.dispose();
+
+    _paiementsPassesNombreController.dispose();
+    _paiementsPassesMontantController.dispose();
+
     super.dispose();
   }
 
@@ -1172,5 +1184,111 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         });
       }
     });
+  }
+
+  void _appliquerPaiementsPasses() async {
+    final int? nombre = int.tryParse(_paiementsPassesNombreController.text);
+    final double? montant = double.tryParse(
+        _paiementsPassesMontantController.text.replaceAll(',', '.'));
+
+    if (nombre == null || nombre <= 0 || montant == null || montant <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez entrer un nombre et un montant valides.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final List<MouvementDette> mouvementsPasses = [];
+    final dateDebut = widget.dette.dateDebut ?? DateTime.now();
+
+    for (int i = 0; i < nombre; i++) {
+      final dateMouvement =
+          DateTime(dateDebut.year, dateDebut.month + i, dateDebut.day);
+      mouvementsPasses.add(
+        MouvementDette(
+          id: 'passe_${DateTime.now().millisecondsSinceEpoch}_$i',
+          type: widget.dette.type == 'dette'
+              ? 'remboursement_effectue'
+              : 'remboursement_recu',
+          montant: widget.dette.type == 'dette' ? -montant : montant,
+          date: dateMouvement,
+          note: 'Paiement passé enregistré automatiquement',
+        ),
+      );
+    }
+
+    try {
+      final service = DetteService();
+      await service.ajouterPaiementsPasses(widget.dette.id, mouvementsPasses);
+
+      setState(() {
+        _paiementsPassesAppliques = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les paiements passés ont été appliqués avec succès !'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de l\'application des paiements : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildPaiementsPassesSection() {
+    if (!widget.dette.estManuelle ||
+        widget.dette.archive ||
+        _paiementsPassesAppliques) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: ExpansionTile(
+        title: const Text('Enregistrer des paiements passés',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        initiallyExpanded: false,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _paiementsPassesNombreController,
+                  decoration: const InputDecoration(
+                      labelText: 'Nombre de paiements déjà effectués',
+                      border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _paiementsPassesMontantController,
+                  decoration: const InputDecoration(
+                      labelText: 'Montant moyen de chaque paiement',
+                      border: OutlineInputBorder(),
+                      suffixText: '\$'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _appliquerPaiementsPasses,
+                  child: const Text('Appliquer les paiements passés'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
