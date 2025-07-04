@@ -205,12 +205,6 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                           : Colors.grey[800],
                       foregroundColor:
                           _objectifType == 'mois' ? Colors.black : Colors.white,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          bottomLeft: Radius.circular(8),
-                        ),
-                      ),
                     ),
                     child: const Text('Mois'),
                   ),
@@ -247,12 +241,6 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                           : Colors.grey[800],
                       foregroundColor:
                           _objectifType == 'date' ? Colors.black : Colors.white,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(8),
-                          bottomRight: Radius.circular(8),
-                        ),
-                      ),
                     ),
                     child: const Text('Date Fixe'),
                   ),
