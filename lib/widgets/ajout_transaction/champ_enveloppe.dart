@@ -30,9 +30,19 @@ class ChampEnveloppe extends StatelessWidget {
     // Couleur automatique du thème pour les dropdowns
     final dropdownColor = Theme.of(context).dropdownColor;
 
+    // Construire la liste des items une seule fois
+    final items = _buildEnveloppeItems();
+
+    // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
+    String? valeurActuelle = enveloppeSelectionnee;
+    final occurences = items.where((item) => item.value == valeurActuelle);
+    if (valeurActuelle != null && occurences.length != 1) {
+      valeurActuelle = null;
+    }
+
     return DropdownButtonFormField<String>(
-      value: enveloppeSelectionnee,
-      items: _buildEnveloppeItems(),
+      value: valeurActuelle,
+      items: items,
       onChanged: (String? newValue) => onEnveloppeChanged(newValue),
       decoration: InputDecoration(
         hintText: 'Optionnel',
