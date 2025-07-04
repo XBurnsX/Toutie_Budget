@@ -73,9 +73,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: aEnveloppesNegatives
-                        ? Colors.red[400]
-                        : Colors.white70,
+                    color:
+                        aEnveloppesNegatives ? Colors.red[400] : Colors.white70,
                   ),
                 ),
               ],
@@ -85,8 +84,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               Map<String, dynamic> historique = enveloppe['historique'] != null
                   ? Map<String, dynamic>.from(enveloppe['historique'])
                   : {};
-              Map<String, dynamic>? histoMois =
-                  (selectedMonthKey != null &&
+              Map<String, dynamic>? histoMois = (selectedMonthKey != null &&
                       historique[selectedMonthKey] != null)
                   ? Map<String, dynamic>.from(historique[selectedMonthKey])
                   : null;
@@ -97,8 +95,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               final selectedDate = selectedMonthKey != null
                   ? DateFormat('yyyy-MM').parse(selectedMonthKey!)
                   : now;
-              final isFutureMonth =
-                  selectedDate.year > now.year ||
+              final isFutureMonth = selectedDate.year > now.year ||
                   (selectedDate.year == now.year &&
                       selectedDate.month > now.month);
 
@@ -138,8 +135,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                   (depense >= objectif && objectif > 0);
               final double progression = (objectif > 0)
                   ? (estDepenseAtteint
-                        ? 1.0
-                        : (solde / objectif).clamp(0.0, 1.0))
+                      ? 1.0
+                      : (solde / objectif).clamp(0.0, 1.0))
                   : 0.0;
               final Color etatColor = _getEtatColor(solde, objectif);
               // log(
@@ -301,8 +298,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                           color: estNegative
                                               ? Colors.white
                                               : (solde == 0
-                                                    ? Colors.white70
-                                                    : Colors.black),
+                                                  ? Colors.white70
+                                                  : Colors.black),
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12,
                                         ),
@@ -312,27 +309,26 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                   // Construction des contributions pour le camembert
                                   final List<Contribution> contributions =
                                       provenances.map<Contribution>((prov) {
-                                        final compte = comptes.firstWhere(
-                                          (c) =>
-                                              c['id'].toString() ==
-                                              prov['compte_id'].toString(),
-                                          orElse: () => <String, Object>{},
-                                        );
-                                        final couleur =
-                                            (compte['couleur'] != null &&
+                                    final compte = comptes.firstWhere(
+                                      (c) =>
+                                          c['id'].toString() ==
+                                          prov['compte_id'].toString(),
+                                      orElse: () => <String, Object>{},
+                                    );
+                                    final couleur =
+                                        (compte['couleur'] != null &&
                                                 compte['couleur'] is int)
                                             ? Color(compte['couleur'] as int)
                                             : Colors.amber;
-                                        final nom = compte['nom'] ?? 'Compte';
-                                        return Contribution(
-                                          compte: nom.toString(),
-                                          couleur: couleur,
-                                          montant:
-                                              (prov['montant'] as num?)
-                                                  ?.toDouble() ??
-                                              0.0,
-                                        );
-                                      }).toList();
+                                    final nom = compte['nom'] ?? 'Compte';
+                                    return Contribution(
+                                      compte: nom.toString(),
+                                      couleur: couleur,
+                                      montant: (prov['montant'] as num?)
+                                              ?.toDouble() ??
+                                          0.0,
+                                    );
+                                  }).toList();
                                   return PieChartWithLegend(
                                     contributions: contributions,
                                     size: 40,
@@ -448,13 +444,17 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                         fontSize: 16,
                                       ),
                                     ),
-                                    if (["mensuel", "datefixe", "date"].any(
-                                      (f) =>
-                                          (enveloppe['frequence_objectif']
-                                                      ?.toString() ??
-                                                  '')
-                                              .toLowerCase()
-                                              .contains(f),
+                                    if ([
+                                      "mensuel",
+                                      "datefixe",
+                                      "date",
+                                      "bihebdo"
+                                    ].any(
+                                      (f) => (enveloppe['frequence_objectif']
+                                                  ?.toString() ??
+                                              '')
+                                          .toLowerCase()
+                                          .contains(f),
                                     ))
                                       Builder(
                                         builder: (_) {
@@ -473,34 +473,88 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             );
+                                          } else if (freq.contains('bihebdo')) {
+                                            // Affichage pour la fréquence toutes les 2 semaines
+                                            double montantObjectif =
+                                                (enveloppe['objectif'] as num?)
+                                                        ?.toDouble() ??
+                                                    0.0;
+
+                                            DateTime lastDate;
+                                            if (enveloppe[
+                                                    'date_dernier_ajout'] !=
+                                                null) {
+                                              try {
+                                                lastDate = DateTime.parse(
+                                                    enveloppe[
+                                                        'date_dernier_ajout']);
+                                              } catch (_) {
+                                                lastDate = DateTime.now();
+                                              }
+                                            } else {
+                                              lastDate = DateTime.now();
+                                            }
+
+                                            // Prochaine échéance = dernier ajout + 14 jours
+                                            DateTime prochaineDate = lastDate
+                                                .add(const Duration(days: 14));
+
+                                            // S'assurer qu'on tombe bien sur le bon jour de la semaine si objectifJour est défini
+                                            int? objectifJour = enveloppe[
+                                                'objectif_jour']; // 1=lundi … 7=dim
+                                            if (objectifJour != null) {
+                                              // Avancer jusqu'au prochain jour de la semaine correspondant
+                                              while (prochaineDate.weekday !=
+                                                  objectifJour) {
+                                                prochaineDate = prochaineDate
+                                                    .add(const Duration(
+                                                        days: 1));
+                                              }
+                                            }
+
+                                            String dateStr =
+                                                '${prochaineDate.day.toString().padLeft(2, '0')}/${prochaineDate.month.toString().padLeft(2, '0')}';
+
+                                            return Text(
+                                              '${montantObjectif.toStringAsFixed(2)}\u00A0\$ d\'ici le $dateStr',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 13,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            );
                                           } else if (freq.contains('date')) {
                                             double montantNecessaire = 0;
                                             if (enveloppe['objectif'] != null &&
                                                 enveloppe['objectif_date'] !=
                                                     null) {
                                               try {
-                                                DateTime
-                                                dateCible = DateTime.parse(
+                                                DateTime dateCible =
+                                                    DateTime.parse(
                                                   enveloppe['objectif_date'],
                                                 );
 
                                                 // Utiliser le mois sélectionné pour le calcul du statut
                                                 DateTime dateReference =
                                                     selectedMonthKey != null
-                                                    ? DateFormat(
-                                                        'yyyy-MM',
-                                                      ).parse(selectedMonthKey!)
-                                                    : DateTime.now();
+                                                        ? DateFormat(
+                                                            'yyyy-MM',
+                                                          ).parse(
+                                                            selectedMonthKey!)
+                                                        : DateTime.now();
 
                                                 // CORRECTION : Utiliser une date de création fixe au lieu du mois consulté
                                                 DateTime dateCreationObjectif;
-                                                if (enveloppe['date_creation_objectif'] !=
+                                                if (enveloppe[
+                                                        'date_creation_objectif'] !=
                                                     null) {
                                                   // Si on a la vraie date de création de l'objectif
                                                   dateCreationObjectif =
                                                       DateTime.parse(
-                                                        enveloppe['date_creation_objectif'],
-                                                      );
+                                                    enveloppe[
+                                                        'date_creation_objectif'],
+                                                  );
                                                 } else {
                                                   // Fallback : utiliser juin 2025 comme exemple (à ajuster selon vos données)
                                                   dateCreationObjectif =
@@ -508,8 +562,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                 }
 
                                                 // Calculer le nombre total de mois depuis la VRAIE création jusqu'à la date cible
-                                                int moisTotal =
-                                                    (dateCible.year -
+                                                int moisTotal = (dateCible
+                                                                .year -
                                                             dateCreationObjectif
                                                                 .year) *
                                                         12 +
@@ -519,8 +573,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                     1;
 
                                                 // Calculer le nombre de mois restants depuis le mois de référence
-                                                int moisRestants =
-                                                    (dateCible.year -
+                                                int moisRestants = (dateCible
+                                                                .year -
                                                             dateReference
                                                                 .year) *
                                                         12 +
@@ -535,11 +589,11 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                 // Le montant nécessaire chaque mois est fixe : objectif total / nombre total de mois
                                                 double objectifTotal =
                                                     (enveloppe['objectif']
-                                                            as num?)
-                                                        ?.toDouble() ??
-                                                    0.0;
-                                                montantNecessaire =
-                                                    moisTotal > 0
+                                                                as num?)
+                                                            ?.toDouble() ??
+                                                        0.0;
+                                                montantNecessaire = moisTotal >
+                                                        0
                                                     ? objectifTotal / moisTotal
                                                     : 0;
 
@@ -561,21 +615,21 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                                     // Dernier mois : afficher simplement ce qui manque pour atteindre l'objectif
                                                     double manquant =
                                                         objectifTotal -
-                                                        soldeActuel;
+                                                            soldeActuel;
                                                     montantNecessaire =
                                                         manquant > 0
-                                                        ? manquant
-                                                        : 0;
+                                                            ? manquant
+                                                            : 0;
                                                   } else {
                                                     // Autres mois : calculer ce qui manque réparti sur les mois restants
                                                     double manquant =
                                                         objectifTotal -
-                                                        soldeActuel;
+                                                            soldeActuel;
                                                     montantNecessaire =
                                                         manquant > 0
-                                                        ? (manquant /
-                                                              moisRestants)
-                                                        : 0;
+                                                            ? (manquant /
+                                                                moisRestants)
+                                                            : 0;
                                                   }
                                                 } else {
                                                   // Objectif déjà atteint
@@ -601,13 +655,13 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              if (["mensuel", "datefixe", "date"].any(
-                                (f) =>
-                                    (enveloppe['frequence_objectif']
-                                                ?.toString() ??
-                                            '')
-                                        .toLowerCase()
-                                        .contains(f),
+                              if (["mensuel", "datefixe", "date", "bihebdo"]
+                                  .any(
+                                (f) => (enveloppe['frequence_objectif']
+                                            ?.toString() ??
+                                        '')
+                                    .toLowerCase()
+                                    .contains(f),
                               ))
                                 Container(
                                   margin: const EdgeInsets.only(
@@ -628,8 +682,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                       color: estNegative
                                           ? Colors.white
                                           : (solde == 0
-                                                ? Colors.white70
-                                                : Colors.black),
+                                              ? Colors.white70
+                                              : Colors.black),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                     ),
@@ -676,10 +730,10 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                         backgroundColor: Colors.white12,
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
-                                              estDepenseAtteint
-                                                  ? Colors.green[800]!
-                                                  : etatColor,
-                                            ),
+                                          estDepenseAtteint
+                                              ? Colors.green[800]!
+                                              : etatColor,
+                                        ),
                                         minHeight: 6,
                                       ),
                                     ),

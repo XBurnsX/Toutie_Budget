@@ -23,6 +23,17 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   String _objectifType = 'mois'; // Ajout de la variable d'état
   DateTime? _selectedDate;
   int? _objectifJour;
+  DateTime? _bihebdoStartDate; // Date de départ pour le cycle bi-hebdo
+  // Liste fixe des jours de la semaine (1 = lundi, 7 = dimanche)
+  static const List<String> _joursSemaine = [
+    'Lundi',
+    'Mardi',
+    'Mercredi',
+    'Jeudi',
+    'Vendredi',
+    'Samedi',
+    'Dimanche',
+  ];
   double _currentObjectif = 0.0; // Variable pour suivre l'objectif actuel
   String? _montantOriginal;
 
@@ -35,10 +46,21 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       text: _currentObjectif > 0 ? _currentObjectif.toStringAsFixed(2) : '',
     );
     _objectifJour = widget.enveloppe.objectifJour;
+    _bihebdoStartDate = widget.enveloppe.dateDernierAjout;
     // Définir le type d'objectif basé sur l'enveloppe existante
     if (_currentObjectif > 0) {
-      _objectifType =
-          widget.enveloppe.frequenceObjectif == 'mensuel' ? 'mois' : 'date';
+      switch (widget.enveloppe.frequenceObjectif) {
+        case 'mensuel':
+          _objectifType = 'mois';
+          break;
+        case 'bihebdo':
+          _objectifType = '2sem';
+          _bihebdoStartDate ??= DateTime.now();
+          break;
+        default:
+          _objectifType = 'date';
+      }
+
       if (widget.enveloppe.objectifDate != null) {
         _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
       }
@@ -108,8 +130,14 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       depense: widget.enveloppe.depense,
       archivee: widget.enveloppe.archivee,
       provenanceCompteId: widget.enveloppe.provenanceCompteId,
-      frequenceObjectif: _objectifType == 'mois' ? 'mensuel' : 'date',
-      dateDernierAjout: widget.enveloppe.dateDernierAjout,
+      frequenceObjectif: _objectifType == 'mois'
+          ? 'mensuel'
+          : _objectifType == '2sem'
+              ? 'bihebdo'
+              : 'date',
+      dateDernierAjout: _objectifType == '2sem'
+          ? _bihebdoStartDate ?? widget.enveloppe.dateDernierAjout
+          : widget.enveloppe.dateDernierAjout,
       objectifJour: _objectifJour,
     );
     // Mise à jour de la liste d'enveloppes dans la catégorie
@@ -180,6 +208,24 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       ),
                     ),
                     child: const Text('Mois'),
+                  ),
+                ),
+                // Bouton "2 semaines"
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _objectifType = '2sem';
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _objectifType == '2sem'
+                          ? Theme.of(context).colorScheme.secondary
+                          : Colors.grey[800],
+                      foregroundColor:
+                          _objectifType == '2sem' ? Colors.black : Colors.white,
+                    ),
+                    child: const Text('2 semaines'),
                   ),
                 ),
                 Expanded(
@@ -263,7 +309,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                 ),
               ),
             ],
-            // Déplacer le sélecteur de jour entre les boutons et le TextField
+            // Sélecteur jour/mois pour objectif mensuel
             if (_objectifType == 'mois') ...[
               const SizedBox(height: 16),
               Row(
@@ -286,6 +332,79 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                           (day) => DropdownMenuItem(
                             value: day,
                             child: Text(day.toString()),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _objectifJour = val;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
+            // Sélecteur du jour de la semaine pour objectif bihebdo
+            if (_objectifType == '2sem') ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Premier jour du cycle :',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _bihebdoStartDate ?? DateTime.now(),
+                        firstDate:
+                            DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        locale: const Locale('fr', 'CA'),
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          _bihebdoStartDate = picked;
+                        });
+                      }
+                    },
+                    child: Text(
+                      _bihebdoStartDate != null
+                          ? '${_bihebdoStartDate!.day.toString().padLeft(2, '0')}/${_bihebdoStartDate!.month.toString().padLeft(2, '0')}/${_bihebdoStartDate!.year}'
+                          : 'Choisir la date',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text(
+                    'Jour de la semaine :',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(width: 16),
+                  DropdownButton<int>(
+                    value: _objectifJour,
+                    dropdownColor: Theme.of(context).dropdownColor,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    hint: const Text(
+                      'Jour',
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                    items: List.generate(7, (i) => i + 1)
+                        .map(
+                          (weekday) => DropdownMenuItem(
+                            value: weekday,
+                            child: Text(_joursSemaine[weekday - 1]),
                           ),
                         )
                         .toList(),

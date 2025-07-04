@@ -23,8 +23,8 @@ class FirebaseService {
   final CollectionReference comptesRef = FirebaseFirestore.instance.collection(
     'comptes',
   );
-  final CollectionReference categoriesRef = FirebaseFirestore.instance
-      .collection('categories');
+  final CollectionReference categoriesRef =
+      FirebaseFirestore.instance.collection('categories');
   final CollectionReference tiersRef = FirebaseFirestore.instance.collection(
     'tiers',
   );
@@ -91,27 +91,27 @@ class FirebaseService {
         ) // Ne lit que les catégories de l'utilisateur
         .snapshots()
         .map((snapshot) {
-          final categories = snapshot.docs
-              .map(
-                (doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>),
-              )
-              .toList();
+      final categories = snapshot.docs
+          .map(
+            (doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>),
+          )
+          .toList();
 
-          // Trier les catégories : Dette toujours en premier, puis par ordre
-          categories.sort((a, b) {
-            // Forcer "Dette" en premier, insensible à la casse
-            final aNom = a.nom.toLowerCase();
-            final bNom = b.nom.toLowerCase();
-            if (aNom == 'dette' || aNom == 'dettes') return -1;
-            if (bNom == 'dette' || bNom == 'dettes') return 1;
-            // Ensuite trier par ordre
-            final aOrdre = a.ordre ?? 999999;
-            final bOrdre = b.ordre ?? 999999;
-            return aOrdre.compareTo(bOrdre);
-          });
+      // Trier les catégories : Dette toujours en premier, puis par ordre
+      categories.sort((a, b) {
+        // Forcer "Dette" en premier, insensible à la casse
+        final aNom = a.nom.toLowerCase();
+        final bNom = b.nom.toLowerCase();
+        if (aNom == 'dette' || aNom == 'dettes') return -1;
+        if (bNom == 'dette' || bNom == 'dettes') return 1;
+        // Ensuite trier par ordre
+        final aOrdre = a.ordre ?? 999999;
+        final bOrdre = b.ordre ?? 999999;
+        return aOrdre.compareTo(bOrdre);
+      });
 
-          return categories;
-        });
+      return categories;
+    });
   }
 
   Future<void> ajouterTransaction(app_model.Transaction transaction) async {
@@ -457,6 +457,27 @@ class FirebaseService {
               // Mettre à jour l'enveloppe
               enveloppe['solde'] = nouveauSolde;
               enveloppe['depense'] = nouvelleDepense;
+
+              // Gestion de l'objectif bihebdomadaire : lorsque la dépense atteint
+              // ou dépasse l'objectif, on enregistre la date pour pouvoir
+              // réinitialiser plus tard dans le service de rollover.
+              try {
+                final String? frequence =
+                    (enveloppe['frequence_objectif'] as String?)?.toLowerCase();
+                final double objectif =
+                    (enveloppe['objectif'] as num?)?.toDouble() ?? 0.0;
+
+                if (frequence == 'bihebdo' && objectif > 0) {
+                  // Si l'objectif est atteint, on mémorise la date
+                  if (nouvelleDepense >= objectif) {
+                    enveloppe['date_dernier_ajout'] =
+                        DateTime.now().toIso8601String();
+                  }
+                }
+              } catch (_) {
+                // Sécurité : ne pas planter la transaction
+              }
+
               enveloppes[enveloppeIndex] = enveloppe;
 
               // Sauvegarder la catégorie modifiée
@@ -840,6 +861,27 @@ class FirebaseService {
               // Mettre à jour l'enveloppe
               enveloppe['solde'] = nouveauSolde;
               enveloppe['depense'] = nouvelleDepense;
+
+              // Gestion de l'objectif bihebdomadaire : lorsque la dépense atteint
+              // ou dépasse l'objectif, on enregistre la date pour pouvoir
+              // réinitialiser plus tard dans le service de rollover.
+              try {
+                final String? frequence =
+                    (enveloppe['frequence_objectif'] as String?)?.toLowerCase();
+                final double objectif =
+                    (enveloppe['objectif'] as num?)?.toDouble() ?? 0.0;
+
+                if (frequence == 'bihebdo' && objectif > 0) {
+                  // Si l'objectif est atteint, on mémorise la date
+                  if (nouvelleDepense >= objectif) {
+                    enveloppe['date_dernier_ajout'] =
+                        DateTime.now().toIso8601String();
+                  }
+                }
+              } catch (_) {
+                // Sécurité : ne pas planter la transaction
+              }
+
               enveloppes[enveloppeIndex] = enveloppe;
 
               // Sauvegarder la catégorie modifiée
