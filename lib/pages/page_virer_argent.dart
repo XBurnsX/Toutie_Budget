@@ -65,6 +65,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         controller: _montantController,
         onValueChanged: (val) {}, // Le listener sur le controller s'en occupe
         onClear: () => _montantController.clear(),
+        showDone: false,
       ),
     ).whenComplete(() {
       // Si l'utilisateur ferme sans entrer de valeur, restaurer la valeur originale
@@ -651,6 +652,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                           });
                         },
                         showDecimal: true,
+                        showDone: false,
                       ),
                     ),
                     // Bouton Virer ajouté

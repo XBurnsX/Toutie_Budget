@@ -7,6 +7,7 @@ class NumericKeyboard extends StatefulWidget {
   final Function(String)? onValueChanged;
   final VoidCallback? onDone;
   final bool isMoney;
+  final bool showDone;
 
   const NumericKeyboard({
     super.key,
@@ -16,6 +17,7 @@ class NumericKeyboard extends StatefulWidget {
     this.onValueChanged,
     this.onDone,
     this.isMoney = true,
+    this.showDone = true,
   });
 
   @override
@@ -47,9 +49,9 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
         bool isNegative = currentText.startsWith('-');
         String positiveText =
             (isNegative ? currentText.substring(1) : currentText).replaceAll(
-              '.',
-              '',
-            );
+          '.',
+          '',
+        );
 
         String newText = positiveText + key;
 
@@ -90,16 +92,15 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
 
   void _onBackspace() {
     if (widget.isMoney) {
-      String currentText = widget.controller.text
-          .replaceAll('\$', '')
-          .replaceAll(' ', '');
+      String currentText =
+          widget.controller.text.replaceAll('\$', '').replaceAll(' ', '');
 
       bool isNegative = currentText.startsWith('-');
       String positiveText =
           (isNegative ? currentText.substring(1) : currentText).replaceAll(
-            '.',
-            '',
-          );
+        '.',
+        '',
+      );
 
       if (positiveText.length > 1) {
         positiveText = positiveText.substring(0, positiveText.length - 1);
@@ -243,35 +244,37 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                   ),
                 ),
                 const SizedBox(width: 35),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 6.0,
-                    horizontal: 2.0,
-                  ),
-                  child: SizedBox(
-                    width: 85,
-                    height: 44,
-                    child: ElevatedButton(
-                      onPressed:
-                          widget.onDone ??
-                          () => Navigator.of(context).maybePop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.secondaryContainer,
-                        foregroundColor: Theme.of(context).colorScheme.primary,
-                        elevation: 2,
-                        shape: const StadiumBorder(),
-                        padding: EdgeInsets.zero,
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        size: 22,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
+                widget.showDone
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6.0,
+                          horizontal: 2.0,
+                        ),
+                        child: SizedBox(
+                          width: 85,
+                          height: 44,
+                          child: ElevatedButton(
+                            onPressed: widget.onDone ??
+                                () => Navigator.of(context).maybePop(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                              elevation: 2,
+                              shape: const StadiumBorder(),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 22,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(width: 85),
               ],
             ),
             const SizedBox(height: 8),
@@ -325,7 +328,6 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 8),
           ],
         ),
