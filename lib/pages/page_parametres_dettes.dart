@@ -159,9 +159,27 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       _calculerDateFinParDefaut();
     }
 
-    if (_detteActuelle.montantMensuel != null) {
+    if (_detteActuelle.montantMensuel != null &&
+        _detteActuelle.montantMensuel! > 0) {
       _montantMensuelController.text =
           _detteActuelle.montantMensuel!.toStringAsFixed(2);
+    } else {
+      // S'il n'y a pas de paiement mensuel, on le calcule
+      final prixAchat = _toDouble(_prixAchatController.text);
+      final tauxInteret = _toDouble(_tauxController.text);
+      final dureeMois = int.tryParse(_nombrePaiementsController.text);
+
+      if (prixAchat != null &&
+          tauxInteret != null &&
+          dureeMois != null &&
+          dureeMois > 0) {
+        final montantMensuel = CalculPretService.calculerPaiementMensuel(
+          principal: prixAchat,
+          tauxAnnuel: tauxInteret,
+          dureeMois: dureeMois,
+        );
+        _montantMensuelController.text = montantMensuel.toStringAsFixed(2);
+      }
     }
 
     if (_detteActuelle.prixAchat != null && _detteActuelle.prixAchat! > 0) {
@@ -185,7 +203,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     _calculerEtMettrAJour(); // On fait un seul calcul initial
-    _onParametresChanges(); // On s'assure que tout est synchronisé
   }
 
   void _calculerPaiementsEffectues() {
