@@ -1023,7 +1023,12 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       decoration: const InputDecoration(
                           labelText: 'Nombre de paiements déjà effectués',
                           border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
+                      readOnly: true,
+                      onTap: () => _ouvrirClavierNumerique(
+                        _nombrePaiementsPassesController,
+                        showDecimal: false,
+                        isMoney: false,
+                      ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Veuillez entrer un nombre';
@@ -1042,8 +1047,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                           labelText: 'Montant par paiement',
                           border: OutlineInputBorder(),
                           suffixText: '\$'),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      readOnly: true,
+                      onTap: () => _ouvrirClavierNumerique(
+                        _montantPaiementPasseController,
+                        isMoney: true,
+                      ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Veuillez entrer un montant';
