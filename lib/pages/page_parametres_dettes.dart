@@ -34,6 +34,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   final _montantPaiementPasseController = TextEditingController();
   DateTime _datePaiementPasse = DateTime.now();
   bool _afficherSectionPaiementsPasses = false;
+  Key _paiementsPassesKey = UniqueKey();
 
   // Simulateur
   final _simulateurTauxController = TextEditingController();
@@ -305,7 +306,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       context: context,
       initialDate: _parseDate(_dateFinController.text) ?? dateFinMaximale,
       firstDate: dateDebut.add(const Duration(days: 1)),
-      lastDate: DateTime(2100),
+      lastDate: dateFinMaximale,
     );
 
     if (nouvelleDateFin != null) {
@@ -860,6 +861,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       final calculs = _calculerValeursPret();
       final coutTotalCalcule = calculs['coutTotal'];
       final interetsPayesCalcules = calculs['interetsPayes'];
+      final montantMensuelCalcule = calculs['montantMensuel'];
 
       final totalRemboursements = _calculerTotalRemboursementsHistorique();
       double? nouveauSolde;
@@ -876,7 +878,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         tauxInteret: _toDouble(_tauxController.text) ?? 0,
         dateDebut: _parseDate(_dateDebutController.text),
         dateFin: _parseDate(_dateFinController.text),
-        montantMensuel: _toDouble(_montantMensuelController.text) ?? 0,
+        montantMensuel: montantMensuelCalcule,
         prixAchat: _toDouble(_prixAchatController.text) ?? 0,
         coutTotal: coutTotalCalcule,
         interetsPayes: interetsPayesCalcules,
@@ -968,6 +970,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             _nombrePaiementsPassesController.text = '1';
             _montantPaiementPasseController.clear();
             _afficherSectionPaiementsPasses = false;
+            _paiementsPassesKey =
+                UniqueKey(); // Force le rebuild du ExpansionTile
           });
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -990,6 +994,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Card(
         child: ExpansionTile(
+          key: _paiementsPassesKey,
           title: const Text('Enregistrer des paiements passés',
               style: TextStyle(fontWeight: FontWeight.bold)),
           initiallyExpanded: _afficherSectionPaiementsPasses,

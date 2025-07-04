@@ -764,10 +764,12 @@ class DetteService {
         enveloppes[indexEnveloppe]['frequence_objectif'] = 'mensuel';
         enveloppes[indexEnveloppe]['objectif_jour'] = dette.dateDebut!.day;
       } else {
-        // Dette automatique ou dette manuelle sans coût total → aucun objectif
-        enveloppes[indexEnveloppe]['objectif'] = 0.0;
-        enveloppes[indexEnveloppe]['frequence_objectif'] = null;
-        enveloppes[indexEnveloppe]['objectif_jour'] = null;
+        // Auparavant, cette condition échouait silencieusement. Maintenant, elle lèvera une erreur.
+        throw Exception(
+            'Impossible de définir l\'objectif car les conditions ne sont pas remplies. '
+            'estManuelle: ${dette.estManuelle}, '
+            'coutTotal: ${dette.coutTotal}, '
+            'dateDebut: ${dette.dateDebut}');
       }
 
       // 4. Sauvegarder la catégorie modifiée
