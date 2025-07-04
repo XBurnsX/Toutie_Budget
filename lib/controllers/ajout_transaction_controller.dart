@@ -619,19 +619,17 @@ class AjoutTransactionController extends ChangeNotifier {
 
       var dettesDuTiers = toutesLesDettes
           .where((d) =>
-              d.nomTiers != null &&
-              normaliserChaine(d.nomTiers!) == normaliserChaine(nomTiers) &&
+              normaliserChaine(d.nomTiers) == normaliserChaine(nomTiers) &&
               d.type == typeDetteRecherche)
           .toList();
 
       if (dettesDuTiers.isEmpty) {
         dettesDuTiers = toutesLesDettes
             .where((d) =>
-                d.nomTiers != null &&
-                (normaliserChaine(d.nomTiers!)
+                (normaliserChaine(d.nomTiers)
                         .contains(normaliserChaine(nomTiers)) ||
                     normaliserChaine(nomTiers)
-                        .contains(normaliserChaine(d.nomTiers!))) &&
+                        .contains(normaliserChaine(d.nomTiers))) &&
                 d.type == typeDetteRecherche)
             .toList();
       }
