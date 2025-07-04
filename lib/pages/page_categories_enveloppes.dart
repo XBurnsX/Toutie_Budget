@@ -83,12 +83,22 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
 
   // Méthode pour réorganiser les catégories
   Future<void> _reorderCategories(int oldIndex, int newIndex) async {
-    // Empêcher le déplacement de la catégorie Dette (position 0)
-    if (oldIndex == 0) return;
-
-    // Empêcher de déplacer une catégorie au-dessus de Dette (position 0)
-    if (newIndex == 0) {
-      return;
+    // Vérifier si la catégorie "Dette" est déplacée ou si on la déplace à sa place
+    if (_categories.isNotEmpty) {
+      final Categorie categorieADeplacer = _categories[oldIndex];
+      if (categorieADeplacer.nom.toLowerCase() == 'dette' ||
+          categorieADeplacer.nom.toLowerCase() == 'dettes') {
+        // La catégorie "Dette" ne peut pas être déplacée
+        return;
+      }
+      if (newIndex == 0) {
+        final Categorie categorieEnPremierePosition = _categories[0];
+        if (categorieEnPremierePosition.nom.toLowerCase() == 'dette' ||
+            categorieEnPremierePosition.nom.toLowerCase() == 'dettes') {
+          // On ne peut pas déplacer une autre catégorie à la place de "Dette"
+          return;
+        }
+      }
     }
 
     // Ajuster l'index comme d'habitude
