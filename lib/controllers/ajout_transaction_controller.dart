@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import '../models/transaction_model.dart';
+import '../models/transaction_model.dart' as app_model;
 import '../models/compte.dart';
 import '../models/fractionnement_model.dart';
 import '../models/dette.dart';
 import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AjoutTransactionController extends ChangeNotifier {
   // Variables d'état
-  TypeTransaction _typeSelectionne = TypeTransaction.depense;
-  TypeMouvementFinancier _typeMouvementSelectionne =
-      TypeMouvementFinancier.depenseNormale;
+  app_model.TypeTransaction _typeSelectionne =
+      app_model.TypeTransaction.depense;
+  app_model.TypeMouvementFinancier _typeMouvementSelectionne =
+      app_model.TypeMouvementFinancier.depenseNormale;
   final TextEditingController montantController = TextEditingController(
     text: '0.00',
   );
@@ -31,11 +33,11 @@ class AjoutTransactionController extends ChangeNotifier {
   TransactionFractionnee? _transactionFractionnee;
 
   // Variable pour le mode modification
-  Transaction? _transactionExistante;
+  app_model.Transaction? _transactionExistante;
 
   // Getters
-  TypeTransaction get typeSelectionne => _typeSelectionne;
-  TypeMouvementFinancier get typeMouvementSelectionne =>
+  app_model.TypeTransaction get typeSelectionne => _typeSelectionne;
+  app_model.TypeMouvementFinancier get typeMouvementSelectionne =>
       _typeMouvementSelectionne;
   String? get enveloppeSelectionnee => _enveloppeSelectionnee;
   String? get compteSelectionne => _compteSelectionne;
@@ -46,7 +48,7 @@ class AjoutTransactionController extends ChangeNotifier {
   List<Map<String, dynamic>> get categoriesFirebase => _categoriesFirebase;
   bool get estFractionnee => _estFractionnee;
   TransactionFractionnee? get transactionFractionnee => _transactionFractionnee;
-  Transaction? get transactionExistante => _transactionExistante;
+  app_model.Transaction? get transactionExistante => _transactionExistante;
 
   // Validation
   bool get estValide {
@@ -86,7 +88,8 @@ class AjoutTransactionController extends ChangeNotifier {
 
     // Validation pour les transactions normales
     if (!_estFractionnee &&
-        _typeMouvementSelectionne == TypeMouvementFinancier.depenseNormale &&
+        _typeMouvementSelectionne ==
+            app_model.TypeMouvementFinancier.depenseNormale &&
         (_enveloppeSelectionnee == null || _enveloppeSelectionnee!.isEmpty)) {
       return false;
     }
@@ -95,24 +98,25 @@ class AjoutTransactionController extends ChangeNotifier {
   }
 
   // Méthodes de mise à jour
-  void setTypeTransaction(TypeTransaction type) {
+  void setTypeTransaction(app_model.TypeTransaction type) {
     _typeSelectionne = type;
-    if (type == TypeTransaction.depense &&
+    if (type == app_model.TypeTransaction.depense &&
         !_typeMouvementSelectionne.estDepense) {
-      _typeMouvementSelectionne = TypeMouvementFinancier.depenseNormale;
-    } else if (type == TypeTransaction.revenu &&
+      _typeMouvementSelectionne =
+          app_model.TypeMouvementFinancier.depenseNormale;
+    } else if (type == app_model.TypeTransaction.revenu &&
         !_typeMouvementSelectionne.estRevenu) {
-      _typeMouvementSelectionne = TypeMouvementFinancier.revenuNormal;
+      _typeMouvementSelectionne = app_model.TypeMouvementFinancier.revenuNormal;
     }
     notifyListeners();
   }
 
-  void setTypeMouvement(TypeMouvementFinancier type) {
+  void setTypeMouvement(app_model.TypeMouvementFinancier type) {
     _typeMouvementSelectionne = type;
     if (type.estDepense) {
-      _typeSelectionne = TypeTransaction.depense;
+      _typeSelectionne = app_model.TypeTransaction.depense;
     } else if (type.estRevenu) {
-      _typeSelectionne = TypeTransaction.revenu;
+      _typeSelectionne = app_model.TypeTransaction.revenu;
     }
     notifyListeners();
   }
@@ -144,7 +148,7 @@ class AjoutTransactionController extends ChangeNotifier {
   }
 
   // Méthode pour définir la transaction existante en mode modification
-  void setTransactionExistante(Transaction? transaction) {
+  void setTransactionExistante(app_model.Transaction? transaction) {
     _transactionExistante = transaction;
   }
 
@@ -262,6 +266,17 @@ class AjoutTransactionController extends ChangeNotifier {
           // 1. Rollback de l'effet de l'ancienne transaction sur les soldes
           await firebaseService.rollbackTransaction(_transactionExistante!);
 
+          // ANNULER L'EFFET DU REMBOURSEMENT SUR LA DETTE
+          if (_transactionExistante!.typeMouvement ==
+                  app_model.TypeMouvementFinancier.remboursementEffectue ||
+              _transactionExistante!.typeMouvement ==
+                  app_model.TypeMouvementFinancier.remboursementRecu) {
+            await _rollbackRemboursementViaDettesService(
+              _transactionExistante!,
+              detteService,
+            );
+          }
+
           // 2. Supprimer l'ancienne transaction de Firestore
           await firebaseService.supprimerDocument(
             'transactions',
@@ -273,8 +288,10 @@ class AjoutTransactionController extends ChangeNotifier {
       }
 
       // Gérer les dettes/prêts
-      if (_typeMouvementSelectionne == TypeMouvementFinancier.detteContractee ||
-          _typeMouvementSelectionne == TypeMouvementFinancier.pretAccorde) {
+      if (_typeMouvementSelectionne ==
+              app_model.TypeMouvementFinancier.detteContractee ||
+          _typeMouvementSelectionne ==
+              app_model.TypeMouvementFinancier.pretAccorde) {
         await _creerDetteViaDettesService(
           tiersTexte,
           montant,
@@ -285,9 +302,9 @@ class AjoutTransactionController extends ChangeNotifier {
 
       // Gérer les remboursements
       if (_typeMouvementSelectionne ==
-              TypeMouvementFinancier.remboursementRecu ||
+              app_model.TypeMouvementFinancier.remboursementRecu ||
           _typeMouvementSelectionne ==
-              TypeMouvementFinancier.remboursementEffectue) {
+              app_model.TypeMouvementFinancier.remboursementEffectue) {
         infoFinalisation = await _traiterRemboursementViaDettesService(
           tiersTexte,
           montant,
@@ -298,12 +315,13 @@ class AjoutTransactionController extends ChangeNotifier {
       }
 
       // Gérer les revenus normaux - augmenter automatiquement le prêt à placer et le solde
-      if (_typeMouvementSelectionne == TypeMouvementFinancier.revenuNormal) {
+      if (_typeMouvementSelectionne ==
+          app_model.TypeMouvementFinancier.revenuNormal) {
         await _traiterRevenuNormal(compte, montant, firebaseService);
       }
 
       // Créer la transaction
-      final transaction = Transaction(
+      final transaction = app_model.Transaction(
         id: transactionId,
         type: _typeSelectionne,
         typeMouvement: _typeMouvementSelectionne,
@@ -319,8 +337,8 @@ class AjoutTransactionController extends ChangeNotifier {
         estFractionnee: _estFractionnee,
         sousItems: _estFractionnee
             ? _transactionFractionnee!.sousItems
-                  .map((item) => item.toJson())
-                  .toList()
+                .map((item) => item.toJson())
+                .toList()
             : null,
       );
 
@@ -338,7 +356,7 @@ class AjoutTransactionController extends ChangeNotifier {
   Future<void> _creerDetteViaDettesService(
     String nomTiers,
     double montant,
-    TypeMouvementFinancier typeMouvement,
+    app_model.TypeMouvementFinancier typeMouvement,
     DetteService detteService,
   ) async {
     try {
@@ -347,9 +365,10 @@ class AjoutTransactionController extends ChangeNotifier {
 
       // Déterminer le type de dette selon le mouvement
       String typeDette;
-      if (typeMouvement == TypeMouvementFinancier.detteContractee) {
+      if (typeMouvement == app_model.TypeMouvementFinancier.detteContractee) {
         typeDette = 'dette'; // Je dois de l'argent
-      } else if (typeMouvement == TypeMouvementFinancier.pretAccorde) {
+      } else if (typeMouvement ==
+          app_model.TypeMouvementFinancier.pretAccorde) {
         typeDette = 'pret'; // On me doit de l'argent
       } else {
         return; // Pour les remboursements, on ne crée pas de nouvelle dette
@@ -390,9 +409,8 @@ class AjoutTransactionController extends ChangeNotifier {
       // Créer la dette
       final nouvelleDette = Dette(
         id: detteId,
-        nomTiers: nomTiers.trim().isNotEmpty
-            ? nomTiers.trim()
-            : 'Tiers générique',
+        nomTiers:
+            nomTiers.trim().isNotEmpty ? nomTiers.trim() : 'Tiers générique',
         montantInitial: montant,
         solde: montant,
         type: typeDette,
@@ -429,7 +447,7 @@ class AjoutTransactionController extends ChangeNotifier {
   Future<Map<String, dynamic>?> _traiterRemboursementViaDettesService(
     String nomTiers,
     double montant,
-    TypeMouvementFinancier typeMouvement,
+    app_model.TypeMouvementFinancier typeMouvement,
     String transactionId,
     DetteService detteService,
   ) async {
@@ -441,7 +459,7 @@ class AjoutTransactionController extends ChangeNotifier {
       String typeRemboursement;
       String typeDetteRecherche;
 
-      if (typeMouvement == TypeMouvementFinancier.remboursementRecu) {
+      if (typeMouvement == app_model.TypeMouvementFinancier.remboursementRecu) {
         typeRemboursement = 'remboursement_recu';
         typeDetteRecherche = 'pret'; // Chercher dans les prêts accordés
       } else {
@@ -494,8 +512,8 @@ class AjoutTransactionController extends ChangeNotifier {
       // Utiliser une marge d'erreur pour éviter les problèmes de précision des nombres à virgule flottante
       const double epsilon = 0.01; // Marge d'erreur de 1 cent
       if (montant > totalSoldeRestant + epsilon) {
-        final message =
-            typeMouvement == TypeMouvementFinancier.remboursementEffectue
+        final message = typeMouvement ==
+                app_model.TypeMouvementFinancier.remboursementEffectue
             ? 'Seulement ${totalSoldeRestant.abs().toStringAsFixed(2)} dollars sont nécessaires pour rembourser votre dette à $nomTiers'
             : 'Seulement ${totalSoldeRestant.abs().toStringAsFixed(2)} dollars peuvent être remboursés par $nomTiers';
 
@@ -509,9 +527,8 @@ class AjoutTransactionController extends ChangeNotifier {
       for (final dette in dettesATiers) {
         if (montantRestant <= 0) break;
 
-        final montantAPayer = montantRestant >= dette.solde
-            ? dette.solde
-            : montantRestant;
+        final montantAPayer =
+            montantRestant >= dette.solde ? dette.solde : montantRestant;
 
         // Vérifier si cette dette sera finalisée
         if (montantAPayer >= dette.solde) {
@@ -573,6 +590,92 @@ class AjoutTransactionController extends ChangeNotifier {
       });
     } catch (e) {
       // Erreur silencieuse
+    }
+  }
+
+  Future<void> _rollbackRemboursementViaDettesService(
+    app_model.Transaction transaction,
+    DetteService detteService,
+  ) async {
+    try {
+      final user = FirebaseService().auth.currentUser;
+      if (user == null) return;
+
+      final nomTiers = transaction.tiers;
+      if (nomTiers == null) return;
+      final transactionId = transaction.id;
+      final typeMouvement = transaction.typeMouvement;
+
+      String typeDetteRecherche;
+      if (typeMouvement == app_model.TypeMouvementFinancier.remboursementRecu) {
+        typeDetteRecherche = 'pret';
+      } else {
+        typeDetteRecherche = 'dette';
+      }
+
+      final dettesActives = await detteService.dettesActives().first;
+      final dettesArchivees = await detteService.dettesArchivees().first;
+      final toutesLesDettes = [...dettesActives, ...dettesArchivees];
+
+      var dettesDuTiers = toutesLesDettes
+          .where((d) =>
+              d.nomTiers != null &&
+              normaliserChaine(d.nomTiers!) == normaliserChaine(nomTiers) &&
+              d.type == typeDetteRecherche)
+          .toList();
+
+      if (dettesDuTiers.isEmpty) {
+        dettesDuTiers = toutesLesDettes
+            .where((d) =>
+                d.nomTiers != null &&
+                (normaliserChaine(d.nomTiers!)
+                        .contains(normaliserChaine(nomTiers)) ||
+                    normaliserChaine(nomTiers)
+                        .contains(normaliserChaine(d.nomTiers!))) &&
+                d.type == typeDetteRecherche)
+            .toList();
+      }
+
+      if (dettesDuTiers.isEmpty) {
+        return;
+      }
+
+      for (final dette in dettesDuTiers) {
+        final mouvementId = '${transactionId}_${dette.id}';
+        MouvementDette? mouvementASupprimer;
+        for (final m in dette.historique) {
+          if (m.id == mouvementId) {
+            mouvementASupprimer = m;
+            break;
+          }
+        }
+
+        if (mouvementASupprimer != null) {
+          final docRef =
+              FirebaseFirestore.instance.collection('dettes').doc(dette.id);
+
+          if (dette.archive) {
+            await docRef.update({'archive': false, 'dateArchivage': null});
+          }
+          await docRef.update({
+            'historique': FieldValue.arrayRemove([mouvementASupprimer.toMap()])
+          });
+
+          // Déclencher le recalcul du solde
+          await detteService.ajouterMouvement(
+            dette.id,
+            MouvementDette(
+              id: 'recalc_${DateTime.now().millisecondsSinceEpoch}',
+              type: 'ajustement',
+              montant: 0,
+              date: DateTime.now(),
+              note: 'Recalcul après modification de transaction.',
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 
