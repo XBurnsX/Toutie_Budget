@@ -161,9 +161,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           widget.dette.montantMensuel!.toStringAsFixed(2);
     }
 
-    if (widget.dette.prixAchat != null) {
-      _prixAchatController.text = widget.dette.prixAchat!.toStringAsFixed(2);
-    }
+    _prixAchatController.text = widget.dette.solde.toStringAsFixed(2);
 
     if (widget.dette.nombrePaiements != null) {
       _nombrePaiementsController.text =
