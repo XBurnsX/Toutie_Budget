@@ -311,6 +311,7 @@ class AjoutTransactionController extends ChangeNotifier {
           _typeMouvementSelectionne,
           transactionId,
           detteService,
+          estModification: _transactionExistante != null,
         );
       }
 
@@ -449,8 +450,9 @@ class AjoutTransactionController extends ChangeNotifier {
     double montant,
     app_model.TypeMouvementFinancier typeMouvement,
     String transactionId,
-    DetteService detteService,
-  ) async {
+    DetteService detteService, {
+    bool estModification = false,
+  }) async {
     try {
       final user = FirebaseService().auth.currentUser;
       if (user == null) return null;
@@ -545,7 +547,11 @@ class AjoutTransactionController extends ChangeNotifier {
         );
 
         // Ajouter le mouvement à la dette
-        await detteService.ajouterMouvement(dette.id, mouvement);
+        await detteService.ajouterMouvement(
+          dette.id,
+          mouvement,
+          estModification: estModification,
+        );
 
         montantRestant -= montantAPayer;
       }

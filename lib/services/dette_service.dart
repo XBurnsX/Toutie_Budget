@@ -40,18 +40,24 @@ class DetteService {
 
   Future<void> ajouterMouvement(
     String detteId,
-    MouvementDette mouvement,
-  ) async {
+    MouvementDette mouvement, {
+    bool estModification = false,
+  }) async {
     final doc = dettesRef.doc(detteId);
 
-    // Ajouter le mouvement à l'historique
-    await doc.update({
+    final updates = <String, dynamic>{
       'historique': FieldValue.arrayUnion([mouvement.toMap()]),
-      // Incrémenter automatiquement le compteur de paiements effectués pour les remboursements
-      if (mouvement.type == 'remboursement_recu' ||
-          mouvement.type == 'remboursement_effectue')
-        'paiementsEffectues': FieldValue.increment(1),
-    });
+    };
+
+    // N'incrémenter que si ce n'est PAS une modification
+    if ((mouvement.type == 'remboursement_recu' ||
+            mouvement.type == 'remboursement_effectue') &&
+        !estModification) {
+      updates['paiementsEffectues'] = FieldValue.increment(1);
+    }
+
+    // Ajouter le mouvement à l'historique
+    await doc.update(updates);
 
     // Recalculer et mettre à jour le solde automatiquement
     await _recalculerSolde(detteId);
@@ -218,12 +224,12 @@ class DetteService {
         .where('userId', isEqualTo: user.uid)
         .snapshots()
         .map((snap) {
-          final dettes = snap.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return Dette.fromMap(data);
-          }).toList();
-          return dettes;
-        });
+      final dettes = snap.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return Dette.fromMap(data);
+      }).toList();
+      return dettes;
+    });
   }
 
   Stream<List<Dette>> dettesArchivees() {
@@ -371,16 +377,15 @@ class DetteService {
     required String nomTiers,
     required double montantTotal,
     required String
-    typeRemboursement, // 'remboursement_recu' ou 'remboursement_effectue'
+        typeRemboursement, // 'remboursement_recu' ou 'remboursement_effectue'
     required String transactionId,
     String? note,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("Aucun utilisateur connecté");
 
-    final typeDetteRecherche = typeRemboursement == 'remboursement_recu'
-        ? 'pret'
-        : 'dette';
+    final typeDetteRecherche =
+        typeRemboursement == 'remboursement_recu' ? 'pret' : 'dette';
     final dettes = await dettesActives().first;
 
     // Filtrer et trier les dettes du tiers par date de création (plus ancien en premier)
@@ -400,9 +405,8 @@ class DetteService {
       if (montantRestant <= 0) break;
 
       final soldeAbsolu = dette.solde.abs();
-      final montantAPayer = montantRestant >= soldeAbsolu
-          ? soldeAbsolu
-          : montantRestant;
+      final montantAPayer =
+          montantRestant >= soldeAbsolu ? soldeAbsolu : montantRestant;
 
       // Créer le mouvement pour cette dette
       final mouvement = MouvementDette(
@@ -473,9 +477,8 @@ class DetteService {
     double nouveauSolde,
   ) async {
     final docRef = dettesRef.doc(detteId);
-    final compteRef = FirebaseFirestore.instance
-        .collection('comptes')
-        .doc(detteId);
+    final compteRef =
+        FirebaseFirestore.instance.collection('comptes').doc(detteId);
 
     // Récupérer les infos de la dette avant archivage
     String? nomTiersDette;
@@ -673,8 +676,8 @@ class DetteService {
       if (categorieDettes == null) {
         final nomCategorie =
             categories.any((cat) => cat.nom.toLowerCase().contains('dette'))
-            ? 'Dettes'
-            : 'Dettes';
+                ? 'Dettes'
+                : 'Dettes';
         categorieDettes = Categorie(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           nom: nomCategorie,
@@ -711,9 +714,8 @@ class DetteService {
       final categorieModifiee = Categorie(
         id: categorieDettes.id,
         nom: categorieDettes.nom,
-        enveloppes: nouvellesEnveloppes
-            .map((e) => Enveloppe.fromMap(e))
-            .toList(),
+        enveloppes:
+            nouvellesEnveloppes.map((e) => Enveloppe.fromMap(e)).toList(),
         userId: user.uid,
       );
 
@@ -794,9 +796,8 @@ class DetteService {
       if (categorieDettes == null) return;
 
       // 2. Trouver l'enveloppe correspondante
-      final enveloppes = categorieDettes.enveloppes
-          .map((e) => e.toMap())
-          .toList();
+      final enveloppes =
+          categorieDettes.enveloppes.map((e) => e.toMap()).toList();
       final indexEnveloppe = enveloppes.indexWhere(
         (env) => env['nom'] == dette.nomTiers,
       );
