@@ -467,7 +467,8 @@ class FirebaseService {
                 final double objectif =
                     (enveloppe['objectif'] as num?)?.toDouble() ?? 0.0;
 
-                if (frequence == 'bihebdo' && objectif > 0) {
+                if ((frequence == 'bihebdo' || frequence == 'annuel') &&
+                    objectif > 0) {
                   // Si l'objectif est atteint, on mémorise la date
                   if (nouvelleDepense >= objectif) {
                     enveloppe['date_dernier_ajout'] =
@@ -871,7 +872,8 @@ class FirebaseService {
                 final double objectif =
                     (enveloppe['objectif'] as num?)?.toDouble() ?? 0.0;
 
-                if (frequence == 'bihebdo' && objectif > 0) {
+                if ((frequence == 'bihebdo' || frequence == 'annuel') &&
+                    objectif > 0) {
                   // Si l'objectif est atteint, on mémorise la date
                   if (nouvelleDepense >= objectif) {
                     enveloppe['date_dernier_ajout'] =

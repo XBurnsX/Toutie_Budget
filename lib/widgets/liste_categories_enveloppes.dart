@@ -448,7 +448,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                       "mensuel",
                                       "datefixe",
                                       "date",
-                                      "bihebdo"
+                                      "bihebdo",
+                                      "annuel"
                                     ].any(
                                       (f) => (enveloppe['frequence_objectif']
                                                   ?.toString() ??
@@ -648,6 +649,64 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             );
+                                          } else if (freq.contains('annuel')) {
+                                            double montantObjectif =
+                                                (enveloppe['objectif'] as num?)
+                                                        ?.toDouble() ??
+                                                    0.0;
+
+                                            DateTime maintenant =
+                                                DateTime.now();
+
+                                            // Date cible stockée dans objectif_date (on ignore l'année)
+                                            DateTime? cible;
+                                            if (enveloppe['objectif_date'] !=
+                                                null) {
+                                              try {
+                                                DateTime temp = DateTime.parse(
+                                                    enveloppe['objectif_date']);
+                                                cible = DateTime(
+                                                    maintenant.year,
+                                                    temp.month,
+                                                    temp.day);
+                                              } catch (_) {}
+                                            }
+
+                                            cible ??= DateTime(
+                                                maintenant.year,
+                                                maintenant.month,
+                                                maintenant.day);
+
+                                            // Si date passée cette année, prendre l'année prochaine
+                                            if (cible.isBefore(maintenant)) {
+                                              cible = DateTime(
+                                                  maintenant.year + 1,
+                                                  cible.month,
+                                                  cible.day);
+                                            }
+
+                                            // Calcul du nombre de mois restants (inclusif)
+                                            int moisRestants =
+                                                (cible.year - maintenant.year) *
+                                                        12 +
+                                                    (cible.month -
+                                                        maintenant.month) +
+                                                    1;
+                                            if (moisRestants < 1)
+                                              moisRestants = 1;
+
+                                            double montantMensuelNecessaire =
+                                                montantObjectif / moisRestants;
+
+                                            return Text(
+                                              'Nécessaire par mois : ${montantMensuelNecessaire.toStringAsFixed(2)}\u00A0\$',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 13,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            );
                                           }
                                           return const SizedBox.shrink();
                                         },
@@ -655,8 +714,13 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              if (["mensuel", "datefixe", "date", "bihebdo"]
-                                  .any(
+                              if ([
+                                "mensuel",
+                                "datefixe",
+                                "date",
+                                "bihebdo",
+                                "annuel"
+                              ].any(
                                 (f) => (enveloppe['frequence_objectif']
                                             ?.toString() ??
                                         '')

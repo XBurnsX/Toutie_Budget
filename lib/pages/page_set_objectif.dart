@@ -57,6 +57,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
           _objectifType = '2sem';
           _bihebdoStartDate ??= DateTime.now();
           break;
+        case 'annuel':
+          _objectifType = 'annee';
+          break;
         default:
           _objectifType = 'date';
       }
@@ -134,7 +137,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
           ? 'mensuel'
           : _objectifType == '2sem'
               ? 'bihebdo'
-              : 'date',
+              : _objectifType == 'annee'
+                  ? 'annuel'
+                  : 'date',
       dateDernierAjout: _objectifType == '2sem'
           ? _bihebdoStartDate ?? widget.enveloppe.dateDernierAjout
           : widget.enveloppe.dateDernierAjout,
@@ -252,9 +257,29 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                     child: const Text('Date Fixe'),
                   ),
                 ),
+                // Bouton "Année"
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _objectifType = 'annee';
+                        _selectedDate ??= DateTime.now();
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _objectifType == 'annee'
+                          ? Theme.of(context).colorScheme.secondary
+                          : Colors.grey[800],
+                      foregroundColor: _objectifType == 'annee'
+                          ? Colors.black
+                          : Colors.white,
+                    ),
+                    child: const Text('Année'),
+                  ),
+                ),
               ],
             ),
-            if (_objectifType == 'date') ...[
+            if (_objectifType == 'date' || _objectifType == 'annee') ...[
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: () async {

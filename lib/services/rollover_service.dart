@@ -11,6 +11,7 @@ class RolloverService {
     // Toujours traiter les resets bihebdomadaires, même si le rollover mensuel
     // a déjà été effectué.
     await _processBiweeklyResets();
+    await _processYearlyResets();
 
     final settingsDocRef =
         FirebaseFirestore.instance.collection('user_settings').doc('main');
@@ -139,6 +140,80 @@ class RolloverService {
     }
 
     // S'il y a des modifications, on les applique.
+    await batch.commit();
+  }
+
+  /// Réinitialise les enveloppes « annuel » une fois par an à la date cible.
+  Future<void> _processYearlyResets() async {
+    final now = DateTime.now();
+
+    final categories = await _firebaseService.lireCategories().first;
+    final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    for (var categorie in categories) {
+      bool catUpdated = false;
+      final List<Map<String, dynamic>> updatedEnveloppes = [];
+
+      for (var enveloppe in categorie.enveloppes) {
+        if (enveloppe.frequenceObjectif.toLowerCase() != 'annuel') {
+          updatedEnveloppes.add(enveloppe.toMap());
+          continue;
+        }
+
+        final envMap = enveloppe.toMap();
+
+        // Date cible (jour+mois) stockée dans objectif_date
+        if (envMap['objectif_date'] == null) {
+          updatedEnveloppes.add(envMap);
+          continue;
+        }
+
+        DateTime? cible;
+        try {
+          cible = DateTime.parse(envMap['objectif_date']);
+        } catch (_) {}
+
+        if (cible == null) {
+          updatedEnveloppes.add(envMap);
+          continue;
+        }
+
+        // Date cible de cette année
+        DateTime cibleThisYear = DateTime(now.year, cible.month, cible.day);
+        if (now.isBefore(cibleThisYear)) {
+          // Pas encore atteint cette année
+          updatedEnveloppes.add(envMap);
+          continue;
+        }
+
+        // Vérifier si l'année a déjà été reset
+        DateTime? lastReset;
+        if (envMap['date_dernier_ajout'] != null) {
+          lastReset = DateTime.tryParse(envMap['date_dernier_ajout']);
+        }
+
+        if (lastReset != null && lastReset.year == now.year) {
+          // Déjà réinitialisé cette année
+          updatedEnveloppes.add(envMap);
+          continue;
+        }
+
+        // On reset les dépenses et enregistre la date
+        envMap['depense'] = 0.0;
+        envMap['date_dernier_ajout'] = now.toIso8601String();
+        catUpdated = true;
+
+        updatedEnveloppes.add(envMap);
+      }
+
+      if (catUpdated) {
+        final docRef = FirebaseFirestore.instance
+            .collection('categories')
+            .doc(categorie.id);
+        batch.update(docRef, {'enveloppes': updatedEnveloppes});
+      }
+    }
+
     await batch.commit();
   }
 }
