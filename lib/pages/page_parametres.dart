@@ -74,26 +74,6 @@ class _PageParametresState extends State<PageParametres> {
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.warning),
-                title: const Text('Alerte budget'),
-                subtitle: Text(
-                  'Alerte si le budget dépasse ${budgetNotif.toInt()}%',
-                ),
-                trailing: SizedBox(
-                  width: 120,
-                  child: Slider(
-                    value: budgetNotif,
-                    min: 50,
-                    max: 100,
-                    divisions: 10,
-                    label: '${budgetNotif.toInt()}%',
-                    onChanged: (val) => setState(() => budgetNotif = val),
-                  ),
-                ),
-              ),
-
-              const Divider(),
-              ListTile(
                 leading: Icon(Icons.palette, color: themeService.primaryColor),
                 title: const Text('Thème'),
                 subtitle: Text('Couleur principale de l\'application'),
@@ -176,25 +156,6 @@ class _PageParametresState extends State<PageParametres> {
                 },
               ),
               const Divider(),
-              ListTile(
-                leading: const Icon(Icons.science, color: Colors.orange),
-                title: const Text('🧪 Test Import CSV (Émulateur)'),
-                subtitle: const Text(
-                  'Tester l\'import avec le fichier exemple YNAB inclus',
-                ),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const PageImportCsv(
-                        fichierTest: 'exemple_csv.csv',
-                        mappingTest: true,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const Divider(),
-
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.red),
                 title: const Text('Réinitialiser votre compte'),
