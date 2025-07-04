@@ -23,6 +23,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
   late double _pretAPlacer;
   late Color _couleur;
   final _soldeController = TextEditingController();
+  final _pretAPlacerController = TextEditingController();
 
   final List<String> _types = [
     'Chèque',
@@ -40,28 +41,34 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
     _pretAPlacer = widget.compte.pretAPlacer;
     _couleur = Color(widget.compte.couleur);
     _soldeController.text = _solde.toStringAsFixed(2);
+    _pretAPlacerController.text = _pretAPlacer.toStringAsFixed(2);
   }
 
   void _calculerPretAPlacer() {
-    // Calcul automatique : nouveau prêt à placer = ancien prêt à placer + (nouveau solde - ancien solde)
-    _pretAPlacer = widget.compte.pretAPlacer + (_solde - widget.compte.solde);
+    // Le calcul automatique est maintenant désactivé.
+    // _pretAPlacer = widget.compte.pretAPlacer + (_solde - widget.compte.solde);
   }
 
-  void _ouvrirClavierNumerique() {
+  void _ouvrirClavierNumerique({required bool pourPretAPlacer}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => NumericKeyboard(
-        controller: _soldeController,
+        controller: pourPretAPlacer ? _pretAPlacerController : _soldeController,
         onClear: () {
           setState(() {
-            _soldeController.text = '';
-            _solde = 0.0;
+            if (pourPretAPlacer) {
+              _pretAPlacerController.text = '';
+              _pretAPlacer = 0.0;
+            } else {
+              _soldeController.text = '';
+              _solde = 0.0;
+            }
           });
         },
         onValueChanged: (value) {
           setState(() {
-            _solde =
+            final double parsedValue =
                 double.tryParse(
                   value
                       .replaceAll('\$', '')
@@ -69,6 +76,11 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                       .replaceAll(',', '.'),
                 ) ??
                 0.0;
+            if (pourPretAPlacer) {
+              _pretAPlacer = parsedValue;
+            } else {
+              _solde = parsedValue;
+            }
           });
         },
         showDecimal: true,
@@ -79,6 +91,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
   @override
   void dispose() {
     _soldeController.dispose();
+    _pretAPlacerController.dispose();
     super.dispose();
   }
 
@@ -101,7 +114,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                 );
                 return;
               }
-              _calculerPretAPlacer(); // Calcul automatique avant sauvegarde
+              // La valeur _pretAPlacer est maintenant directement issue du champ de texte
               await FirebaseService().updateCompte(widget.compte.id, {
                 'nom': _nom,
                 'type': _type,
@@ -154,7 +167,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
               ),
               const SizedBox(height: 16),
               GestureDetector(
-                onTap: () => _ouvrirClavierNumerique(),
+                onTap: () => _ouvrirClavierNumerique(pourPretAPlacer: false),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -193,7 +206,46 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Section "Prêt à placer" supprimée - plus affichée dans l'interface
+              GestureDetector(
+                onTap: () => _ouvrirClavierNumerique(pourPretAPlacer: true),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Prêt à placer',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _pretAPlacerController.text.isEmpty
+                                  ? '0.00'
+                                  : _pretAPlacerController.text,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Text('\$', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey),

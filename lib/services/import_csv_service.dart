@@ -197,16 +197,6 @@ class ImportCsvService {
           comptesParNom,
         );
 
-        // Vérifier si c'est une transaction Reconciled (à ignorer)
-        final estReconcilied =
-            transactionImport.marqueur != null &&
-            transactionImport.marqueur!.toLowerCase().contains('reconciled');
-
-        if (estReconcilied) {
-          // Ignorer les transactions Reconciled - elles sont déjà ajustées
-          continue;
-        }
-
         // Gestion de l'enveloppe (ignorer "Ready to Assign" qui est du revenus normal YNAB)
         String? enveloppeId;
         if (transactionImport.enveloppe != null &&
@@ -219,8 +209,6 @@ class ImportCsvService {
             compteId,
           );
         }
-
-        // Gestion des revenus sans debug verbeux
 
         // Corriger le problème d'affichage -0.00$
         final montantCorrige = montant.abs() == 0.0 ? 0.0 : montant.abs();
@@ -418,6 +406,38 @@ class ImportCsvService {
     return nouvelleCategorie;
   }
 
+  /// Génère une signature unique pour détecter les doublons (tiers|date|montant)
+  String _signatureTransaction(Transaction t) {
+    final tiers = (t.tiers ?? '').toLowerCase().trim();
+    final dateIso = t.date.toIso8601String(); // ISO complet pour unicité
+    final montant = t.montant.toStringAsFixed(2);
+    return '$tiers|$dateIso|$montant';
+  }
+
+  /// Charge toutes les transactions existantes de l'utilisateur et renvoie les signatures
+  Future<Set<String>> _chargerSignaturesExistantes() async {
+    final userId = _firebaseService.auth.currentUser?.uid;
+    if (userId == null) return {};
+
+    final snapshot = await _firebaseService.firestore
+        .collection('transactions')
+        .where('userId', isEqualTo: userId)
+        .get();
+
+    final signatures = <String>{};
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final tiers = (data['tiers'] ?? '').toString().toLowerCase().trim();
+      final dateStr = data['date'] as String?; // Stocké ISO
+      final montant = (data['montant'] as num?)?.toDouble() ?? 0.0;
+      if (dateStr != null) {
+        final signature = '$tiers|$dateStr|${montant.toStringAsFixed(2)}';
+        signatures.add(signature);
+      }
+    }
+    return signatures;
+  }
+
   /// Importe les transactions en traitant mois par mois avec remise à zéro intelligente
   Future<void> importerTransactions(
     List<Transaction> transactions,
@@ -426,6 +446,31 @@ class ImportCsvService {
     if (transactions.isEmpty) {
       return;
     }
+
+    // ----- Nouveauté : déduplication -----
+    final signaturesExistantes = await _chargerSignaturesExistantes();
+    final transactionsFiltrees = <Transaction>[];
+    final signaturesAjoutees =
+        <String>{}; // éviter doublons à l'intérieur du CSV
+
+    for (var t in transactions) {
+      final sig = _signatureTransaction(t);
+      if (signaturesExistantes.contains(sig) ||
+          signaturesAjoutees.contains(sig)) {
+        // Déjà présent, on ignore
+        continue;
+      }
+      transactionsFiltrees.add(t);
+      signaturesAjoutees.add(sig);
+    }
+
+    if (transactionsFiltrees.isEmpty) {
+      onProgress(1.0);
+      return; // Rien à importer après déduplication
+    }
+
+    // On remplace la variable d'entrée par la liste filtrée
+    transactions = transactionsFiltrees;
 
     // Étape 1 : Grouper les transactions par mois
     final transactionsParMois = <String, List<Transaction>>{};
@@ -453,8 +498,8 @@ class ImportCsvService {
 
       await _traiterMoisAvecCompensation(mois, transactionsDuMois);
 
-      // Compensation IMMÉDIATE après chaque mois (même le mois en cours)
-      await _compenserEnveloppesNegatives();
+      // La compensation des enveloppes négatives est maintenant effectuée
+      // à l'intérieur de _traiterMoisAvecCompensation après les dépenses.
 
       onProgress(0.1 + ((i + 1) / totalMois) * 0.8); // 10-90%
     }
@@ -462,8 +507,12 @@ class ImportCsvService {
     // Étape 5 : Remise à zéro finale des enveloppes (comme demandé)
     await _remettreAZeroEtTransfererVersPretAPlacer(
       'FIN_IMPORT',
-      (subProgress) => onProgress(0.9 + subProgress * 0.1), // 90-100%
+      (subProgress) => onProgress(0.9 + subProgress * 0.05), // 90-95%
     );
+
+    // Étape 6 : Recalibrage final du prêt à placer pour cohérence
+    await _recalibrerPretAPlacer();
+    onProgress(1.0); // 100%
   }
 
   /// Remet à zéro les enveloppes et transfère l'argent vers le prêt à placer
@@ -574,14 +623,17 @@ class ImportCsvService {
       await _firebaseService.ajouterTransaction(depense);
     }
 
-    // Étape 3 : Ajouter tous les REVENUS
+    // Étape 3 : Compense immédiatement les enveloppes négatives
+    // en utilisant le prêt à placer du compte correspondant
+    await _compenserEnveloppesNegatives();
+
+    // Étape 4 : Ajouter tous les REVENUS
     // Cela va augmenter le solde du compte et le prêt à placer
     for (var revenu in revenus) {
       await _firebaseService.ajouterTransaction(revenu);
     }
 
-    // Note : La compensation des enveloppes négatives se fait maintenant
-    // dans la boucle principale après chaque mois traité
+    // Note : plus besoin de compensation ici, elle a été faite avant les revenus
   }
 
   /// Crée les enveloppes manquantes pour les dépenses
@@ -802,5 +854,48 @@ class ImportCsvService {
       }
       return transaction; // Pas de changement
     }).toList();
+  }
+
+  /// Recalibre le prêt à placer de chaque compte pour qu'il corresponde au solde disponible non alloué
+  Future<void> _recalibrerPretAPlacer() async {
+    final comptes = await _obtenirComptes();
+    final categories = await _obtenirCategories();
+
+    // Calcul rapide : somme des soldes d'enveloppes par compte
+    final enveloppeSoldeParCompte = <String, double>{};
+    for (final cat in categories) {
+      for (final env in cat.enveloppes) {
+        final compteId = env.provenanceCompteId;
+        final soldeEnv = env.solde;
+        enveloppeSoldeParCompte.update(
+          compteId,
+          (v) => v + soldeEnv,
+          ifAbsent: () => soldeEnv,
+        );
+      }
+    }
+
+    for (final compte in comptes) {
+      final totalEnveloppes = enveloppeSoldeParCompte[compte.id] ?? 0.0;
+      final pretAPlacerVise = compte.solde - totalEnveloppes;
+      double nouveauPret = pretAPlacerVise;
+      if (nouveauPret < 0) nouveauPret = 0;
+      if ((nouveauPret - compte.pretAPlacer).abs() > 0.01) {
+        // Mettre à jour uniquement si différence significative
+        final compteCorrige = Compte(
+          id: compte.id,
+          userId: compte.userId,
+          nom: compte.nom,
+          type: compte.type,
+          solde: compte.solde,
+          couleur: compte.couleur,
+          pretAPlacer: nouveauPret,
+          dateCreation: compte.dateCreation,
+          estArchive: compte.estArchive,
+          dateSuppression: compte.dateSuppression,
+        );
+        await _firebaseService.ajouterCompte(compteCorrige);
+      }
+    }
   }
 }
