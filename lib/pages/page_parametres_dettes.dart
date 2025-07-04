@@ -55,6 +55,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   double _totalCompte = 0.0;
   double? _soldeFirestore;
 
+  late Dette _detteActuelle;
+
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _detteListener;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _txListener;
 
@@ -68,6 +70,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   @override
   void initState() {
     super.initState();
+    _detteActuelle = widget.dette;
     _chargerDonnees();
     _nombrePaiementsController.addListener(_onParametresChanges);
     _dateDebutController.addListener(_onParametresChanges);
@@ -82,17 +85,16 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         .doc(widget.dette.id)
         .snapshots()
         .listen((snapshot) {
-      if (!snapshot.exists) return;
+      if (!snapshot.exists || !mounted) return;
       final data = snapshot.data();
       if (data == null) return;
-      final paiements = (data['paiementsEffectues'] as num?)?.toInt() ?? 0;
-      _soldeFirestore = (data['solde'] as num?)?.toDouble();
 
-      if (_paiementsEffectuesController.text != paiements.toString()) {
-        setState(() {
-          _paiementsEffectuesController.text = paiements.toString();
-        });
-      }
+      setState(() {
+        _detteActuelle = Dette.fromMap(data);
+        _soldeFirestore = _detteActuelle.solde;
+        _paiementsEffectuesController.text =
+            (_detteActuelle.paiementsEffectues ?? 0).toString();
+      });
     });
 
     void updateAssocie(QuerySnapshot<Map<String, dynamic>> snapshot) {
@@ -924,17 +926,18 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       final coutTotalCalcule = calculs['coutTotal'];
       final interetsPayesCalcules = calculs['interetsPayes'];
 
+      final totalRemboursements = _calculerTotalRemboursementsHistorique();
       double? nouveauSolde;
       if (coutTotalCalcule != null) {
-        final soldeCalcule = coutTotalCalcule - _totalRemboursements;
-        nouveauSolde = soldeCalcule < 0 ? 0 : soldeCalcule;
+        nouveauSolde = coutTotalCalcule - totalRemboursements;
       } else {
-        nouveauSolde = _calculerValeursPret()['solde'];
+        nouveauSolde = _detteActuelle.montantInitial - totalRemboursements;
       }
+      nouveauSolde = (nouveauSolde < 0) ? 0 : nouveauSolde;
 
-      final ancienSolde = widget.dette.solde;
+      final ancienSolde = _detteActuelle.solde;
 
-      final detteModifiee = widget.dette.copyWith(
+      final detteModifiee = _detteActuelle.copyWith(
         tauxInteret: _toDouble(_tauxController.text) ?? 0,
         dateDebut: _parseDate(_dateDebutController.text),
         dateFin: _parseDate(_dateFinController.text),
@@ -981,33 +984,63 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
           _toDouble(_montantPaiementPasseController.text);
 
       if (nombrePaiements != null && montantParPaiement != null) {
-        final totalPaiements = nombrePaiements * montantParPaiement;
+        // 1. Calculer le nouveau solde de manière simple et directe
+        final calculsActuels = _calculerValeursPret();
+        final coutTotal = calculsActuels['coutTotal'];
+        if (coutTotal == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Erreur: Coût total non calculé.'),
+            backgroundColor: Colors.red,
+          ));
+          return;
+        }
+        final totalPaiementsPasses = nombrePaiements * montantParPaiement;
+        final nouveauSolde = coutTotal - totalPaiementsPasses;
 
-        final mouvement = MouvementDette(
-          id: FirebaseFirestore.instance.collection('dettes').doc().id,
-          montant: -totalPaiements,
-          type: widget.dette.type == 'dette'
-              ? 'remboursement_effectue'
-              : 'remboursement_recu',
-          date: _datePaiementPasse,
-          note:
-              '$nombrePaiements paiement(s) passé(s) de ${montantParPaiement.toStringAsFixed(2)}\$ chacun(e)',
-        );
+        // 2. Préparer la liste des transactions pour l'historique
+        final List<MouvementDette> nouveauxMouvements = [];
+        final dateDebut =
+            _parseDate(_dateDebutController.text) ?? DateTime.now();
+
+        for (int i = 0; i < nombrePaiements; i++) {
+          final dateMouvement =
+              DateTime(dateDebut.year, dateDebut.month + i, dateDebut.day);
+          nouveauxMouvements.add(MouvementDette(
+            id: 'passe_${DateTime.now().millisecondsSinceEpoch}_$i',
+            montant: -montantParPaiement, // Montant individuel
+            type: widget.dette.type == 'dette'
+                ? 'remboursement_effectue'
+                : 'remboursement_recu',
+            date: dateMouvement,
+            note: 'Paiement passé #${i + 1} enregistré',
+          ));
+        }
+
+        // 3. Calculer le nouveau total de paiements effectués
+        final paiementsActuels = widget.dette.paiementsEffectues ?? 0;
+        final nouveauCompteurPaiements = paiementsActuels + nombrePaiements;
 
         try {
-          await DetteService().ajouterMouvement(widget.dette.id, mouvement);
+          // 4. Appeler la nouvelle méthode du service
+          await DetteService().enregistrerPaiementsPasses(
+            widget.dette.id,
+            nouveauSolde < 0 ? 0 : nouveauSolde,
+            nouveauCompteurPaiements,
+            nouveauxMouvements,
+          );
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Paiements passés enregistrés avec succès'),
               backgroundColor: Colors.green,
             ),
           );
+
           setState(() {
             _nombrePaiementsPassesController.text = '1';
             _montantPaiementPasseController.clear();
             _afficherSectionPaiementsPasses = false;
           });
-          _chargerDonnees();
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1163,14 +1196,15 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
       solde = _soldeFirestore;
 
-      if (widget.dette.interetsPayes != null) {
-        interetsPayes = widget.dette.interetsPayes;
+      if (_detteActuelle.interetsPayes != null) {
+        interetsPayes = _detteActuelle.interetsPayes;
       } else {
-        if (_totalRemboursements > 0) {
+        final totalRemboursements = _calculerTotalRemboursementsHistorique();
+        if (totalRemboursements > 0) {
           final tauxMensuel = tauxInteret / 100 / 12;
           double soldeSimule = prixAchat;
           double interetsSimules = 0.0;
-          double remboursementsRestants = _totalRemboursements;
+          double remboursementsRestants = totalRemboursements;
 
           while (remboursementsRestants > 0 && soldeSimule > 0) {
             final interetMensuel = soldeSimule * tauxMensuel;
@@ -1202,6 +1236,17 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       'interetsPayes': interetsPayes,
       'paiementMensuelSaisi': paiementMensuelSaisi,
     };
+  }
+
+  double _calculerTotalRemboursementsHistorique() {
+    double total = 0.0;
+    for (final mouvement in _detteActuelle.historique) {
+      if (mouvement.type == 'remboursement_recu' ||
+          mouvement.type == 'remboursement_effectue') {
+        total += mouvement.montant.abs();
+      }
+    }
+    return total;
   }
 
   DateTime? _parseDate(String dateStr) {

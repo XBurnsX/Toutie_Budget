@@ -90,68 +90,32 @@ class DetteService {
       final prixAchat = detteData['prixAchat'] != null
           ? (detteData['prixAchat'] as num).toDouble()
           : null;
+      final coutTotal = detteData['coutTotal'] != null
+          ? (detteData['coutTotal'] as num).toDouble()
+          : null;
 
-      // Calcul du nouveau solde : Montant initial + la somme de TOUS les mouvements
-      double nouveauSolde = montantInitial;
+      // Logique de calcul du solde simplifiée et corrigée
+      final baseCalcul = coutTotal ?? montantInitial;
+
+      double totalRemboursements = 0.0;
       for (final mouvement in historique) {
-        nouveauSolde += mouvement.montant;
+        if (mouvement.type == 'remboursement_recu' ||
+            mouvement.type == 'remboursement_effectue') {
+          totalRemboursements += mouvement.montant.abs();
+        }
       }
+
+      double nouveauSolde = baseCalcul - totalRemboursements;
 
       // S'assurer que le solde ne devient pas négatif
       if (nouveauSolde < 0) nouveauSolde = 0;
 
-      // Calculer et mettre à jour les intérêts payés si c'est un prêt avec intérêts
-      double? interetsPayesCalcules;
-      if (tauxInteret != null && prixAchat != null && tauxInteret > 0) {
-        final montantMensuel = detteData['montantMensuel'] != null
-            ? (detteData['montantMensuel'] as num).toDouble()
-            : null;
-
-        if (montantMensuel != null) {
-          // Calculer les intérêts payés via simulation
-          double totalRemboursements = 0.0;
-          for (MouvementDette mouvement in historique) {
-            if (mouvement.type == 'remboursement_recu' ||
-                mouvement.type == 'remboursement_effectue') {
-              totalRemboursements += mouvement.montant.abs();
-            }
-          }
-
-          if (totalRemboursements > 0) {
-            final tauxMensuel = tauxInteret / 100 / 12;
-            double soldeSimule = prixAchat;
-            double interetsSimules = 0.0;
-            double remboursementsRestants = totalRemboursements;
-
-            while (remboursementsRestants > 0 && soldeSimule > 0) {
-              final interetMensuel = soldeSimule * tauxMensuel;
-              final paiementEffectif = remboursementsRestants >= montantMensuel
-                  ? montantMensuel
-                  : remboursementsRestants;
-
-              if (paiementEffectif <= interetMensuel) {
-                interetsSimules += paiementEffectif;
-              } else {
-                interetsSimules += interetMensuel;
-                soldeSimule -= (paiementEffectif - interetMensuel);
-              }
-
-              remboursementsRestants -= paiementEffectif;
-            }
-
-            interetsPayesCalcules = interetsSimules;
-          }
-        }
-      }
-
-      // Mettre à jour le solde, les paiements effectués et les intérêts payés dans Firestore
+      // Mettre à jour le solde et le compteur de paiements
       Map<String, dynamic> updates = {
         'solde': nouveauSolde,
         'paiementsEffectues': paiementsCompteur,
       };
-      if (interetsPayesCalcules != null) {
-        updates['interetsPayes'] = interetsPayesCalcules;
-      }
+
       await doc.update(updates);
 
       // Si le solde est maintenant à 0 (ou très proche de 0), archiver automatiquement la dette
@@ -830,5 +794,19 @@ class DetteService {
 
     // Recalculer le solde une seule fois après l'ajout de tous les mouvements
     await _recalculerSolde(detteId);
+  }
+
+  Future<void> enregistrerPaiementsPasses(
+      String detteId,
+      double nouveauSolde,
+      int nouveauCompteurPaiements,
+      List<MouvementDette> nouveauxMouvements) async {
+    final doc = dettesRef.doc(detteId);
+    await doc.update({
+      'solde': nouveauSolde,
+      'paiementsEffectues': nouveauCompteurPaiements,
+      'historique': FieldValue.arrayUnion(
+          nouveauxMouvements.map((m) => m.toMap()).toList()),
+    });
   }
 }
