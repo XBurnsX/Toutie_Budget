@@ -761,11 +761,28 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                 Builder(
                   builder: (context) {
                     return GestureDetector(
-                      onTap: () => _ajouterEnveloppe(categorie),
-                      child: Icon(
-                        Icons.add_circle_outline,
-                        color: Colors.white70,
-                        size: 22,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PageSetObjectif(
+                              categorie: categorie,
+                              enveloppe: enveloppe,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        (enveloppe.objectif > 0)
+                            ? '${enveloppe.objectif.toStringAsFixed(2)} \$'
+                            : 'Objectif',
+                        style: TextStyle(
+                          color: (enveloppe.objectif > 0)
+                              ? Colors.greenAccent
+                              : Theme.of(context).colorScheme.primary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     );
                   },
