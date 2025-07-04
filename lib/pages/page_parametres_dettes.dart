@@ -48,6 +48,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   double? _coutTotalCalcule;
   String? _erreurSimulateur;
   Map<String, double?> calculs = {};
+  bool _isUpdatingFromDate = false;
 
   // Total des paiements réellement enregistrés dans les transactions
   double _totalRemboursements = 0.0;
@@ -158,12 +159,18 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       _calculerDateFinParDefaut();
     }
 
-    if (widget.dette.montantMensuel != null) {
+    if (_detteActuelle.montantMensuel != null) {
       _montantMensuelController.text =
-          widget.dette.montantMensuel!.toStringAsFixed(2);
+          _detteActuelle.montantMensuel!.toStringAsFixed(2);
     }
 
-    _prixAchatController.text = widget.dette.solde.toStringAsFixed(2);
+    if (_detteActuelle.prixAchat != null && _detteActuelle.prixAchat! > 0) {
+      _prixAchatController.text = _detteActuelle.prixAchat!.toStringAsFixed(2);
+    } else {
+      // Si aucun prix d'achat n'est défini, on utilise le montant initial comme base
+      _prixAchatController.text =
+          _detteActuelle.montantInitial.toStringAsFixed(2);
+    }
 
     if (widget.dette.nombrePaiements != null) {
       _nombrePaiementsController.text =
@@ -193,6 +200,15 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   void _onParametresChanges() {
+    if (_isUpdatingFromDate) {
+      // Si la mise à jour vient du sélecteur de date, on recalcule seulement les valeurs
+      // sans toucher à la date de fin elle-même pour éviter une boucle.
+      setState(() {
+        _calculerEtMettrAJour();
+      });
+      return;
+    }
+
     _calculerDateFinParDefaut();
 
     final dateDebut = _parseDate(_dateDebutController.text);
@@ -240,32 +256,37 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   void _recalculerPaiementMensuel() {
-    final prixAchat = _toDouble(_prixAchatController.text);
-    final tauxInteret = _toDouble(_tauxController.text);
-    final dateDebut = _parseDate(_dateDebutController.text);
-    final dateFin = _parseDate(_dateFinController.text);
+    // Logique ultra-simplifiée, comme demandé.
+    // Solde restant / nombre de mois restants.
 
-    if (prixAchat != null &&
-        tauxInteret != null &&
-        dateDebut != null &&
-        dateFin != null) {
-      final nouvelleDureeMois = (dateFin.year - dateDebut.year) * 12 +
-          dateFin.month -
-          dateDebut.month +
-          1;
-
-      if (nouvelleDureeMois > 0) {
-        final nouveauPaiementMensuel =
-            CalculPretService.calculerPaiementMensuel(
-          principal: prixAchat,
-          tauxAnnuel: tauxInteret,
-          dureeMois: nouvelleDureeMois,
-        );
-        _montantMensuelController.text = nouveauPaiementMensuel.toStringAsFixed(
-          2,
-        );
-      }
+    final soldeRestant = _soldeFirestore;
+    if (soldeRestant == null || soldeRestant <= 0) {
+      _montantMensuelController.text = '0.00';
+      return;
     }
+
+    final dateFin = _parseDate(_dateFinController.text);
+    if (dateFin == null) return;
+
+    final dateDebutCalcul = DateTime.now();
+    if (!dateFin.isAfter(dateDebutCalcul)) {
+      _montantMensuelController.text = soldeRestant.toStringAsFixed(2);
+      return;
+    }
+
+    // Calculer le nombre de mois restants, en incluant le mois actuel.
+    int nombreMoisRestants = (dateFin.year - dateDebutCalcul.year) * 12 +
+        dateFin.month -
+        dateDebutCalcul.month +
+        1;
+
+    if (nombreMoisRestants <= 0) {
+      nombreMoisRestants = 1;
+    }
+
+    final nouveauPaiementMensuel = soldeRestant / nombreMoisRestants;
+
+    _montantMensuelController.text = nouveauPaiementMensuel.toStringAsFixed(2);
   }
 
   Future<void> _selectionnerDateFin() async {
@@ -285,14 +306,23 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       context: context,
       initialDate: _parseDate(_dateFinController.text) ?? dateFinMaximale,
       firstDate: dateDebut.add(const Duration(days: 1)),
-      lastDate: dateFinMaximale,
+      lastDate: DateTime(2100),
     );
 
     if (nouvelleDateFin != null) {
+      _isUpdatingFromDate = true;
       setState(() {
         _dateFinController.text = _formaterDate(nouvelleDateFin);
+        // Mettre à jour la durée en fonction de la nouvelle date de fin
+        final nouvelleDureeMois = (nouvelleDateFin.year - dateDebut.year) * 12 +
+            nouvelleDateFin.month -
+            dateDebut.month +
+            1;
+        _nombrePaiementsController.text = nouvelleDureeMois.toString();
+
         _recalculerPaiementMensuel();
       });
+      _isUpdatingFromDate = false;
     }
   }
 
