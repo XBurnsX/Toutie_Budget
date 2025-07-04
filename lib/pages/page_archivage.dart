@@ -136,10 +136,22 @@ class _PageArchivageState extends State<PageArchivage>
     return StreamBuilder<List<Categorie>>(
       stream: FirebaseService().lireCategories(),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Text(
+              'Aucune enveloppe à afficher',
+              style: TextStyle(color: Colors.white54),
+            ),
+          );
+        }
+
         final enveloppesArchivees = <Map<String, dynamic>>[];
-        for (final cat in snapshot.data ?? []) {
+        for (final cat in snapshot.data!) {
           for (final env in cat.enveloppes) {
-            if (env['archive'] == true) {
+            if (env.archivee == true) {
               enveloppesArchivees.add({
                 'categorie': cat.nom,
                 'enveloppe': env,
@@ -148,6 +160,7 @@ class _PageArchivageState extends State<PageArchivage>
             }
           }
         }
+
         if (enveloppesArchivees.isEmpty) {
           return const Center(
             child: Text(
@@ -156,30 +169,29 @@ class _PageArchivageState extends State<PageArchivage>
             ),
           );
         }
+
         return ListView(
-          children: enveloppesArchivees
-              .map(
-                (item) => Card(
-                  color: const Color(0xFF232526),
-                  child: ListTile(
-                    leading: const Icon(Icons.archive, color: Colors.grey),
-                    title: Text(item['enveloppe']['nom'] ?? ''),
-                    subtitle: Text('Catégorie : ${item['categorie']}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.restore, color: Colors.green),
-                      tooltip: 'Restaurer',
-                      onPressed: () async {
-                        // Restaurer l'enveloppe (archive: false)
-                        await FirebaseService().restaurerEnveloppe(
-                          item['categorieId'],
-                          item['enveloppe']['id'],
-                        );
-                      },
-                    ),
-                  ),
+          children: enveloppesArchivees.map((item) {
+            final Enveloppe enveloppe = item['enveloppe'];
+            return Card(
+              color: const Color(0xFF232526),
+              child: ListTile(
+                leading: const Icon(Icons.archive, color: Colors.grey),
+                title: Text(enveloppe.nom),
+                subtitle: Text('Catégorie : ${item['categorie']}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.restore, color: Colors.green),
+                  tooltip: 'Restaurer',
+                  onPressed: () async {
+                    await FirebaseService().restaurerEnveloppe(
+                      item['categorieId'],
+                      enveloppe.id,
+                    );
+                  },
                 ),
-              )
-              .toList(),
+              ),
+            );
+          }).toList(),
         );
       },
     );

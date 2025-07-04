@@ -491,31 +491,106 @@ class FirebaseService {
   }
 
   Future<void> supprimerCategorie(String categorieId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
     await categoriesRef.doc(categorieId).delete();
   }
 
-  Future<void> updateCompte(String compteId, Map<String, dynamic> data) async {
+  Future<void> archiverEnveloppe(String categorieId, String enveloppeId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
-    await comptesRef.doc(compteId).update(data);
+
+    final categorieDoc = await categoriesRef.doc(categorieId).get();
+    if (!categorieDoc.exists) {
+      throw Exception("Catégorie non trouvée");
+    }
+
+    final categorie = Categorie.fromMap(
+      categorieDoc.data() as Map<String, dynamic>,
+    );
+    final enveloppesMisesAJour = categorie.enveloppes.map((env) {
+      if (env.id == enveloppeId) {
+        return Enveloppe(
+          id: env.id,
+          nom: env.nom,
+          solde: env.solde,
+          objectif: env.objectif,
+          objectifDate: env.objectifDate,
+          depense: env.depense,
+          archivee: true, // On archive l'enveloppe
+          provenanceCompteId: env.provenanceCompteId,
+          frequenceObjectif: env.frequenceObjectif,
+          dateDernierAjout: env.dateDernierAjout,
+          objectifJour: env.objectifJour,
+          historique: env.historique,
+          ordre: env.ordre,
+        );
+      }
+      return env;
+    }).toList();
+
+    final categorieMiseAJour = Categorie(
+      id: categorie.id,
+      userId: categorie.userId,
+      nom: categorie.nom,
+      enveloppes: enveloppesMisesAJour,
+      ordre: categorie.ordre,
+    );
+
+    await ajouterCategorie(categorieMiseAJour);
   }
 
   Future<void> restaurerEnveloppe(
     String categorieId,
     String enveloppeId,
   ) async {
-    final doc = await categoriesRef.doc(categorieId).get();
-    if (!doc.exists) return;
-    final data = doc.data() as Map<String, dynamic>;
-    final enveloppes = List<Map<String, dynamic>>.from(
-      data['enveloppes'] ?? [],
-    );
-    for (var env in enveloppes) {
-      if (env['id'] == enveloppeId) {
-        env['archive'] = false;
-      }
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
+
+    final categorieDoc = await categoriesRef.doc(categorieId).get();
+    if (!categorieDoc.exists) {
+      throw Exception("Catégorie non trouvée");
     }
-    await categoriesRef.doc(categorieId).update({'enveloppes': enveloppes});
+
+    final categorie = Categorie.fromMap(
+      categorieDoc.data() as Map<String, dynamic>,
+    );
+    final enveloppesMisesAJour = categorie.enveloppes.map((env) {
+      if (env.id == enveloppeId) {
+        return Enveloppe(
+          id: env.id,
+          nom: env.nom,
+          solde: env.solde,
+          objectif: env.objectif,
+          objectifDate: env.objectifDate,
+          depense: env.depense,
+          archivee: false, // On restaure l'enveloppe
+          provenanceCompteId: env.provenanceCompteId,
+          frequenceObjectif: env.frequenceObjectif,
+          dateDernierAjout: env.dateDernierAjout,
+          objectifJour: env.objectifJour,
+          historique: env.historique,
+          ordre: env.ordre,
+        );
+      }
+      return env;
+    }).toList();
+
+    final categorieMiseAJour = Categorie(
+      id: categorie.id,
+      userId: categorie.userId,
+      nom: categorie.nom,
+      enveloppes: enveloppesMisesAJour,
+      ordre: categorie.ordre,
+    );
+
+    await ajouterCategorie(categorieMiseAJour);
+  }
+
+  Future<void> updateCompte(String compteId, Map<String, dynamic> data) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
+    await comptesRef.doc(compteId).update(data);
   }
 
   // Méthode pour annuler l'effet d'une transaction (rollback)

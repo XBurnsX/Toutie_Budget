@@ -341,6 +341,11 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     );
     if (confirm == true) {
       await FirebaseService().supprimerCategorie(categorie.id);
+
+      // Mettre à jour l'état local pour refléter la suppression immédiatement
+      setState(() {
+        _categories.removeWhere((c) => c.id == categorie.id);
+      });
     }
   }
 
@@ -401,9 +406,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer l\'enveloppe'),
+        title: const Text('Archiver l\'enveloppe'),
         content: Text(
-          'Voulez-vous vraiment supprimer l\'enveloppe "${enveloppe.nom}" ?',
+          'Voulez-vous vraiment archiver l\'enveloppe "${enveloppe.nom}" ?',
         ),
         actions: [
           TextButton(
@@ -412,35 +417,14 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer'),
+            child: const Text('Archiver'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
           ),
         ],
       ),
     );
     if (confirm == true) {
-      final newEnveloppes = categorie.enveloppes
-          .where((e) => e.id != enveloppe.id)
-          .toList();
-      final updatedCat = Categorie(
-        id: categorie.id,
-        nom: categorie.nom,
-        enveloppes: newEnveloppes,
-        ordre: categorie.ordre,
-        userId: categorie.userId,
-      );
-
-      // Sauvegarder dans Firebase
-      await FirebaseService().ajouterCategorie(updatedCat);
-
-      // Mettre à jour l'état local immédiatement
-      final categorieIndex = _categories.indexWhere(
-        (c) => c.id == categorie.id,
-      );
-      if (categorieIndex != -1) {
-        setState(() {
-          _categories[categorieIndex] = updatedCat;
-        });
-      }
+      await FirebaseService().archiverEnveloppe(categorie.id, enveloppe.id);
     }
   }
 
