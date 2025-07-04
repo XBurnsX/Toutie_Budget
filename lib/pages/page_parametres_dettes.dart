@@ -312,13 +312,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       _isUpdatingFromDate = true;
       setState(() {
         _dateFinController.text = _formaterDate(nouvelleDateFin);
-        // Mettre à jour la durée en fonction de la nouvelle date de fin
-        final nouvelleDureeMois = (nouvelleDateFin.year - dateDebut.year) * 12 +
-            nouvelleDateFin.month -
-            dateDebut.month +
-            1;
-        _nombrePaiementsController.text = nouvelleDureeMois.toString();
-
+        // La durée du prêt est fixe. On ne modifie que la date de fin et on recalcule le paiement.
         _recalculerPaiementMensuel();
       });
       _isUpdatingFromDate = false;
@@ -893,20 +887,13 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
       await DetteService().sauvegarderDetteManuelleComplet(detteModifiee);
 
-      if (nouveauSolde != null && ancienSolde != nouveauSolde) {
-        final montantAjustement = ancienSolde - nouveauSolde;
-        await FirebaseService().creerTransactionAjustementSoldeDette(
-          detteId: widget.dette.id,
-          nomCompte: widget.dette.nomTiers,
-          montantAjustement: montantAjustement,
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Paramètres sauvegardés avec succès!')),
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paramètres sauvegardés avec succès')),
-        );
-        Navigator.pop(context, true);
+        Navigator.of(context)
+            .pop(true); // Indique qu'une modification a eu lieu
       }
     } catch (e) {
       if (mounted) {

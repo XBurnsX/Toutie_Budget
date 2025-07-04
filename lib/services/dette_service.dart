@@ -739,7 +739,9 @@ class DetteService {
           )
           .firstOrNull;
 
-      if (categorieDettes == null) return;
+      if (categorieDettes == null) {
+        throw Exception("Catégorie 'Dettes' non trouvée.");
+      }
 
       // 2. Trouver l'enveloppe correspondante
       final enveloppes =
@@ -748,8 +750,11 @@ class DetteService {
         (env) => env['nom'] == dette.nomTiers,
       );
 
-      if (indexEnveloppe == -1) return; // Enveloppe non trouvée
-
+      if (indexEnveloppe == -1) {
+        throw Exception(
+          "Enveloppe '${dette.nomTiers}' non trouvée dans la catégorie 'Dettes'.",
+        );
+      }
       // 3. Mettre à jour l'objectif selon les nouvelles règles
       if (dette.estManuelle &&
           dette.coutTotal != null &&
@@ -775,7 +780,8 @@ class DetteService {
 
       await firebaseService.ajouterCategorie(categorieModifiee);
     } catch (e) {
-      // Ne pas faire échouer la sauvegarde si la mise à jour d'objectif échoue
+      // Propage l'erreur pour qu'elle soit visible dans l'UI
+      rethrow;
     }
   }
 
@@ -808,5 +814,31 @@ class DetteService {
       'historique': FieldValue.arrayUnion(
           nouveauxMouvements.map((m) => m.toMap()).toList()),
     });
+  }
+
+  Future<void> definirObjectifEnveloppeDette(
+      String nomTiers, double montantObjectif, int jourDuMois) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final enveloppesRef = FirebaseFirestore.instance.collection('enveloppes');
+
+    // Le nom de l'enveloppe est directement le nom du tiers pour les dettes
+    final nomEnveloppe = nomTiers;
+
+    final query = await enveloppesRef
+        .where('userId', isEqualTo: user.uid)
+        .where('nom', isEqualTo: nomEnveloppe)
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      final docId = query.docs.first.id;
+      await enveloppesRef.doc(docId).update({
+        'objectif': montantObjectif,
+        'typeObjectif': 'mensuel',
+        'jourObjectif': jourDuMois,
+        'dateObjectif': null, // On s'assure que l'ancien type est nettoyé
+      });
+    }
   }
 }
