@@ -417,8 +417,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Archiver'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Archiver'),
           ),
         ],
       ),
