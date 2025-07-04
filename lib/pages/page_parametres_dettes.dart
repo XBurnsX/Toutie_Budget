@@ -77,18 +77,18 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         .doc(widget.dette.id)
         .snapshots()
         .listen((snapshot) {
-          if (!snapshot.exists) return;
-          final data = snapshot.data();
-          if (data == null) return;
-          final paiements = (data['paiementsEffectues'] as num?)?.toInt() ?? 0;
-          _soldeFirestore = (data['solde'] as num?)?.toDouble();
+      if (!snapshot.exists) return;
+      final data = snapshot.data();
+      if (data == null) return;
+      final paiements = (data['paiementsEffectues'] as num?)?.toInt() ?? 0;
+      _soldeFirestore = (data['solde'] as num?)?.toDouble();
 
-          if (_paiementsEffectuesController.text != paiements.toString()) {
-            setState(() {
-              _paiementsEffectuesController.text = paiements.toString();
-            });
-          }
+      if (_paiementsEffectuesController.text != paiements.toString()) {
+        setState(() {
+          _paiementsEffectuesController.text = paiements.toString();
         });
+      }
+    });
 
     void updateAssocie(QuerySnapshot<Map<String, dynamic>> snapshot) {
       double total = 0.0;
@@ -119,22 +119,22 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         .where('compteId', isEqualTo: widget.dette.id)
         .snapshots()
         .listen((snapshot) {
-          double total = 0.0;
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final montant = (data['montant'] as num?)?.toDouble() ?? 0.0;
-            final typeMvt = data['typeMouvement'] as String?;
-            if (typeMvt == 'remboursementEffectue' ||
-                typeMvt == 'remboursementRecu') {
-              total += montant;
-            }
-          }
-          _totalCompte = total;
-          setState(() {
-            _totalRemboursements = _totalAssocie + _totalCompte;
-            _calculerEtMettrAJour();
-          });
-        });
+      double total = 0.0;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final montant = (data['montant'] as num?)?.toDouble() ?? 0.0;
+        final typeMvt = data['typeMouvement'] as String?;
+        if (typeMvt == 'remboursementEffectue' ||
+            typeMvt == 'remboursementRecu') {
+          total += montant;
+        }
+      }
+      _totalCompte = total;
+      setState(() {
+        _totalRemboursements = _totalAssocie + _totalCompte;
+        _calculerEtMettrAJour();
+      });
+    });
   }
 
   void _chargerDonnees() {
@@ -153,8 +153,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     if (widget.dette.montantMensuel != null) {
-      _montantMensuelController.text = widget.dette.montantMensuel!
-          .toStringAsFixed(2);
+      _montantMensuelController.text =
+          widget.dette.montantMensuel!.toStringAsFixed(2);
     }
 
     if (widget.dette.prixAchat != null) {
@@ -162,13 +162,13 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     if (widget.dette.nombrePaiements != null) {
-      _nombrePaiementsController.text = widget.dette.nombrePaiements!
-          .toString();
+      _nombrePaiementsController.text =
+          widget.dette.nombrePaiements!.toString();
     }
 
     if (widget.dette.paiementsEffectues != null) {
-      _paiementsEffectuesController.text = widget.dette.paiementsEffectues!
-          .toString();
+      _paiementsEffectuesController.text =
+          widget.dette.paiementsEffectues!.toString();
     } else {
       _calculerPaiementsEffectues();
     }
@@ -182,8 +182,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     final dateDebut = _parseDate(_dateDebutController.text);
     if (dateDebut != null) {
       final maintenant = DateTime.now();
-      final mois =
-          (maintenant.year - dateDebut.year) * 12 +
+      final mois = (maintenant.year - dateDebut.year) * 12 +
           (maintenant.month - dateDebut.month);
       final paiementsEffectues = mois > 0 ? mois : 1;
       _paiementsEffectuesController.text = paiementsEffectues.toString();
@@ -251,8 +250,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         tauxInteret != null &&
         dateDebut != null &&
         dateFin != null) {
-      final nouvelleDureeMois =
-          (dateFin.year - dateDebut.year) * 12 +
+      final nouvelleDureeMois = (dateFin.year - dateDebut.year) * 12 +
           dateFin.month -
           dateDebut.month +
           1;
@@ -260,10 +258,10 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       if (nouvelleDureeMois > 0) {
         final nouveauPaiementMensuel =
             CalculPretService.calculerPaiementMensuel(
-              principal: prixAchat,
-              tauxAnnuel: tauxInteret,
-              dureeMois: nouvelleDureeMois,
-            );
+          principal: prixAchat,
+          tauxAnnuel: tauxInteret,
+          dureeMois: nouvelleDureeMois,
+        );
         _montantMensuelController.text = nouveauPaiementMensuel.toStringAsFixed(
           2,
         );
@@ -718,8 +716,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                       onPressed: () async {
                         final date = await showDatePicker(
                           context: context,
-                          initialDate:
-                              _parseDate(_dateDebutController.text) ??
+                          initialDate: _parseDate(_dateDebutController.text) ??
                               DateTime.now(),
                           firstDate: DateTime.now().subtract(
                             const Duration(days: 3650),
@@ -815,22 +812,21 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     prixAchat > 0 &&
                     tauxInteret >= 0 &&
                     dateFin.isAfter(dateDebut)) {
-                  final dureeMois =
-                      (dateFin.year - dateDebut.year) * 12 +
+                  final dureeMois = (dateFin.year - dateDebut.year) * 12 +
                       dateFin.month -
                       dateDebut.month +
                       1;
 
                   final montantMensuel =
                       CalculPretService.calculerPaiementMensuel(
-                        principal: prixAchat,
-                        tauxAnnuel: tauxInteret,
-                        dureeMois: dureeMois,
-                      );
+                    principal: prixAchat,
+                    tauxAnnuel: tauxInteret,
+                    dureeMois: dureeMois,
+                  );
 
                   setState(() {
-                    _montantMensuelController.text = montantMensuel
-                        .toStringAsFixed(2);
+                    _montantMensuelController.text =
+                        montantMensuel.toStringAsFixed(2);
                   });
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1005,8 +1001,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     final dateFin = _parseDate(_dateFinController.text);
     int? dureeMois;
     if (dateDebut != null && dateFin != null && dateFin.isAfter(dateDebut)) {
-      dureeMois =
-          (dateFin.year - dateDebut.year) * 12 +
+      dureeMois = (dateFin.year - dateDebut.year) * 12 +
           dateFin.month -
           dateDebut.month +
           1;
@@ -1145,6 +1140,9 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     bool showDecimal = true,
     bool isMoney = true,
   }) {
+    final valeurOriginale = controller.text;
+    controller.text = isMoney ? '0.00' : '0';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1157,9 +1155,22 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             controller: controller,
             showDecimal: showDecimal,
             isMoney: isMoney,
+            onClear: () {
+              setState(() {
+                controller.clear();
+              });
+            },
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      final valeurActuelle = controller.text;
+      if ((isMoney && (valeurActuelle == '0.00' || valeurActuelle.isEmpty)) ||
+          (!isMoney && (valeurActuelle == '0' || valeurActuelle.isEmpty))) {
+        setState(() {
+          controller.text = valeurOriginale;
+        });
+      }
+    });
   }
 }

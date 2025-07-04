@@ -762,7 +762,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                   builder: (context) {
                     return GestureDetector(
                       onTap: () async {
-                        await Navigator.push(
+                        final nouveauObjectif = await Navigator.push<double>(
                           context,
                           MaterialPageRoute(
                             builder: (context) => PageSetObjectif(
@@ -771,6 +771,27 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                             ),
                           ),
                         );
+
+                        if (nouveauObjectif != null && mounted) {
+                          setState(() {
+                            final categorieIndex = _categories.indexWhere(
+                              (c) => c.id == categorie.id,
+                            );
+                            if (categorieIndex != -1) {
+                              final enveloppeIndex = _categories[categorieIndex]
+                                  .enveloppes
+                                  .indexWhere((e) => e.id == enveloppe.id);
+                              if (enveloppeIndex != -1) {
+                                // Mettre à jour l'enveloppe
+                                _categories[categorieIndex]
+                                        .enveloppes[enveloppeIndex] =
+                                    _categories[categorieIndex]
+                                        .enveloppes[enveloppeIndex]
+                                        .copyWith(objectif: nouveauObjectif);
+                              }
+                            }
+                          });
+                        }
                       },
                       child: Text(
                         (enveloppe.objectif > 0)

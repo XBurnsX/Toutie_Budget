@@ -24,6 +24,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   DateTime? _selectedDate;
   int? _objectifJour;
   double _currentObjectif = 0.0; // Variable pour suivre l'objectif actuel
+  String? _montantOriginal;
 
   @override
   void initState() {
@@ -36,9 +37,8 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     _objectifJour = widget.enveloppe.objectifJour;
     // Définir le type d'objectif basé sur l'enveloppe existante
     if (_currentObjectif > 0) {
-      _objectifType = widget.enveloppe.frequenceObjectif == 'mensuel'
-          ? 'mois'
-          : 'date';
+      _objectifType =
+          widget.enveloppe.frequenceObjectif == 'mensuel' ? 'mois' : 'date';
       if (widget.enveloppe.objectifDate != null) {
         _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
       }
@@ -52,6 +52,12 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   }
 
   void _openNumericKeyboard() {
+    // Sauvegarder la valeur actuelle et réinitialiser le contrôleur
+    setState(() {
+      _montantOriginal = _controller.text;
+      _controller.text = '0.00';
+    });
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -69,7 +75,14 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
         },
         showDecimal: true,
       ),
-    );
+    ).whenComplete(() {
+      // Si l'utilisateur ferme sans entrer de valeur, restaurer la valeur originale
+      if (_controller.text == '0.00' || _controller.text.isEmpty) {
+        setState(() {
+          _controller.text = _montantOriginal ?? '';
+        });
+      }
+    });
   }
 
   void _valider() async {
@@ -157,9 +170,8 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       backgroundColor: _objectifType == 'mois'
                           ? Theme.of(context).colorScheme.secondary
                           : Colors.grey[800],
-                      foregroundColor: _objectifType == 'mois'
-                          ? Colors.black
-                          : Colors.white,
+                      foregroundColor:
+                          _objectifType == 'mois' ? Colors.black : Colors.white,
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(8),
@@ -182,9 +194,8 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       backgroundColor: _objectifType == 'date'
                           ? Theme.of(context).colorScheme.secondary
                           : Colors.grey[800],
-                      foregroundColor: _objectifType == 'date'
-                          ? Colors.black
-                          : Colors.white,
+                      foregroundColor:
+                          _objectifType == 'date' ? Colors.black : Colors.white,
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.only(
                           topRight: Radius.circular(8),

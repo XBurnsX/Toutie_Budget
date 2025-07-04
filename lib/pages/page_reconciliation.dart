@@ -21,6 +21,7 @@ class _PageReconciliationState extends State<PageReconciliation> {
   double? _soldeReel;
   double? _ecart;
   bool _showEcart = false;
+  String? _montantOriginal;
 
   @override
   void dispose() {
@@ -38,6 +39,12 @@ class _PageReconciliationState extends State<PageReconciliation> {
   }
 
   void _ouvrirClavierNumerique() {
+    // Sauvegarder la valeur actuelle et réinitialiser le contrôleur
+    setState(() {
+      _montantOriginal = _soldeReelController.text;
+      _soldeReelController.text = '0.00';
+    });
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -67,16 +74,30 @@ class _PageReconciliationState extends State<PageReconciliation> {
         },
         showDecimal: true,
       ),
-    );
+    ).whenComplete(() {
+      // Si l'utilisateur ferme sans entrer de valeur, restaurer la valeur originale
+      if (_soldeReelController.text == '0.00' ||
+          _soldeReelController.text.isEmpty) {
+        setState(() {
+          _soldeReelController.text = _montantOriginal ?? '';
+          _soldeReel = double.tryParse(
+                  _montantOriginal?.replaceAll(',', '.') ?? '0.0') ??
+              0.0;
+          if (_soldeReel != 0) {
+            _calculerEcart();
+          } else {
+            _showEcart = false;
+          }
+        });
+      }
+    });
   }
 
   Future<void> _creerTransactionAjustement() async {
     if (_ecart == null || _ecart == 0) return;
 
-    final transactionId = FirebaseService().firestore
-        .collection('transactions')
-        .doc()
-        .id;
+    final transactionId =
+        FirebaseService().firestore.collection('transactions').doc().id;
     final transaction = app_model.Transaction(
       id: transactionId,
       userId: '', // Sera rempli par FirebaseService
@@ -224,9 +245,8 @@ class _PageReconciliationState extends State<PageReconciliation> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: _ecart == 0
-                                    ? Colors.green
-                                    : Colors.orange,
+                                color:
+                                    _ecart == 0 ? Colors.green : Colors.orange,
                               ),
                             ),
                             if (_ecart != 0) ...[

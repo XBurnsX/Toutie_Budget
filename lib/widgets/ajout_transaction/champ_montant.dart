@@ -4,7 +4,7 @@ import '../../models/transaction_model.dart';
 import '../../controllers/ajout_transaction_controller.dart';
 import '../numeric_keyboard.dart';
 
-class ChampMontant extends StatelessWidget {
+class ChampMontant extends StatefulWidget {
   final TextEditingController controller;
   final bool estFractionnee;
   final VoidCallback onFractionnementSupprime;
@@ -19,6 +19,13 @@ class ChampMontant extends StatelessWidget {
   });
 
   @override
+  State<ChampMontant> createState() => _ChampMontantState();
+}
+
+class _ChampMontantState extends State<ChampMontant> {
+  String? _montantOriginal;
+
+  @override
   Widget build(BuildContext context) {
     return Consumer<AjoutTransactionController>(
       builder: (context, controller, child) {
@@ -28,7 +35,7 @@ class ChampMontant extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 30.0),
           child: TextField(
-            controller: this.controller,
+            controller: widget.controller,
             readOnly: true,
             onTap: () => _openNumericKeyboard(context),
             textAlign: TextAlign.center,
@@ -73,7 +80,7 @@ class ChampMontant extends StatelessWidget {
   }
 
   void _openNumericKeyboard(BuildContext context) {
-    if (estFractionnee) {
+    if (widget.estFractionnee) {
       showDialog(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -89,7 +96,7 @@ class ChampMontant extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                onFractionnementSupprime();
+                widget.onFractionnementSupprime();
                 _ouvrirClavierNumerique(context);
               },
               child: const Text('Continuer'),
@@ -103,16 +110,32 @@ class ChampMontant extends StatelessWidget {
   }
 
   void _ouvrirClavierNumerique(BuildContext context) {
+    // Sauvegarder la valeur actuelle et réinitialiser le contrôleur
+    setState(() {
+      _montantOriginal = widget.controller.text;
+      widget.controller.text = '0.00';
+    });
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled:
+          true, // Permet au clavier de prendre plus de place si nécessaire
       builder: (_) => NumericKeyboard(
-        controller: controller,
-        onClear: onMontantChange,
+        controller: widget.controller,
+        onClear: widget.onMontantChange,
         onValueChanged: (value) {
-          onMontantChange();
+          widget.onMontantChange();
         },
         showDecimal: true,
       ),
-    );
+    ).whenComplete(() {
+      // Si l'utilisateur ferme sans entrer de valeur, restaurer la valeur originale
+      if (widget.controller.text == '0.00' || widget.controller.text.isEmpty) {
+        setState(() {
+          widget.controller.text = _montantOriginal ?? '0.00';
+        });
+      }
+      widget.onMontantChange();
+    });
   }
 }

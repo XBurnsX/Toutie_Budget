@@ -24,6 +24,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
   double _solde = 0.0;
   Color _couleur = Colors.green;
   final _soldeController = TextEditingController();
+  String? _montantOriginal;
 
   final List<String> _types = [
     'Chèque',
@@ -49,10 +50,8 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
 
               if (_type == 'Dette') {
                 // Créer une dette au lieu d'un compte
-                final id = FirebaseFirestore.instance
-                    .collection('dettes')
-                    .doc()
-                    .id;
+                final id =
+                    FirebaseFirestore.instance.collection('dettes').doc().id;
                 final dette = Dette(
                   id: id,
                   nomTiers: _nom,
@@ -68,10 +67,8 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                 await DetteService().ajouterDette(dette);
               } else {
                 // Créer un compte normal
-                final id = FirebaseFirestore.instance
-                    .collection('comptes')
-                    .doc()
-                    .id;
+                final id =
+                    FirebaseFirestore.instance.collection('comptes').doc().id;
                 final compte = Compte(
                   id: id,
                   nom: _nom,
@@ -100,9 +97,8 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
               ), // Espacement entre le titre et le premier champ
               TextFormField(
                 decoration: InputDecoration(
-                  labelText: _type == 'Dette'
-                      ? 'Nom du tiers'
-                      : 'Nom du compte',
+                  labelText:
+                      _type == 'Dette' ? 'Nom du tiers' : 'Nom du compte',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) => value == null || value.isEmpty
@@ -163,8 +159,8 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                               _soldeController.text.isEmpty
                                   ? (_type == 'Dette' ? '-0.00' : '0.00')
                                   : (_type == 'Dette'
-                                        ? '-${_soldeController.text}'
-                                        : _soldeController.text),
+                                      ? '-${_soldeController.text}'
+                                      : _soldeController.text),
                               style: const TextStyle(fontSize: 16),
                             ),
                           ],
@@ -275,6 +271,12 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
   }
 
   void _ouvrirClavierNumerique() {
+    // Sauvegarder la valeur actuelle et réinitialiser le contrôleur
+    setState(() {
+      _montantOriginal = _soldeController.text;
+      _soldeController.text = '0.00';
+    });
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -288,19 +290,26 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
         },
         onValueChanged: (value) {
           setState(() {
-            _solde =
-                double.tryParse(
-                  value
-                      .replaceAll('\$', '')
-                      .replaceAll(' ', '')
-                      .replaceAll(',', '.'),
-                ) ??
-                0.0;
+            // Nettoyer le montant du symbole $ et des espaces
+            String montantTexte = value.trim();
+            montantTexte =
+                montantTexte.replaceAll('\$', '').replaceAll(' ', '');
+            _solde = double.tryParse(montantTexte.replaceAll(',', '.')) ?? 0.0;
           });
         },
         showDecimal: true,
       ),
-    );
+    ).whenComplete(() {
+      // Si l'utilisateur ferme sans entrer de valeur, restaurer la valeur originale
+      if (_soldeController.text == '0.00' || _soldeController.text.isEmpty) {
+        setState(() {
+          _soldeController.text = _montantOriginal ?? '';
+          _solde = double.tryParse(
+                  _montantOriginal?.replaceAll(',', '.') ?? '0.0') ??
+              0.0;
+        });
+      }
+    });
   }
 
   @override

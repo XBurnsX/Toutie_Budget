@@ -21,25 +21,58 @@ class PageVirerArgent extends StatefulWidget {
 }
 
 class _PageVirerArgentState extends State<PageVirerArgent> {
-  String montant = '';
+  late TextEditingController _montantController;
   String? sourceId;
   String? destinationId;
   dynamic source;
   dynamic destination;
+  String? _montantOriginal;
 
   @override
   void initState() {
     super.initState();
+    String initialMontant = '';
+    if (widget.montantPreselectionne != null) {
+      initialMontant =
+          widget.montantPreselectionne!.toStringAsFixed(2).replaceAll('.', ',');
+    }
+    _montantController = TextEditingController(text: initialMontant);
+    _montantController.addListener(() {
+      setState(() {});
+    });
+
     // Apply preselection if provided
     if (widget.destinationPreselectionnee != null) {
       destinationId = widget.destinationPreselectionnee;
     }
-    if (widget.montantPreselectionne != null) {
-      // Format with comma as decimal separator
-      montant = widget.montantPreselectionne!
-          .toStringAsFixed(2)
-          .replaceAll('.', ',');
-    }
+  }
+
+  @override
+  void dispose() {
+    _montantController.dispose();
+    super.dispose();
+  }
+
+  void _openNumericKeyboard(BuildContext context) {
+    // Sauvegarder la valeur actuelle et réinitialiser
+    _montantOriginal = _montantController.text;
+    _montantController.text = '0,00';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => NumericKeyboard(
+        controller: _montantController,
+        onValueChanged: (val) {}, // Le listener sur le controller s'en occupe
+        onClear: () => _montantController.clear(),
+      ),
+    ).whenComplete(() {
+      // Si l'utilisateur ferme sans entrer de valeur, restaurer la valeur originale
+      if (_montantController.text == '0,00' ||
+          _montantController.text.isEmpty) {
+        _montantController.text = _montantOriginal ?? '';
+      }
+    });
   }
 
   void _updateObjectsFromSelection(List<dynamic> tout) {
@@ -153,12 +186,13 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
     if (!_peutVirer()) return;
 
     // Vérifier d'abord le montant
-    if (montant.isEmpty) {
+    if (_montantController.text.isEmpty) {
       _afficherErreur('Veuillez saisir un montant.');
       return;
     }
 
-    double montantDouble = double.tryParse(montant.replaceAll(',', '.')) ?? 0;
+    double montantDouble =
+        double.tryParse(_montantController.text.replaceAll(',', '.')) ?? 0;
     if (montantDouble <= 0) {
       _afficherErreur('Le montant doit être supérieur à 0.');
       return;
@@ -350,9 +384,8 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final comptes = comptesSnapshot.data!;
-                final enveloppes = catSnapshot.data!
-                    .expand((cat) => cat.enveloppes)
-                    .toList();
+                final enveloppes =
+                    catSnapshot.data!.expand((cat) => cat.enveloppes).toList();
 
                 // Filtrer les comptes pour exclure les types 'Dette' et 'Investissement'
                 final comptesFilters = comptes
@@ -385,8 +418,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                           TextSpan(
                             text: "${obj.nom} -> ",
                             style: TextStyle(
-                              color:
-                                  Theme.of(
+                              color: Theme.of(
                                     context,
                                   ).textTheme.bodyLarge?.color ??
                                   Colors.black,
@@ -474,7 +506,9 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                         child: Padding(
                           padding: const EdgeInsets.only(right: 16),
                           child: Text(
-                            montant.isEmpty ? '0,00 \$' : '$montant \$',
+                            _montantController.text.isEmpty
+                                ? '0,00 \$'
+                                : '${_montantController.text} \$',
                             style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.bold,
@@ -609,12 +643,11 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                       color: Theme.of(context).scaffoldBackgroundColor,
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: NumericKeyboard(
-                        controller: TextEditingController(text: montant),
+                        controller: _montantController,
                         onValueChanged: (value) {
                           setState(() {
-                            montant = value
-                                .replaceAll('\$', '')
-                                .replaceAll(' ', '');
+                            _montantController.text =
+                                value.replaceAll('\$', '').replaceAll(' ', '');
                           });
                         },
                         showDecimal: true,
@@ -659,6 +692,39 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
           );
         },
       ),
+    );
+  }
+}
+
+class _AmountDisplay extends StatelessWidget {
+  final String label;
+  final String amount;
+  final Color color;
+
+  const _AmountDisplay({
+    required this.label,
+    required this.amount,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 16, color: Colors.grey[400]),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          amount,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }
