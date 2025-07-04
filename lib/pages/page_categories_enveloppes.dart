@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/categorie.dart';
 import '../services/firebase_service.dart';
 import 'page_set_objectif.dart';
+import 'dart:async';
 
 class PageCategoriesEnveloppes extends StatefulWidget {
   const PageCategoriesEnveloppes({super.key});
@@ -15,34 +16,78 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   bool _editionMode = false;
   List<Categorie> _categories = [];
   bool _isLoading = true;
+  StreamSubscription<List<Categorie>>? _categoriesSubscription;
 
   @override
   void initState() {
     super.initState();
+    _initCategories();
+  }
+
+  @override
+  void dispose() {
+    _categoriesSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initCategories() async {
     // Charger les catégories initiales
-    FirebaseService().lireCategories().first.then((categories) {
-      if (mounted) {
-        setState(() {
-          _categories = categories;
-          _isLoading = false;
-        });
+    _categoriesSubscription = FirebaseService().lireCategories().listen((
+      categories,
+    ) {
+      if (mounted && !_editionMode) {
+        final sortedCategories = _sortCategoriesWithDetteFirst(categories);
+
+        // Ne mettre à jour que si l'ordre a changé
+        if (!_areListsEqual(_categories, sortedCategories)) {
+          setState(() {
+            _categories = sortedCategories;
+            _isLoading = false;
+          });
+        } else if (_isLoading) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     });
   }
 
+  // Méthode pour trier les catégories avec "Dette" toujours en première position
+  List<Categorie> _sortCategoriesWithDetteFirst(List<Categorie> categories) {
+    final sorted = List<Categorie>.from(categories);
+    sorted.sort((a, b) {
+      // Forcer "Dette" en premier, insensible à la casse
+      final aNom = a.nom.toLowerCase();
+      final bNom = b.nom.toLowerCase();
+      if (aNom == 'dette' || aNom == 'dettes') return -1;
+      if (bNom == 'dette' || bNom == 'dettes') return 1;
+      // Ensuite trier par ordre
+      final aOrdre = a.ordre ?? 999999;
+      final bOrdre = b.ordre ?? 999999;
+      return aOrdre.compareTo(bOrdre);
+    });
+    return sorted;
+  }
+
+  // Méthode pour comparer deux listes de catégories
+  bool _areListsEqual(List<Categorie> list1, List<Categorie> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id || list1[i].ordre != list2[i].ordre) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // Méthode pour réorganiser les catégories
   Future<void> _reorderCategories(int oldIndex, int newIndex) async {
-    // Trouver l'index de la catégorie Dette
-    final detteIndex = _categories.indexWhere(
-      (c) => c.nom.toLowerCase() == 'dette',
-    );
-    if (detteIndex == -1) return; // Si pas de Dette, ne rien faire
+    // Empêcher le déplacement de la catégorie Dette (position 0)
+    if (oldIndex == 0) return;
 
-    // Empêcher le déplacement de la catégorie Dette
-    if (oldIndex == detteIndex) return;
-
-    // Empêcher de déplacer une catégorie au-dessus de Dette (qui doit rester en position 0)
-    if (newIndex < 1) {
+    // Empêcher de déplacer une catégorie au-dessus de Dette (position 0)
+    if (newIndex == 0) {
       return;
     }
 
@@ -51,34 +96,37 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       newIndex -= 1;
     }
 
+    // Créer une nouvelle liste avec le nouvel ordre
+    final updatedCategories = List<Categorie>.from(_categories);
+    final item = updatedCategories.removeAt(oldIndex);
+    updatedCategories.insert(newIndex, item);
+
+    // Mettre à jour l'état local immédiatement
     setState(() {
-      final item = _categories.removeAt(oldIndex);
-      _categories.insert(newIndex, item);
+      _categories = updatedCategories;
     });
 
-    // Mettre à jour l'ordre dans Firebase en utilisant une transaction
-    final firestore = FirebaseService().firestore;
-    await firestore.runTransaction((transaction) async {
-      // Mettre à jour l'ordre de toutes les catégories en une seule transaction
-      for (int i = 0; i < _categories.length; i++) {
-        final cat = _categories[i];
-
-        // Créer une nouvelle catégorie avec l'ordre mis à jour
-        final updatedCat = Categorie(
-          id: cat.id,
-          nom: cat.nom,
-          enveloppes: cat.enveloppes,
-          ordre: i, // L'ordre correspond à la position dans la liste
-          userId: cat.userId,
-        );
-
-        // Mettre à jour dans la transaction
-        transaction.set(
-          firestore.collection('categories').doc(cat.id),
-          updatedCat.toMap(),
+    // Mettre à jour l'ordre dans Firebase
+    try {
+      // Mettre à jour chaque catégorie individuellement avec son nouvel ordre
+      for (int i = 0; i < updatedCategories.length; i++) {
+        final cat = updatedCategories[i];
+        await FirebaseService().firestore
+            .collection('categories')
+            .doc(cat.id)
+            .update({'ordre': i});
+      }
+    } catch (e) {
+      // En cas d'erreur, afficher un message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la réorganisation des catégories'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
-    });
+    }
   }
 
   Future<void> _reorderEnveloppes(
@@ -162,8 +210,14 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         nom: result,
         enveloppes: [],
+        ordre: _categories.length, // Ajouter à la fin
       );
       await FirebaseService().ajouterCategorie(newCat);
+
+      // Mettre à jour la liste locale
+      setState(() {
+        _categories = _sortCategoriesWithDetteFirst([..._categories, newCat]);
+      });
     }
   }
 
@@ -346,49 +400,60 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
             tooltip: _editionMode ? 'Terminer l\'édition' : 'Mode édition',
             onPressed: () async {
               if (_editionMode) {
-                // Sauvegarder l'ordre final dans Firebase
-                final firestore = FirebaseService().firestore;
-                await firestore.runTransaction((transaction) async {
+                try {
+                  // Désactiver temporairement la synchronisation
+                  _categoriesSubscription?.pause();
+
+                  // Mettre à jour l'ordre de toutes les catégories
                   for (int i = 0; i < _categories.length; i++) {
                     final cat = _categories[i];
+                    await FirebaseService().firestore
+                        .collection('categories')
+                        .doc(cat.id)
+                        .update({'ordre': i});
+                  }
 
-                    final updatedCat = Categorie(
-                      id: cat.id,
-                      nom: cat.nom,
-                      enveloppes: cat.enveloppes,
-                      ordre:
-                          i, // L'ordre correspond à la position dans la liste
-                      userId: cat.userId,
-                    );
+                  setState(() {
+                    _editionMode = false;
+                  });
 
-                    transaction.set(
-                      firestore.collection('categories').doc(cat.id),
-                      updatedCat.toMap(),
+                  // Réactiver la synchronisation
+                  _categoriesSubscription?.resume();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Erreur lors de la sauvegarde de l\'ordre',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
                     );
                   }
-                });
-              }
-              setState(() {
-                _editionMode = !_editionMode;
-                if (_editionMode) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.white),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Maintenez et déplacez les éléments pour réorganiser leur position',
-                            ),
-                          ),
-                        ],
-                      ),
-                      duration: Duration(seconds: 4),
-                    ),
-                  );
                 }
-              });
+              } else {
+                // Désactiver la synchronisation en mode édition
+                _categoriesSubscription?.pause();
+                setState(() {
+                  _editionMode = true;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.white),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Maintenez et déplacez les éléments pour réorganiser leur position',
+                          ),
+                        ),
+                      ],
+                    ),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
             },
           ),
           if (_editionMode)
@@ -439,52 +504,29 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                     ),
                   const SizedBox(height: 40),
                   Expanded(
-                    child: StreamBuilder<List<Categorie>>(
-                      stream: FirebaseService().lireCategories(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData && !_isLoading) {
-                          // Ne mettre à jour la liste locale que lors du chargement initial
-                          if (_categories.isEmpty) {
-                            _categories = snapshot.data!;
-                          }
-
-                          // Trier les catégories
-                          final displayedCategories = List<Categorie>.from(
-                            _categories,
-                          );
-                          displayedCategories.sort((a, b) {
-                            if (a.nom.toLowerCase() == 'dette') return -1;
-                            if (b.nom.toLowerCase() == 'dette') return 1;
-                            return (a.ordre ?? 999999).compareTo(
-                              b.ordre ?? 999999,
-                            );
-                          });
-
-                          return _editionMode
-                              ? ReorderableListView.builder(
-                                  itemCount: displayedCategories.length,
-                                  onReorder: _reorderCategories,
-                                  itemBuilder: (context, index) {
-                                    final categorie =
-                                        displayedCategories[index];
-                                    return _buildCategorieItem(
-                                      categorie,
-                                      key: ValueKey(categorie.id),
-                                    );
-                                  },
-                                )
-                              : ListView.builder(
-                                  itemCount: displayedCategories.length,
-                                  itemBuilder: (context, index) {
-                                    final categorie =
-                                        displayedCategories[index];
-                                    return _buildCategorieItem(categorie);
-                                  },
-                                );
-                        }
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                    ),
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _editionMode
+                        ? ReorderableListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _categories.length,
+                            onReorder: _reorderCategories,
+                            itemBuilder: (context, index) {
+                              final categorie = _categories[index];
+                              return _buildCategorieItem(
+                                categorie,
+                                key: ValueKey(categorie.id),
+                              );
+                            },
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _categories.length,
+                            itemBuilder: (context, index) {
+                              final categorie = _categories[index];
+                              return _buildCategorieItem(categorie);
+                            },
+                          ),
                   ),
                 ],
               ),

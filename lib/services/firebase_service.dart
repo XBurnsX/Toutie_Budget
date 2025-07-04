@@ -99,9 +99,15 @@ class FirebaseService {
 
           // Trier les catégories : Dette toujours en premier, puis par ordre
           categories.sort((a, b) {
-            if (a.nom.toLowerCase() == 'dette') return -1;
-            if (b.nom.toLowerCase() == 'dette') return 1;
-            return (a.ordre ?? 0).compareTo(b.ordre ?? 0);
+            // Forcer "Dette" en premier, insensible à la casse
+            final aNom = a.nom.toLowerCase();
+            final bNom = b.nom.toLowerCase();
+            if (aNom == 'dette' || aNom == 'dettes') return -1;
+            if (bNom == 'dette' || bNom == 'dettes') return 1;
+            // Ensuite trier par ordre
+            final aOrdre = a.ordre ?? 999999;
+            final bOrdre = b.ordre ?? 999999;
+            return aOrdre.compareTo(bOrdre);
           });
 
           return categories;

@@ -33,11 +33,23 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
     if (categories.isEmpty) {
       return const SizedBox.shrink();
     }
+    // Trier les catégories avec Dette en premier
+    final sortedCategories = List<Map<String, dynamic>>.from(categories);
+    sortedCategories.sort((a, b) {
+      final aNom = (a['nom'] as String).toLowerCase();
+      final bNom = (b['nom'] as String).toLowerCase();
+      if (aNom == 'dette' || aNom == 'dettes') return -1;
+      if (bNom == 'dette' || bNom == 'dettes') return 1;
+      final aOrdre = (a['ordre'] as int?) ?? 999999;
+      final bOrdre = (b['ordre'] as int?) ?? 999999;
+      return aOrdre.compareTo(bOrdre);
+    });
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: categories.length,
+      itemCount: sortedCategories.length,
       itemBuilder: (context, index) {
-        final categorie = categories[index];
+        final categorie = sortedCategories[index];
         final enveloppes =
             categorie['enveloppes'] as List<Map<String, dynamic>>;
 
