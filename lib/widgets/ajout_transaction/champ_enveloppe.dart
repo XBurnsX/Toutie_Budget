@@ -116,6 +116,22 @@ class ChampEnveloppe extends StatelessWidget {
   bool _estEnveloppeAffichable(Map<String, dynamic> env) {
     final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
 
+    // Vérifier si l'enveloppe est dans la catégorie Dette
+    if (typeSelectionne == TypeTransaction.depense) {
+      for (final categorie in categoriesFirebase) {
+        if ((categorie['nom'] as String).toLowerCase() == 'dette' ||
+            (categorie['nom'] as String).toLowerCase() == 'dettes') {
+          // Si on trouve l'enveloppe dans la catégorie Dette, on ne l'affiche pas
+          if ((categorie['enveloppes'] as List).any(
+            (e) => e['id'] == env['id'],
+          )) {
+            return false;
+          }
+          break; // On sort de la boucle dès qu'on a trouvé la catégorie Dette
+        }
+      }
+    }
+
     if (typeSelectionne == TypeTransaction.depense &&
         compteSelectionne != null) {
       // Gestion multi-provenances
