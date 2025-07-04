@@ -252,8 +252,22 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         id: categorie.id,
         nom: categorie.nom,
         enveloppes: [...categorie.enveloppes, newEnv],
+        ordre: categorie.ordre,
+        userId: categorie.userId,
       );
+
+      // Sauvegarder dans Firebase
       await FirebaseService().ajouterCategorie(updatedCat);
+
+      // Mettre à jour l'état local immédiatement
+      final categorieIndex = _categories.indexWhere(
+        (c) => c.id == categorie.id,
+      );
+      if (categorieIndex != -1) {
+        setState(() {
+          _categories[categorieIndex] = updatedCat;
+        });
+      }
     }
   }
 
@@ -286,8 +300,22 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         id: categorie.id,
         nom: result,
         enveloppes: categorie.enveloppes,
+        ordre: categorie.ordre,
+        userId: categorie.userId,
       );
+
+      // Sauvegarder dans Firebase
       await FirebaseService().ajouterCategorie(updatedCat);
+
+      // Mettre à jour l'état local immédiatement
+      final categorieIndex = _categories.indexWhere(
+        (c) => c.id == categorie.id,
+      );
+      if (categorieIndex != -1) {
+        setState(() {
+          _categories[categorieIndex] = updatedCat;
+        });
+      }
     }
   }
 
@@ -350,8 +378,22 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         id: categorie.id,
         nom: categorie.nom,
         enveloppes: newEnveloppes,
+        ordre: categorie.ordre,
+        userId: categorie.userId,
       );
+
+      // Sauvegarder dans Firebase
       await FirebaseService().ajouterCategorie(updatedCat);
+
+      // Mettre à jour l'état local immédiatement
+      final categorieIndex = _categories.indexWhere(
+        (c) => c.id == categorie.id,
+      );
+      if (categorieIndex != -1) {
+        setState(() {
+          _categories[categorieIndex] = updatedCat;
+        });
+      }
     }
   }
 
@@ -383,8 +425,22 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         id: categorie.id,
         nom: categorie.nom,
         enveloppes: newEnveloppes,
+        ordre: categorie.ordre,
+        userId: categorie.userId,
       );
+
+      // Sauvegarder dans Firebase
       await FirebaseService().ajouterCategorie(updatedCat);
+
+      // Mettre à jour l'état local immédiatement
+      final categorieIndex = _categories.indexWhere(
+        (c) => c.id == categorie.id,
+      );
+      if (categorieIndex != -1) {
+        setState(() {
+          _categories[categorieIndex] = updatedCat;
+        });
+      }
     }
   }
 
