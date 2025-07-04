@@ -28,6 +28,13 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   final _nombrePaiementsController = TextEditingController();
   final _paiementsEffectuesController = TextEditingController();
 
+  // Nouveaux contrôleurs et clés pour les paiements passés
+  final _formKeyPaiementsPasses = GlobalKey<FormState>();
+  final _nombrePaiementsPassesController = TextEditingController(text: '1');
+  final _montantPaiementPasseController = TextEditingController();
+  DateTime _datePaiementPasse = DateTime.now();
+  bool _afficherSectionPaiementsPasses = false;
+
   // Simulateur
   final _simulateurTauxController = TextEditingController();
   final _simulateurPaiementController = TextEditingController();
@@ -41,11 +48,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   double? _coutTotalCalcule;
   String? _erreurSimulateur;
   Map<String, double?> calculs = {};
-
-  // Nouveaux contrôleurs pour les paiements passés
-  final _paiementsPassesNombreController = TextEditingController();
-  final _paiementsPassesMontantController = TextEditingController();
-  bool _paiementsPassesAppliques = false;
 
   // Total des paiements réellement enregistrés dans les transactions
   double _totalRemboursements = 0.0;
@@ -67,7 +69,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   void initState() {
     super.initState();
     _chargerDonnees();
-    // Ajouter des listeners pour la mise à jour automatique des calculs
     _nombrePaiementsController.addListener(_onParametresChanges);
     _dateDebutController.addListener(_onParametresChanges);
     _dateFinController.addListener(_onParametresChanges);
@@ -76,7 +77,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _montantMensuelController.addListener(_onParametresChanges);
     _paiementsEffectuesController.addListener(_onParametresChanges);
 
-    // Écouter en temps réel les modifications du document dette pour mettre à jour
     _detteListener = FirebaseFirestore.instance
         .collection('dettes')
         .doc(widget.dette.id)
@@ -147,7 +147,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       _tauxController.text = widget.dette.tauxInteret!.toStringAsFixed(2);
     }
 
-    // Date de début (par défaut aujourd'hui)
     final dateDebut = widget.dette.dateDebut ?? DateTime.now();
     _dateDebutController.text = _formaterDate(dateDebut);
 
@@ -178,7 +177,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       _calculerPaiementsEffectues();
     }
 
-    // Calculs initiaux après chargement
     _onParametresChanges();
     _calculerEtMettrAJour();
   }
@@ -195,10 +193,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
   }
 
   void _onParametresChanges() {
-    // Fonction centrale qui recalcule tout ce qui doit l'être
     _calculerDateFinParDefaut();
 
-    // Vérifier que la date de fin courante ne dépasse pas la durée maximale
     final dateDebut = _parseDate(_dateDebutController.text);
     final dureeMois = int.tryParse(_nombrePaiementsController.text);
     final dateFinMax = (dateDebut != null && dureeMois != null && dureeMois > 0)
@@ -214,13 +210,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     if (dateFinMax != null &&
         dateFinCourante != null &&
         dateFinCourante.isAfter(dateFinMax)) {
-      // Remettre la date au maximum autorisé
       setState(() {
         _dateFinController.text = _formaterDate(dateFinMax);
       });
     }
 
-    // Mettre à jour les calculs et l'interface utilisateur
     setState(() {
       _calculerEtMettrAJour();
     });
@@ -298,7 +292,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       setState(() {
         _dateFinController.text = _formaterDate(nouvelleDateFin);
         _recalculerPaiementMensuel();
-        // Déclencher la mise à jour des calculs automatiques
       });
     }
   }
@@ -352,6 +345,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                     _buildCalculsAutomatiques(),
                     const SizedBox(height: 24),
                     _buildPaiementsPassesSection(),
+                    const SizedBox(height: 24),
                     Center(
                       child: ElevatedButton.icon(
                         onPressed: _sauvegarder,
@@ -526,7 +520,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
       if (principal != null && duree != null && duree > 0) {
         if (taux != null) {
-          // Calculer le paiement mensuel avec le taux donné
           final montantMensuel = CalculPretService.calculerPaiementMensuel(
             principal: principal,
             tauxAnnuel: taux,
@@ -541,7 +534,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             _coutTotalCalcule = coutTotal;
           });
         } else if (paiement != null) {
-          // Calculer le taux avec le paiement donné
           final tauxEffectif = CalculPretService.calculerTauxEffectif(
             principal: principal,
             paiementMensuel: paiement,
@@ -582,7 +574,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Taux d'intérêt
                 Row(
                   children: [
                     Expanded(
@@ -613,7 +604,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Prix d'achat
                 Row(
                   children: [
                     Expanded(
@@ -644,7 +634,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Durée du prêt
                 Row(
                   children: [
                     Expanded(
@@ -676,7 +665,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Montant mensuel
                 Row(
                   children: [
                     Expanded(
@@ -711,7 +699,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Date de début (bouton)
                 Row(
                   children: [
                     const Icon(Icons.date_range),
@@ -740,7 +727,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Date de fin
                 Row(
                   children: [
                     const Icon(Icons.event_available),
@@ -760,7 +746,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Nombre de paiements effectués
                 Row(
                   children: [
                     Expanded(
@@ -805,7 +790,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                // Calcul du montant mensuel et remplissage automatique du champ
                 final prixAchat = _toDouble(_prixAchatController.text);
                 final tauxInteret = _toDouble(_tauxController.text);
                 final dateDebut = _parseDate(_dateDebutController.text);
@@ -915,7 +899,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
       return;
     }
 
-    // Validation supplémentaire : la date de fin ne doit pas dépasser la durée max
     final dateDebut = _parseDate(_dateDebutController.text);
     final dateFin = _parseDate(_dateFinController.text);
     final dureeMoisMax = int.tryParse(_nombrePaiementsController.text) ?? 0;
@@ -939,46 +922,40 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     }
 
     try {
-      // Calculer le nouveau solde avec coutTotal - totalTransactions
       final calculs = _calculerValeursPret();
       final coutTotalCalcule = calculs['coutTotal'];
       final interetsPayesCalcules = calculs['interetsPayes'];
 
       double? nouveauSolde;
       if (coutTotalCalcule != null) {
-        // Calculer le nouveau solde : coutTotal - transactions
         final soldeCalcule = coutTotalCalcule - _totalRemboursements;
         nouveauSolde = soldeCalcule < 0 ? 0 : soldeCalcule;
       } else {
-        // Fallback si pas de coût total
         nouveauSolde = _calculerValeursPret()['solde'];
       }
 
       final ancienSolde = widget.dette.solde;
 
-      // Créer l'objet Dette complet avec toutes les informations à jour
       final detteModifiee = widget.dette.copyWith(
         tauxInteret: _toDouble(_tauxController.text) ?? 0,
         dateDebut: _parseDate(_dateDebutController.text),
         dateFin: _parseDate(_dateFinController.text),
         montantMensuel: _toDouble(_montantMensuelController.text) ?? 0,
         prixAchat: _toDouble(_prixAchatController.text) ?? 0,
-        coutTotal: coutTotalCalcule, // Stocker le coût total avec intérêts
-        interetsPayes: interetsPayesCalcules, // Stocker les intérêts payés
+        coutTotal: coutTotalCalcule,
+        interetsPayes: interetsPayesCalcules,
         nombrePaiements: int.tryParse(_nombrePaiementsController.text),
         paiementsEffectues: int.tryParse(_paiementsEffectuesController.text),
-        solde: nouveauSolde, // On met à jour le solde ici pour la sauvegarde
+        solde: nouveauSolde,
       );
 
-      // Appeler la méthode de sauvegarde unifiée
       await DetteService().sauvegarderDetteManuelleComplet(detteModifiee);
 
-      // Si le solde a changé, créer une transaction d'ajustement
       if (nouveauSolde != null && ancienSolde != nouveauSolde) {
         final montantAjustement = ancienSolde - nouveauSolde;
         await FirebaseService().creerTransactionAjustementSoldeDette(
           detteId: widget.dette.id,
-          nomCompte: widget.dette.nomTiers, // ou le nom du compte si différent
+          nomCompte: widget.dette.nomTiers,
           montantAjustement: montantAjustement,
         );
       }
@@ -996,6 +973,155 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         );
       }
     }
+  }
+
+  void _enregistrerPaiementsPasses() async {
+    if (_formKeyPaiementsPasses.currentState!.validate()) {
+      final nombrePaiements =
+          int.tryParse(_nombrePaiementsPassesController.text);
+      final montantParPaiement =
+          _toDouble(_montantPaiementPasseController.text);
+
+      if (nombrePaiements != null && montantParPaiement != null) {
+        final totalPaiements = nombrePaiements * montantParPaiement;
+
+        final mouvement = MouvementDette(
+          id: FirebaseFirestore.instance.collection('dettes').doc().id,
+          montant: -totalPaiements,
+          type: widget.dette.type == 'dette'
+              ? 'remboursement_effectue'
+              : 'remboursement_recu',
+          date: _datePaiementPasse,
+          note:
+              '$nombrePaiements paiement(s) passé(s) de ${montantParPaiement.toStringAsFixed(2)}\$ chacun(e)',
+        );
+
+        try {
+          await DetteService().ajouterMouvement(widget.dette.id, mouvement);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Paiements passés enregistrés avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          setState(() {
+            _nombrePaiementsPassesController.text = '1';
+            _montantPaiementPasseController.clear();
+            _afficherSectionPaiementsPasses = false;
+          });
+          _chargerDonnees();
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildPaiementsPassesSection() {
+    if (!widget.dette.estManuelle || widget.dette.archive) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Card(
+        child: ExpansionTile(
+          title: const Text('Enregistrer des paiements passés',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          initiallyExpanded: _afficherSectionPaiementsPasses,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _afficherSectionPaiementsPasses = expanded;
+            });
+          },
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKeyPaiementsPasses,
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _nombrePaiementsPassesController,
+                      decoration: const InputDecoration(
+                          labelText: 'Nombre de paiements déjà effectués',
+                          border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer un nombre';
+                        }
+                        if (int.tryParse(value) == null ||
+                            int.parse(value) <= 0) {
+                          return 'Veuillez entrer un nombre valide';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _montantPaiementPasseController,
+                      decoration: const InputDecoration(
+                          labelText: 'Montant par paiement',
+                          border: OutlineInputBorder(),
+                          suffixText: '\$'),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer un montant';
+                        }
+                        if (_toDouble(value) == null ||
+                            _toDouble(value)! <= 0) {
+                          return 'Veuillez entrer un montant valide';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Icon(Icons.date_range),
+                        const SizedBox(width: 8),
+                        const Text('Date du dernier paiement:'),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: _datePaiementPasse,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now(),
+                            );
+                            if (date != null) {
+                              setState(() {
+                                _datePaiementPasse = date;
+                              });
+                            }
+                          },
+                          child: Text(_formaterDate(_datePaiementPasse)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _enregistrerPaiementsPasses,
+                      icon: const Icon(Icons.save),
+                      label: const Text('Enregistrer les paiements'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Map<String, double?> _calculerValeursPret() {
@@ -1028,31 +1154,24 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         dureeMois: dureeMois,
       );
 
-      // Calculer le coût total
       if (widget.dette.coutTotal != null) {
         coutTotal = widget.dette.coutTotal;
       } else {
-        // Calculer pour compatibilité avec anciennes dettes
         coutTotal = CalculPretService.calculerCoutTotal(
           paiementMensuel: montantMensuel,
           dureeMois: dureeMois,
         );
       }
 
-      // Utiliser TOUJOURS le solde Firebase pour l'affichage
       solde = _soldeFirestore;
 
-      // Utiliser les intérêts payés stockés dans Firebase si disponibles
       if (widget.dette.interetsPayes != null) {
         interetsPayes = widget.dette.interetsPayes;
       } else {
-        // Sinon calculer pour compatibilité avec anciennes dettes
         if (_totalRemboursements > 0) {
           final tauxMensuel = tauxInteret / 100 / 12;
           double soldeSimule = prixAchat;
           double interetsSimules = 0.0;
-
-          // Simuler chaque paiement pour calculer les intérêts réels
           double remboursementsRestants = _totalRemboursements;
 
           while (remboursementsRestants > 0 && soldeSimule > 0) {
@@ -1062,10 +1181,8 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
                 : remboursementsRestants;
 
             if (paiementEffectif <= interetMensuel) {
-              // Paiement ne couvre que les intérêts (ou moins)
               interetsSimules += paiementEffectif;
             } else {
-              // Paiement couvre intérêts + capital
               interetsSimules += interetMensuel;
               soldeSimule -= (paiementEffectif - interetMensuel);
             }
@@ -1104,9 +1221,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     return null;
   }
 
-  // Nouvelle fonction : convertit un texte (ex. « 12.34 $ ») en double
   double? _toDouble(String text) {
-    // Supprime tout caractère qui n'est pas chiffre, point ou signe moins
     final sanitized = text.replaceAll(RegExp(r'[^0-9\.\-]'), '');
     if (sanitized.isEmpty) return null;
     return double.tryParse(sanitized);
@@ -1114,7 +1229,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
   @override
   void dispose() {
-    // Retirer tous les listeners
     _nombrePaiementsController.removeListener(_onParametresChanges);
     _dateDebutController.removeListener(_onParametresChanges);
     _dateFinController.removeListener(_onParametresChanges);
@@ -1123,7 +1237,6 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _montantMensuelController.removeListener(_onParametresChanges);
     _paiementsEffectuesController.removeListener(_onParametresChanges);
 
-    // Annuler l'abonnement Firestore
     _detteListener?.cancel();
     _txListener?.cancel();
 
@@ -1140,13 +1253,12 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     _simulateurPrincipalController.dispose();
     _simulateurDureeController.dispose();
 
-    _paiementsPassesNombreController.dispose();
-    _paiementsPassesMontantController.dispose();
+    _nombrePaiementsPassesController.dispose();
+    _montantPaiementPasseController.dispose();
 
     super.dispose();
   }
 
-  // Ajout d'une fonction utilitaire pour ouvrir le clavier numérique personnalisé
   void _ouvrirClavierNumerique(
     TextEditingController controller, {
     bool showDecimal = true,
@@ -1184,111 +1296,5 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         });
       }
     });
-  }
-
-  void _appliquerPaiementsPasses() async {
-    final int? nombre = int.tryParse(_paiementsPassesNombreController.text);
-    final double? montant = double.tryParse(
-        _paiementsPassesMontantController.text.replaceAll(',', '.'));
-
-    if (nombre == null || nombre <= 0 || montant == null || montant <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez entrer un nombre et un montant valides.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final List<MouvementDette> mouvementsPasses = [];
-    final dateDebut = widget.dette.dateDebut ?? DateTime.now();
-
-    for (int i = 0; i < nombre; i++) {
-      final dateMouvement =
-          DateTime(dateDebut.year, dateDebut.month + i, dateDebut.day);
-      mouvementsPasses.add(
-        MouvementDette(
-          id: 'passe_${DateTime.now().millisecondsSinceEpoch}_$i',
-          type: widget.dette.type == 'dette'
-              ? 'remboursement_effectue'
-              : 'remboursement_recu',
-          montant: widget.dette.type == 'dette' ? -montant : montant,
-          date: dateMouvement,
-          note: 'Paiement passé enregistré automatiquement',
-        ),
-      );
-    }
-
-    try {
-      final service = DetteService();
-      await service.ajouterPaiementsPasses(widget.dette.id, mouvementsPasses);
-
-      setState(() {
-        _paiementsPassesAppliques = true;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Les paiements passés ont été appliqués avec succès !'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de l\'application des paiements : $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Widget _buildPaiementsPassesSection() {
-    if (!widget.dette.estManuelle ||
-        widget.dette.archive ||
-        _paiementsPassesAppliques) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ExpansionTile(
-        title: const Text('Enregistrer des paiements passés',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        initiallyExpanded: false,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _paiementsPassesNombreController,
-                  decoration: const InputDecoration(
-                      labelText: 'Nombre de paiements déjà effectués',
-                      border: OutlineInputBorder()),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _paiementsPassesMontantController,
-                  decoration: const InputDecoration(
-                      labelText: 'Montant moyen de chaque paiement',
-                      border: OutlineInputBorder(),
-                      suffixText: '\$'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _appliquerPaiementsPasses,
-                  child: const Text('Appliquer les paiements passés'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
