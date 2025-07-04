@@ -257,9 +257,11 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
 
   void _recalculerPaiementMensuel() {
     // Logique ultra-simplifiée, comme demandé.
-    // Solde restant / nombre de mois restants.
+    // Solde restant (tel qu'affiché) / nombre de mois restants.
 
-    final soldeRestant = _soldeFirestore;
+    final calculs = _calculerValeursPret();
+    final soldeRestant = calculs['solde'];
+
     if (soldeRestant == null || soldeRestant <= 0) {
       _montantMensuelController.text = '0.00';
       return;
@@ -1224,38 +1226,39 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
         );
       }
 
-      solde = _soldeFirestore;
+      final totalRemboursements = _calculerTotalRemboursementsHistorique();
+      if (coutTotal != null) {
+        solde = coutTotal - totalRemboursements;
+      } else {
+        solde = _detteActuelle.montantInitial - totalRemboursements;
+      }
+      solde = (solde < 0) ? 0 : solde;
 
       if (_detteActuelle.interetsPayes != null) {
         interetsPayes = _detteActuelle.interetsPayes;
       } else {
-        final totalRemboursements = _calculerTotalRemboursementsHistorique();
-        if (totalRemboursements > 0) {
-          final tauxMensuel = tauxInteret / 100 / 12;
-          double soldeSimule = prixAchat;
-          double interetsSimules = 0.0;
-          double remboursementsRestants = totalRemboursements;
+        final tauxMensuel = tauxInteret / 100 / 12;
+        double soldeSimule = prixAchat;
+        double interetsSimules = 0.0;
+        double remboursementsRestants = totalRemboursements;
 
-          while (remboursementsRestants > 0 && soldeSimule > 0) {
-            final interetMensuel = soldeSimule * tauxMensuel;
-            final paiementEffectif = remboursementsRestants >= montantMensuel
-                ? montantMensuel
-                : remboursementsRestants;
+        while (remboursementsRestants > 0 && soldeSimule > 0) {
+          final interetMensuel = soldeSimule * tauxMensuel;
+          final paiementEffectif = remboursementsRestants >= montantMensuel
+              ? montantMensuel
+              : remboursementsRestants;
 
-            if (paiementEffectif <= interetMensuel) {
-              interetsSimules += paiementEffectif;
-            } else {
-              interetsSimules += interetMensuel;
-              soldeSimule -= (paiementEffectif - interetMensuel);
-            }
-
-            remboursementsRestants -= paiementEffectif;
+          if (paiementEffectif <= interetMensuel) {
+            interetsSimules += paiementEffectif;
+          } else {
+            interetsSimules += interetMensuel;
+            soldeSimule -= (paiementEffectif - interetMensuel);
           }
 
-          interetsPayes = interetsSimules;
-        } else {
-          interetsPayes = 0;
+          remboursementsRestants -= paiementEffectif;
         }
+
+        interetsPayes = interetsSimules;
       }
     }
 
