@@ -26,6 +26,7 @@ class _PageInvestissementState extends State<PageInvestissement> {
   bool _isLoading = true;
   String _nextUpdateTime = '';
   Timer? _updateTimer;
+  Compte? _compte;
 
   @override
   void initState() {
@@ -41,7 +42,6 @@ class _PageInvestissementState extends State<PageInvestissement> {
   }
 
   void _demarrerMiseAJourAutomatique() {
-    // Mettre à jour le temps toutes les secondes
     _updateTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         _nextUpdateTime = _investissementService.getNextUpdateTime();
@@ -55,6 +55,20 @@ class _PageInvestissementState extends State<PageInvestissement> {
     });
 
     try {
+      // Charger le compte
+      final comptes = await _firebaseService.lireComptes().first;
+      final compte = comptes.firstWhere((c) => c.id == widget.compteId,
+          orElse: () => Compte(
+                id: widget.compteId,
+                nom: '',
+                type: '',
+                solde: 0.0,
+                couleur: 0xFF2196F3,
+                pretAPlacer: 0.0,
+                dateCreation: DateTime.now(),
+                estArchive: false,
+              ));
+
       // Charger les actions
       final actions = await _investissementService.getActions(widget.compteId);
 
@@ -63,6 +77,7 @@ class _PageInvestissementState extends State<PageInvestissement> {
           .calculerPerformanceCompte(widget.compteId);
 
       setState(() {
+        _compte = compte;
         _actions = actions;
         _performanceCompte = performance;
         _isLoading = false;
@@ -163,8 +178,10 @@ class _PageInvestissementState extends State<PageInvestissement> {
   }
 
   Future<void> _supprimerAction(
-      String actionId, String symbol, double quantite) async {
+      String actionId, String symbol, double quantitePossedee) async {
     final prixController = TextEditingController();
+    final quantiteController =
+        TextEditingController(text: quantitePossedee.toString());
 
     await showDialog(
       context: context,
@@ -173,7 +190,16 @@ class _PageInvestissementState extends State<PageInvestissement> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Quantité: $quantite'),
+            Text('Quantité possédée: $quantitePossedee'),
+            SizedBox(height: 16),
+            TextField(
+              controller: quantiteController,
+              decoration: InputDecoration(
+                labelText: 'Quantité à vendre',
+                hintText: quantitePossedee.toString(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
             SizedBox(height: 16),
             TextField(
               controller: prixController,
@@ -194,10 +220,22 @@ class _PageInvestissementState extends State<PageInvestissement> {
             onPressed: () async {
               try {
                 final prix = double.tryParse(prixController.text) ?? 0;
+                final quantiteAVendre =
+                    double.tryParse(quantiteController.text) ?? 0;
 
-                if (prix <= 0) {
+                if (prix <= 0 || quantiteAVendre <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Veuillez entrer un prix valide')),
+                    SnackBar(
+                        content: Text(
+                            'Veuillez entrer un prix et une quantité valides')),
+                  );
+                  return;
+                }
+                if (quantiteAVendre > quantitePossedee) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text(
+                            'Vous ne pouvez pas vendre plus que la quantité possédée')),
                   );
                   return;
                 }
@@ -205,9 +243,10 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 await _investissementService.supprimerAction(
                   actionId: actionId,
                   compteId: widget.compteId,
-                  quantite: quantite,
+                  quantite: quantiteAVendre,
                   prixVente: prix,
                   dateVente: DateTime.now(),
+                  quantiteRestante: quantitePossedee - quantiteAVendre,
                 );
 
                 Navigator.pop(context);
@@ -346,6 +385,73 @@ class _PageInvestissementState extends State<PageInvestissement> {
     );
   }
 
+  Widget _buildSoldeGraphique() {
+    // Données fictives pour l'exemple (remplacer par l'historique Firestore si dispo)
+    final List<double> soldeHistorique =
+        List.generate(30, (i) => 900 + i * 4 + (i % 5) * 10);
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Évolution du solde (30 jours)',
+                style: Theme.of(context).textTheme.titleMedium),
+            SizedBox(height: 12),
+            SizedBox(
+              height: 160,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(show: false),
+                  titlesData: FlTitlesData(show: false),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: [
+                        for (int i = 0; i < soldeHistorique.length; i++)
+                          FlSpot(i.toDouble(), soldeHistorique[i]),
+                      ],
+                      isCurved: true,
+                      color: Colors.greenAccent,
+                      barWidth: 3,
+                      dotData: FlDotData(show: false),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCashDisponible() {
+    final cash = _compte?.pretAPlacer ?? 0.0;
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Cash disponible',
+                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '\$${cash.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: cash >= 0 ? Colors.green : Colors.red,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionCard(Map<String, dynamic> action) {
     final symbol = action['symbol'] as String;
     final quantite = (action['quantite'] as num).toDouble();
@@ -443,8 +549,17 @@ class _PageInvestissementState extends State<PageInvestissement> {
               child: SingleChildScrollView(
                 physics: AlwaysScrollableScrollPhysics(),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildPerformanceCard(),
+                    _buildSoldeGraphique(),
+                    _buildCashDisponible(),
+                    Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Text('Mes actions',
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ),
                     if (_actions.isEmpty)
                       Padding(
                         padding: EdgeInsets.all(32),
@@ -453,16 +568,14 @@ class _PageInvestissementState extends State<PageInvestissement> {
                             Icon(Icons.trending_up,
                                 size: 64, color: Colors.grey),
                             SizedBox(height: 16),
-                            Text(
-                              'Aucune action',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
+                            Text('Aucune action',
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall),
                             SizedBox(height: 8),
                             Text(
-                              'Ajoutez votre première action en appuyant sur le bouton +',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey),
-                            ),
+                                'Ajoutez votre première action en appuyant sur le bouton +',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       )
@@ -470,7 +583,7 @@ class _PageInvestissementState extends State<PageInvestissement> {
                       ...(_actions
                           .map((action) => _buildActionCard(action))
                           .toList()),
-                    SizedBox(height: 100), // Espace pour le FAB
+                    SizedBox(height: 100),
                   ],
                 ),
               ),

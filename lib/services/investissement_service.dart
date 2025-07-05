@@ -50,6 +50,22 @@ class InvestissementService {
       // Sauvegarder la transaction
       await _firebaseService.ajouterTransaction(transaction);
 
+      // Déduire le montant du cash disponible (pretAPlacer)
+      final compteDoc = await _firebaseService.firestore
+          .collection('comptes')
+          .doc(compteId)
+          .get();
+      if (!compteDoc.exists) throw Exception('Compte non trouvé');
+      final compteData = compteDoc.data()!;
+      final pretAPlacer = (compteData['pretAPlacer'] ?? 0).toDouble();
+      final nouveauPretAPlacer = pretAPlacer - (quantite * prixAchat);
+      await _firebaseService.firestore
+          .collection('comptes')
+          .doc(compteId)
+          .update({
+        'pretAPlacer': nouveauPretAPlacer,
+      });
+
       // Sauvegarder les détails de l'action
       await _firebaseService.firestore.collection('actions').add({
         'compteId': compteId,
@@ -77,6 +93,7 @@ class InvestissementService {
     required double quantite,
     required double prixVente,
     required DateTime dateVente,
+    required double quantiteRestante,
   }) async {
     try {
       // Récupérer les détails de l'action
@@ -90,6 +107,7 @@ class InvestissementService {
 
       final actionData = actionDoc.data()!;
       final symbol = actionData['symbol'] as String;
+      final prixAchat = (actionData['prixAchat'] as num).toDouble();
 
       // Créer la transaction de vente
       final transaction = app_model.Transaction(
@@ -108,13 +126,40 @@ class InvestissementService {
       // Sauvegarder la transaction
       await _firebaseService.ajouterTransaction(transaction);
 
-      // Supprimer l'action
+      // Mettre à jour le cash disponible (pretAPlacer)
+      final compteDoc = await _firebaseService.firestore
+          .collection('comptes')
+          .doc(compteId)
+          .get();
+      if (!compteDoc.exists) throw Exception('Compte non trouvé');
+      final compteData = compteDoc.data()!;
+      final pretAPlacer = (compteData['pretAPlacer'] ?? 0).toDouble();
+      final nouveauPretAPlacer = pretAPlacer + (quantite * prixVente);
       await _firebaseService.firestore
-          .collection('actions')
-          .doc(actionId)
-          .delete();
+          .collection('comptes')
+          .doc(compteId)
+          .update({
+        'pretAPlacer': nouveauPretAPlacer,
+      });
 
-      print('✅ Action $symbol supprimée du compte $compteId');
+      if (quantiteRestante > 0) {
+        // Vente partielle : mettre à jour la quantité
+        await _firebaseService.firestore
+            .collection('actions')
+            .doc(actionId)
+            .update({
+          'quantite': quantiteRestante,
+        });
+      } else {
+        // Vente totale : supprimer l'action
+        await _firebaseService.firestore
+            .collection('actions')
+            .doc(actionId)
+            .delete();
+      }
+
+      print(
+          '✅ Action $symbol vendue ($quantite/$quantiteRestante) du compte $compteId');
     } catch (e) {
       print('❌ Erreur suppression action: $e');
       rethrow;
