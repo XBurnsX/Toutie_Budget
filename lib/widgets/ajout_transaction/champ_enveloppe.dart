@@ -31,7 +31,7 @@ class ChampEnveloppe extends StatelessWidget {
     final dropdownColor = Theme.of(context).dropdownColor;
 
     // Construire la liste des items une seule fois
-    final items = _buildEnveloppeItems();
+    final items = _buildEnveloppeItems(context);
 
     // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
     String? valeurActuelle = enveloppeSelectionnee;
@@ -67,7 +67,7 @@ class ChampEnveloppe extends StatelessWidget {
     );
   }
 
-  List<DropdownMenuItem<String>> _buildEnveloppeItems() {
+  List<DropdownMenuItem<String>> _buildEnveloppeItems(BuildContext context) {
     final items = <DropdownMenuItem<String>>[];
 
     // Option "Aucune"
@@ -97,38 +97,64 @@ class ChampEnveloppe extends StatelessWidget {
       }
     }
 
-    // Enveloppes classiques filtrées
-    final enveloppesFiltrees = categoriesFirebase
-        .expand((cat) => (cat['enveloppes'] as List))
-        .where((env) => _estEnveloppeAffichable(env))
-        .toList();
+    // Parcourir chaque catégorie pour ajouter un en-tête puis ses enveloppes
+    for (final cat in categoriesFirebase) {
+      final String nomCat = cat['nom'] ?? '';
+      final List enveloppesCat = cat['enveloppes'] ?? [];
 
-    for (final env in enveloppesFiltrees) {
-      final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
-      final couleurCompte = getCouleurCompteEnveloppe(env);
+      // Filtrer les enveloppes selon la logique existante
+      final enveloppesVisibles = enveloppesCat
+          .where((e) => _estEnveloppeAffichable(e as Map<String, dynamic>))
+          .toList();
 
+      if (enveloppesVisibles.isEmpty)
+        continue; // Rien à afficher pour cette catégorie
+
+      // Ajouter un séparateur/entête pour la catégorie
       items.add(
         DropdownMenuItem<String>(
-          value: env['id'],
+          enabled: false,
+          value: 'header_$nomCat',
           child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(env['nom'], overflow: TextOverflow.ellipsis),
-                const SizedBox(width: 6),
-                Text(
-                  '${solde.toStringAsFixed(2)} \$',
-                  style: TextStyle(
-                    color: couleurCompte,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            child: Text(
+              nomCat.toUpperCase(),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
       );
+
+      // Ajouter les enveloppes de cette catégorie
+      for (final env in enveloppesVisibles) {
+        final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
+        final couleurCompte = getCouleurCompteEnveloppe(env);
+
+        items.add(
+          DropdownMenuItem<String>(
+            value: env['id'],
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(env['nom'], overflow: TextOverflow.ellipsis),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${solde.toStringAsFixed(2)} \$',
+                    style: TextStyle(
+                      color: couleurCompte,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     return items;

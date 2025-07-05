@@ -73,8 +73,9 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color:
-                        aEnveloppesNegatives ? Colors.red[400] : Colors.white70,
+                    color: aEnveloppesNegatives
+                        ? Colors.red[400]
+                        : Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],

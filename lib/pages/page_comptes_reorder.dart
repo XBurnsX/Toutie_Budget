@@ -3,6 +3,8 @@ import 'package:toutie_budget/models/compte.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'page_creation_compte.dart';
 import 'page_transactions_compte.dart';
+import 'page_modification_compte.dart';
+import 'page_reconciliation.dart';
 
 class PageComptesReorder extends StatefulWidget {
   const PageComptesReorder({super.key});
@@ -136,6 +138,8 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                     ),
                   );
                 },
+          onLongPress:
+              editing ? null : () => _showCompteMenu(context, compte, isCheque),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -225,5 +229,100 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
     }
 
     setState(() {}); // Rafraîchir l\'UI
+  }
+
+  void _showCompteMenu(BuildContext context, Compte compte, bool isCheque) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Modifier'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          PageModificationCompte(compte: compte),
+                    ),
+                  );
+                },
+              ),
+              if (isCheque || compte.type == 'Carte de crédit')
+                ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Réconcilier'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PageReconciliation(compte: compte),
+                      ),
+                    );
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Supprimer',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDelete(context, compte);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Compte compte) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmer la suppression'),
+          content: Text(
+              'Êtes-vous sûr de vouloir supprimer le compte "${compte.nom}" ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await FirebaseService().updateCompte(compte.id, {
+                    'estArchive': true,
+                    'dateSuppression': DateTime.now().toIso8601String(),
+                  });
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Compte supprimé avec succès')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur: $e')),
+                    );
+                  }
+                }
+              },
+              child:
+                  const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

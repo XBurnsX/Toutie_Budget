@@ -627,10 +627,10 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                   Expanded(
                     child: Text(
                       categorie.nom,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white70,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),

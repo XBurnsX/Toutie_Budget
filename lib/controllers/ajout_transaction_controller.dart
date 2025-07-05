@@ -194,8 +194,10 @@ class AjoutTransactionController extends ChangeNotifier {
 
   void _mettreAJourListeComptesAffichables() {
     _listeComptesAffichables = _comptesFirebase
+        .where((c) => !c.estArchive)
         .where((c) => c.type == 'Chèque' || c.type == 'Carte de crédit')
-        .toList();
+        .toList()
+      ..sort((a, b) => (a.ordre ?? 999999).compareTo(b.ordre ?? 999999));
   }
 
   // Fonction utilitaire pour normaliser les chaînes de caractères
