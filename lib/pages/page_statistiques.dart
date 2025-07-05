@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../models/transaction_model.dart' as app_model;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PageStatistiques extends StatefulWidget {
   const PageStatistiques({super.key});
@@ -29,70 +30,60 @@ class _PageStatistiquesState extends State<PageStatistiques> {
 
   Future<void> _chargerStatistiques() async {
     setState(() => _isLoading = true);
-
     final firebaseService = FirebaseService();
     final debutMois = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final finMois = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-
-    // Récupérer toutes les données
-    final comptes = await firebaseService.lireComptes().first;
+    final comptes = (await firebaseService.lireComptes().first)
+        .where((c) => c.type == 'Chèque')
+        .toList();
     final categories = await firebaseService.lireCategories().first;
-
-    // Statistiques des enveloppes et tiers
     Map<String, double> enveloppesUtilisation = {};
     Map<String, double> tiersUtilisation = {};
     double revenus = 0.0;
     double depenses = 0.0;
-
-    // Parcourir toutes les transactions du mois
     for (var compte in comptes) {
-      final transactions =
-          await firebaseService.lireTransactions(compte.id).first;
-
+      // Nouvelle requête optimisée : ne charger que les transactions du mois
+      final snap = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: compte.userId)
+          .where('compteId', isEqualTo: compte.id)
+          .where('date', isGreaterThanOrEqualTo: debutMois)
+          .where('date', isLessThanOrEqualTo: finMois)
+          .get();
+      final transactions = snap.docs
+          .map((doc) => app_model.Transaction.fromJson(
+              doc.data() as Map<String, dynamic>))
+          .toList();
       for (var transaction in transactions) {
-        if (transaction.date.isAfter(
-              debutMois.subtract(const Duration(days: 1)),
-            ) &&
-            transaction.date.isBefore(finMois.add(const Duration(days: 1)))) {
-          if (transaction.type == app_model.TypeTransaction.depense) {
-            depenses += transaction.montant;
-
-            // Trouver le nom de l'enveloppe pour les statistiques
-            String enveloppeNom = 'Enveloppe inconnue';
-            for (var categorie in categories) {
-              for (var enveloppe in categorie.enveloppes) {
-                if (enveloppe.id == transaction.enveloppeId) {
-                  enveloppeNom = enveloppe.nom;
-                  break;
-                }
+        if (transaction.type == app_model.TypeTransaction.depense) {
+          depenses += transaction.montant;
+          String enveloppeNom = 'Enveloppe inconnue';
+          for (var categorie in categories) {
+            for (var enveloppe in categorie.enveloppes) {
+              if (enveloppe.id == transaction.enveloppeId) {
+                enveloppeNom = enveloppe.nom;
+                break;
               }
             }
-
-            enveloppesUtilisation[enveloppeNom] =
-                (enveloppesUtilisation[enveloppeNom] ?? 0) +
-                    transaction.montant;
-
-            // Statistiques des tiers
-            if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
-              tiersUtilisation[transaction.tiers!] =
-                  (tiersUtilisation[transaction.tiers!] ?? 0) +
-                      transaction.montant;
-            }
-          } else {
-            revenus += transaction.montant;
           }
+          enveloppesUtilisation[enveloppeNom] =
+              (enveloppesUtilisation[enveloppeNom] ?? 0) + transaction.montant;
+          if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
+            tiersUtilisation[transaction.tiers!] =
+                (tiersUtilisation[transaction.tiers!] ?? 0) +
+                    transaction.montant;
+          }
+        } else {
+          revenus += transaction.montant;
         }
       }
     }
-
-    // Trier et prendre le top 5
     final sortedEnveloppes = enveloppesUtilisation.entries
         .where((entry) => entry.key != 'Enveloppe inconnue')
         .toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final sortedTiers = tiersUtilisation.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-
     setState(() {
       _topEnveloppes = sortedEnveloppes.take(5).toList();
       _topTiers = sortedTiers.take(5).toList();
