@@ -10,6 +10,7 @@ import 'page_reconciliation.dart';
 import 'page_parametres_dettes.dart';
 import 'page_pret_personnel.dart';
 import 'page_investissement.dart';
+import 'page_carte_de_credit.dart';
 import 'package:toutie_budget/services/investissement_service.dart';
 
 class PageComptesReorder extends StatefulWidget {
@@ -328,6 +329,13 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                         MaterialPageRoute(
                           builder: (_) =>
                               PageInvestissement(compteId: compte.id),
+                        ),
+                      );
+                    } else if (compte.type == 'Carte de crédit') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PageDetailCarteCredit(),
                         ),
                       );
                     } else {
