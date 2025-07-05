@@ -198,7 +198,7 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                   if (compte.type == 'Investissement') {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => PageInvestissement(compte: compte),
+                        builder: (_) => PageInvestissement(compteId: compte.id),
                       ),
                     );
                   } else {
