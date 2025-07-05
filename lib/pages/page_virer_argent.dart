@@ -392,6 +392,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                 final comptesFilters = comptes
                     .where(
                       (compte) =>
+                          !compte.estArchive &&
                           compte.type != 'Dette' &&
                           compte.type != 'Investissement',
                     )
