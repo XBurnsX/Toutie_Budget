@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AlphaVantageService {
   static const String API_KEY = 'BD4NV7ZVF2RBD59B';
@@ -18,11 +19,36 @@ class AlphaVantageService {
   DateTime _lastResetDate = DateTime.now();
   Timer? _batchTimer;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  DateTime? _lastBatchTime;
 
   // Singleton pattern
   static final AlphaVantageService _instance = AlphaVantageService._internal();
   factory AlphaVantageService() => _instance;
-  AlphaVantageService._internal();
+  AlphaVantageService._internal() {
+    _loadPersistentStats();
+  }
+
+  Future<void> _loadPersistentStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    _requestsToday = prefs.getInt('requestsToday') ?? 0;
+    final lastReset = prefs.getString('lastResetDate');
+    if (lastReset != null) {
+      _lastResetDate = DateTime.parse(lastReset);
+    }
+    final lastBatch = prefs.getString('lastBatchTime');
+    if (lastBatch != null) {
+      _lastBatchTime = DateTime.parse(lastBatch);
+    }
+  }
+
+  Future<void> _savePersistentStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('requestsToday', _requestsToday);
+    await prefs.setString('lastResetDate', _lastResetDate.toIso8601String());
+    if (_lastBatchTime != null) {
+      await prefs.setString('lastBatchTime', _lastBatchTime!.toIso8601String());
+    }
+  }
 
   // Démarrer le batch update automatique
   void startBatchUpdate() {
@@ -63,7 +89,6 @@ class AlphaVantageService {
 
   // Traiter le prochain batch
   Future<void> _processNextBatch() async {
-    // Reset le compteur si c'est un nouveau jour
     _resetDailyCounter();
 
     // Vérifier si on peut faire des requêtes
@@ -99,6 +124,8 @@ class AlphaVantageService {
     }
 
     print('📊 Batch terminé. Actions restantes: ${_pendingSymbols.length}');
+    _lastBatchTime = DateTime.now();
+    await _savePersistentStats();
   }
 
   // Reset le compteur quotidien
@@ -109,6 +136,7 @@ class AlphaVantageService {
         now.year != _lastResetDate.year) {
       _requestsToday = 0;
       _lastResetDate = now;
+      _savePersistentStats();
       print('🔄 Nouveau jour, compteur Alpha Vantage remis à zéro');
     }
   }
@@ -203,20 +231,22 @@ class AlphaVantageService {
       'pendingSymbols': _pendingSymbols.length,
       'batchSize': BATCH_SIZE,
       'batchInterval': BATCH_INTERVAL ~/ 60000, // en minutes
+      'lastBatchTime': _lastBatchTime?.toIso8601String(),
+      'lastResetDate': _lastResetDate.toIso8601String(),
     };
   }
 
   // Obtenir le temps jusqu'à la prochaine mise à jour
   String getNextUpdateTime() {
     if (_batchTimer == null) return 'Arrêté';
-
     final now = DateTime.now();
-    final nextUpdate = now.add(Duration(minutes: 10));
+    if (_lastBatchTime == null) return 'Inconnu';
+    final nextUpdate =
+        _lastBatchTime!.add(Duration(milliseconds: BATCH_INTERVAL));
     final difference = nextUpdate.difference(now);
-
+    if (difference.isNegative) return 'Imminente';
     final minutes = difference.inMinutes;
     final seconds = difference.inSeconds % 60;
-
     return '${minutes}m ${seconds}s';
   }
 
