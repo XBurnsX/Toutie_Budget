@@ -113,6 +113,22 @@ class Categorie {
     this.ordre,
   });
 
+  Categorie copyWith({
+    String? id,
+    String? userId,
+    String? nom,
+    List<Enveloppe>? enveloppes,
+    int? ordre,
+  }) {
+    return Categorie(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      nom: nom ?? this.nom,
+      enveloppes: enveloppes ?? this.enveloppes,
+      ordre: ordre ?? this.ordre,
+    );
+  }
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'userId': userId,

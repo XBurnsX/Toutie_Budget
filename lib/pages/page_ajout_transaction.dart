@@ -17,6 +17,9 @@ class EcranAjoutTransactionRefactored extends StatefulWidget {
   final Transaction? transactionExistante;
   final bool modeModification;
   final VoidCallback? onTransactionSaved;
+  final String? nomTiers;
+  final String? typeRemboursement;
+  final double? montantSuggere;
 
   const EcranAjoutTransactionRefactored({
     super.key,
@@ -24,6 +27,9 @@ class EcranAjoutTransactionRefactored extends StatefulWidget {
     this.transactionExistante,
     this.modeModification = false,
     this.onTransactionSaved,
+    this.nomTiers,
+    this.typeRemboursement,
+    this.montantSuggere,
   });
 
   @override
@@ -42,6 +48,28 @@ class _EcranAjoutTransactionRefactoredState
     _controller = AjoutTransactionController();
     _initialiserController();
     _chargerDonnees();
+    // Pré-remplissage si arguments fournis
+    if (widget.nomTiers != null && widget.nomTiers!.isNotEmpty) {
+      _controller.payeController.text = widget.nomTiers!;
+    }
+    if (widget.montantSuggere != null) {
+      _controller.montantController.text =
+          widget.montantSuggere!.toStringAsFixed(2);
+    }
+    if (widget.typeRemboursement != null) {
+      // On mappe la string sur l'enum TypeMouvementFinancier si possible
+      switch (widget.typeRemboursement) {
+        case 'remboursement_effectue':
+          _controller
+              .setTypeMouvement(TypeMouvementFinancier.remboursementEffectue);
+          break;
+        case 'remboursement_recu':
+          _controller
+              .setTypeMouvement(TypeMouvementFinancier.remboursementRecu);
+          break;
+        // Ajoute d'autres cas si besoin
+      }
+    }
   }
 
   void _initialiserController() {

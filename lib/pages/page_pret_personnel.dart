@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/dette.dart';
 import '../services/dette_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../services/firebase_service.dart';
 
 class PagePretPersonnel extends StatefulWidget {
   const PagePretPersonnel({super.key});
@@ -458,14 +459,20 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
     );
   }
 
-  void _ajouterRemboursement(Dette dette) {
+  void _ajouterRemboursement(Dette dette) async {
     Navigator.pop(context); // Fermer le modal
+
+    // Charger la liste des comptes non archivés
+    final comptes = await FirebaseService().lireComptes().first;
+    final comptesNonArchives = comptes.where((c) => !c.estArchive).toList();
+    final nomsComptes = comptesNonArchives.map((c) => c.nom).toList();
 
     // Rediriger vers la page d'ajout de transaction avec les bonnes valeurs préremplies
     Navigator.pushNamed(
       context,
       '/ajout_transaction',
       arguments: {
+        'comptesExistants': nomsComptes,
         'typeRemboursement': dette.type == 'pret'
             ? 'remboursement_recu'
             : 'remboursement_effectue',

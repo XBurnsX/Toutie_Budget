@@ -139,6 +139,17 @@ class MyApp extends StatelessWidget {
                   ),
                 );
               }
+              if (settings.name == '/ajout_transaction') {
+                final args = settings.arguments as Map<String, dynamic>?;
+                return MaterialPageRoute(
+                  builder: (context) => EcranAjoutTransactionRefactored(
+                    comptesExistants: args?['comptesExistants'] ?? [],
+                    nomTiers: args?['nomTiers'],
+                    typeRemboursement: args?['typeRemboursement'],
+                    montantSuggere: args?['montantSuggere'],
+                  ),
+                );
+              }
               return null;
             },
             routes: {

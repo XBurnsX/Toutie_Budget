@@ -683,7 +683,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   }
 
   Widget _buildCategorieItem(Categorie categorie, {Key? key, int? index}) {
-    final enveloppes = List<Enveloppe>.from(categorie.enveloppes);
+    final enveloppes =
+        categorie.enveloppes.where((env) => env.archivee != true).toList();
     if (_editionMode) {
       enveloppes.sort((a, b) => (a.ordre ?? 0).compareTo(b.ordre ?? 0));
     }

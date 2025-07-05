@@ -163,8 +163,11 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         }
 
         final categorie = _displayedCategories[index];
+        // Filtrer les enveloppes archivées
         final enveloppes =
-            categorie['enveloppes'] as List<Map<String, dynamic>>;
+            (categorie['enveloppes'] as List<Map<String, dynamic>>)
+                .where((env) => env['archivee'] != true)
+                .toList();
 
         // Vérifier si la catégorie a des enveloppes négatives
         final aEnveloppesNegatives = enveloppes.any(
