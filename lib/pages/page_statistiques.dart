@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../models/transaction_model.dart' as app_model;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/cache_service.dart';
 
 class PageStatistiques extends StatefulWidget {
   const PageStatistiques({super.key});
@@ -33,10 +33,10 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     final firebaseService = FirebaseService();
     final debutMois = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final finMois = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-    final comptes = (await firebaseService.lireComptes().first)
+    final comptes = (await CacheService.getComptes(firebaseService))
         .where((c) => c.type == 'Chèque')
         .toList();
-    final categories = await firebaseService.lireCategories().first;
+    final categories = await CacheService.getCategories(firebaseService);
     Map<String, double> enveloppesUtilisation = {};
     Map<String, double> tiersUtilisation = {};
     double revenus = 0.0;
@@ -112,14 +112,6 @@ class _PageStatistiquesState extends State<PageStatistiques> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: _buildStatistiquesContent(context),
-        ),
-      );
-    }
     return _buildStatistiquesContent(context);
   }
 

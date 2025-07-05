@@ -5,8 +5,8 @@ import '../models/transaction_model.dart' as app_model;
 import '../models/categorie.dart';
 import '../services/firebase_service.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/cache_service.dart';
 
 /// Page affichant la liste des transactions d'un compte chèque
 class PageTransactionsCompte extends StatefulWidget {
@@ -236,20 +236,6 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Transactions - ${widget.compte.nom}'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
-        ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: _buildTransactionsCompteContent(context),
-          ),
-        ),
-      );
-    }
     return Scaffold(
       appBar: AppBar(
         title: Text('Transactions - ${widget.compte.nom}'),
@@ -262,7 +248,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
   Widget _buildTransactionsCompteContent(BuildContext context) {
     // On charge les enveloppes une seule fois
     return FutureBuilder<List<Categorie>>(
-      future: FirebaseService().lireCategories().first,
+      future: CacheService.getCategories(FirebaseService()),
       builder: (context, catSnapshot) {
         final enveloppeIdToNom = <String, String>{};
         if (catSnapshot.hasData) {

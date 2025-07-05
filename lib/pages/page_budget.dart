@@ -16,6 +16,7 @@ import 'page_statistiques.dart';
 import 'page_ajout_transaction.dart';
 import 'page_comptes.dart';
 import 'page_transactions_compte.dart';
+import '../services/cache_service.dart';
 
 /// Page d'affichage du budget et des enveloppes
 class PageBudget extends StatefulWidget {
@@ -102,8 +103,8 @@ class _PageBudgetState extends State<PageBudget> {
   Widget build(BuildContext context) {
     if (kIsWeb) {
       return Scaffold(
-        body: StreamBuilder<List<Compte>>(
-          stream: FirebaseService().lireComptes(),
+        body: FutureBuilder<List<Compte>>(
+          future: CacheService.getComptes(FirebaseService()),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -114,9 +115,8 @@ class _PageBudgetState extends State<PageBudget> {
             final comptesChequesPretAPlacer = comptesNonArchives
                 .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
                 .toList();
-            return StreamBuilder<List<Categorie>>(
-              key: ValueKey(refreshKey),
-              stream: FirebaseService().lireCategories(),
+            return FutureBuilder<List<Categorie>>(
+              future: CacheService.getCategories(FirebaseService()),
               builder: (context, catSnapshot) {
                 final categories = catSnapshot.data ?? [];
                 final montantNegatif =
@@ -519,8 +519,8 @@ class _PageBudgetState extends State<PageBudget> {
           ),
         ),
       ),
-      body: StreamBuilder<List<Compte>>(
-        stream: FirebaseService().lireComptes(),
+      body: FutureBuilder<List<Compte>>(
+        future: CacheService.getComptes(FirebaseService()),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -534,9 +534,8 @@ class _PageBudgetState extends State<PageBudget> {
               ),
             );
           }
-          return StreamBuilder<List<Categorie>>(
-            key: ValueKey(refreshKey),
-            stream: FirebaseService().lireCategories(),
+          return FutureBuilder<List<Categorie>>(
+            future: CacheService.getCategories(FirebaseService()),
             builder: (context, catSnapshot) {
               final categories = catSnapshot.data ?? [];
               final montantNegatif = _calculerMontantNegatifTotal(

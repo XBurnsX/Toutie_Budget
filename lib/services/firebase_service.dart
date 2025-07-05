@@ -909,15 +909,17 @@ class FirebaseService {
     if (user == null) {
       return Stream.value([]);
     }
+    // Requête optimisée : filtrer d'abord par userId, puis par compteId
+    // Cela évite l'index composite en utilisant un seul where + orderBy
     return firestore
         .collection('transactions')
         .where('userId', isEqualTo: user.uid)
-        .where('compteId', isEqualTo: compteId)
         .orderBy('date', descending: true)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => app_model.Transaction.fromJson(doc.data()))
+              .where((transaction) => transaction.compteId == compteId) // Filtrer côté client
               .toList(),
         );
   }
