@@ -108,26 +108,12 @@ class _PageBudgetState extends State<PageBudget> {
               return const Center(child: CircularProgressIndicator());
             }
             final comptes = snapshot.data ?? [];
-            debugPrint('DEBUG: Total comptes chargés: ${comptes.length}');
-            for (var compte in comptes) {
-              debugPrint(
-                  'DEBUG: Compte "${compte.nom}" - Type: ${compte.type} - Archivé: ${compte.estArchive} - Prêt à placer: ${compte.pretAPlacer}');
-            }
-
             final comptesNonArchives =
                 comptes.where((c) => !c.estArchive).toList();
-            debugPrint(
-                'DEBUG: Comptes non archivés: ${comptesNonArchives.length}');
 
             final comptesChequesPretAPlacer = comptesNonArchives
                 .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
                 .toList();
-            debugPrint(
-                'DEBUG: Comptes chèques prêt à placer: ${comptesChequesPretAPlacer.length}');
-            for (var compte in comptesChequesPretAPlacer) {
-              debugPrint(
-                  'DEBUG: Compte dans bandeau "${compte.nom}" - Type: ${compte.type} - Prêt à placer: ${compte.pretAPlacer}');
-            }
             return StreamBuilder<List<Categorie>>(
               stream: FirebaseService().lireCategories(),
               builder: (context, catSnapshot) {
@@ -517,6 +503,9 @@ class _PageBudgetState extends State<PageBudget> {
             return const Center(child: CircularProgressIndicator());
           }
           final comptes = snapshot.data ?? [];
+          final comptesNonArchives =
+              comptes.where((c) => !c.estArchive).toList();
+
           if (comptes.isEmpty) {
             return const Center(
               child: Text(
@@ -533,11 +522,11 @@ class _PageBudgetState extends State<PageBudget> {
               }
               final categories = catSnapshot.data ?? [];
               final montantNegatif = _calculerMontantNegatifTotal(
-                comptes,
+                comptesNonArchives,
                 categories,
               );
               final aSituationsUrgence = _aSituationsUrgence(
-                comptes,
+                comptesNonArchives,
                 categories,
               );
 
@@ -552,7 +541,7 @@ class _PageBudgetState extends State<PageBudget> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  ...comptes
+                  ...comptesNonArchives
                       .where(
                         (compte) =>
                             compte.type == 'Chèque' && compte.pretAPlacer != 0,
