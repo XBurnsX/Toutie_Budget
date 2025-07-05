@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:toutie_budget/pages/page_comptes_reorder.dart';
 import 'package:toutie_budget/pages/page_login.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
@@ -12,7 +13,6 @@ import 'package:provider/provider.dart';
 import 'models/categorie.dart';
 import 'pages/page_budget.dart';
 import 'pages/page_statistiques.dart';
-import 'pages/page_comptes.dart';
 import 'pages/page_set_objectif.dart';
 import 'pages/page_ajout_transaction.dart';
 import 'pages/page_pret_personnel.dart';
@@ -168,7 +168,7 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
 
   static const _pageBudget = PageBudget();
-  static const _pageComptes = PageComptes();
+  static const _PageComptesReorder = PageComptesReorder();
   static const _pageStatistiques = PageStatistiques();
 
   @override
@@ -187,7 +187,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     final List<Widget> pages = <Widget>[
       _pageBudget,
-      _pageComptes,
+      _PageComptesReorder,
       EcranAjoutTransactionRefactored(
         comptesExistants: comptesExistants,
         onTransactionSaved: () {
