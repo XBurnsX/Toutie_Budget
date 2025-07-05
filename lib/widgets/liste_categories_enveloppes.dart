@@ -4,13 +4,14 @@ import 'pie_chart_with_legend.dart';
 import 'package:toutie_budget/widgets/assignation_bottom_sheet.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes
-class ListeCategoriesEnveloppes extends StatelessWidget {
+class ListeCategoriesEnveloppes extends StatefulWidget {
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> comptes;
   final bool editionMode;
   final void Function(String catId, String envId)? onRename;
   final void Function(String catId, String envId)? onDelete;
   final String? selectedMonthKey;
+
   const ListeCategoriesEnveloppes({
     super.key,
     required this.categories,
@@ -21,21 +22,99 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
     this.selectedMonthKey,
   });
 
-  Color _getEtatColor(double solde, double objectif) {
-    if (solde < 0) return Colors.red;
-    if (objectif == 0) return Colors.grey;
-    if (solde >= objectif) return Colors.green;
-    if (solde >= objectif * 0.7) return Colors.yellow;
-    return Colors.orange;
+  @override
+  State<ListeCategoriesEnveloppes> createState() =>
+      _ListeCategoriesEnveloppesState();
+}
+
+class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
+  static const int pageSize = 20;
+  List<Map<String, dynamic>> _displayedCategories = [];
+  int _currentPage = 0;
+  bool _isLoading = false;
+  bool _hasMore = true;
+  final ScrollController _scrollController = ScrollController();
+  int enveloppesAffichees = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (categories.isEmpty) {
-      return const SizedBox.shrink();
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(ListeCategoriesEnveloppes oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.categories != widget.categories) {
+      _loadInitialData();
     }
-    // Trier les catégories avec Dette en premier
-    final sortedCategories = List<Map<String, dynamic>>.from(categories);
+  }
+
+  void _loadInitialData() {
+    setState(() {
+      _currentPage = 0;
+      _hasMore = true;
+      _displayedCategories = [];
+    });
+    _loadNextPage();
+  }
+
+  void _loadNextPage() {
+    if (_isLoading || !_hasMore) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simuler un délai pour éviter les rebuilds trop rapides
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+
+      final sortedCategories = _getSortedCategories();
+      final startIndex = _currentPage * pageSize;
+      final endIndex = startIndex + pageSize;
+
+      if (startIndex >= sortedCategories.length) {
+        setState(() {
+          _hasMore = false;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final newCategories = sortedCategories.sublist(
+          startIndex,
+          endIndex > sortedCategories.length
+              ? sortedCategories.length
+              : endIndex);
+
+      setState(() {
+        _displayedCategories.addAll(newCategories);
+        _currentPage++;
+        _hasMore = endIndex < sortedCategories.length;
+        _isLoading = false;
+      });
+    });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoading &&
+        _hasMore) {
+      _loadNextPage();
+    }
+  }
+
+  List<Map<String, dynamic>> _getSortedCategories() {
+    final sortedCategories = List<Map<String, dynamic>>.from(widget.categories);
     sortedCategories.sort((a, b) {
       final aNom = (a['nom'] as String).toLowerCase();
       final bNom = (b['nom'] as String).toLowerCase();
@@ -45,12 +124,45 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
       final bOrdre = (b['ordre'] as int?) ?? 999999;
       return aOrdre.compareTo(bOrdre);
     });
+    return sortedCategories;
+  }
+
+  Color _getEtatColor(double solde, double objectif) {
+    if (solde < 0) return Colors.red;
+    if (objectif == 0) return Colors.grey;
+    if (solde >= objectif) return Colors.green;
+    if (solde >= objectif * 0.7) return Colors.yellow;
+    return Colors.orange;
+  }
+
+  void chargerPlusEnveloppes() {
+    setState(() {
+      enveloppesAffichees += 20;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: sortedCategories.length,
+      itemCount: _displayedCategories.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        final categorie = sortedCategories[index];
+        if (index == _displayedCategories.length) {
+          if (_isLoading) {
+            return const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return const SizedBox.shrink();
+        }
+
+        final categorie = _displayedCategories[index];
         final enveloppes =
             categorie['enveloppes'] as List<Map<String, dynamic>>;
 
@@ -81,21 +193,23 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 ),
               ],
             ),
-            ...enveloppes.map((enveloppe) {
+            ...enveloppes.take(enveloppesAffichees).map((enveloppe) {
               // --- Logique d'affichage de l'historique ---
               Map<String, dynamic> historique = enveloppe['historique'] != null
                   ? Map<String, dynamic>.from(enveloppe['historique'])
                   : {};
-              Map<String, dynamic>? histoMois = (selectedMonthKey != null &&
-                      historique[selectedMonthKey] != null)
-                  ? Map<String, dynamic>.from(historique[selectedMonthKey])
-                  : null;
+              Map<String, dynamic>? histoMois =
+                  (widget.selectedMonthKey != null &&
+                          historique[widget.selectedMonthKey] != null)
+                      ? Map<String, dynamic>.from(
+                          historique[widget.selectedMonthKey])
+                      : null;
 
               final now = DateTime.now();
               final currentMonthKey =
                   "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
-              final selectedDate = selectedMonthKey != null
-                  ? DateFormat('yyyy-MM').parse(selectedMonthKey!)
+              final selectedDate = widget.selectedMonthKey != null
+                  ? DateFormat('yyyy-MM').parse(widget.selectedMonthKey!)
                   : now;
               final isFutureMonth = selectedDate.year > now.year ||
                   (selectedDate.year == now.year &&
@@ -105,8 +219,8 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               double objectif;
               double depense;
 
-              if (selectedMonthKey == null ||
-                  selectedMonthKey == currentMonthKey) {
+              if (widget.selectedMonthKey == null ||
+                  widget.selectedMonthKey == currentMonthKey) {
                 // Mois courant -> valeurs globales
                 solde = (enveloppe['solde'] ?? 0.0).toDouble();
                 objectif = (enveloppe['objectif'] ?? 0.0).toDouble();
@@ -158,7 +272,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 } else if (estNegative) {
                   bulleColor = Colors.red; // Rouge pour les montants négatifs
                 } else if (compteId.isNotEmpty) {
-                  final compte = comptes.firstWhere(
+                  final compte = widget.comptes.firstWhere(
                     (c) => c['id'].toString() == compteId.toString(),
                     orElse: () => <String, Object>{},
                   );
@@ -238,7 +352,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (editionMode) ...[
+                            if (widget.editionMode) ...[
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -253,7 +367,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                       horizontal: 2,
                                     ),
                                     constraints: BoxConstraints(),
-                                    onPressed: () => onRename?.call(
+                                    onPressed: () => widget.onRename?.call(
                                       categorie['id'],
                                       enveloppe['id'],
                                     ),
@@ -270,7 +384,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                       horizontal: 2,
                                     ),
                                     constraints: BoxConstraints(),
-                                    onPressed: () => onDelete?.call(
+                                    onPressed: () => widget.onDelete?.call(
                                       categorie['id'],
                                       enveloppe['id'],
                                     ),
@@ -311,7 +425,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                   // Construction des contributions pour le camembert
                                   final List<Contribution> contributions =
                                       provenances.map<Contribution>((prov) {
-                                    final compte = comptes.firstWhere(
+                                    final compte = widget.comptes.firstWhere(
                                       (c) =>
                                           c['id'].toString() ==
                                           prov['compte_id'].toString(),
@@ -345,7 +459,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                   ),
                 );
 
-                return editionMode
+                return widget.editionMode
                     ? cardWidget
                     : InkWell(
                         onTap: () {
@@ -354,7 +468,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                             isScrollControlled: true,
                             builder: (_) => AssignationBottomSheet(
                               enveloppe: enveloppe,
-                              comptes: comptes,
+                              comptes: widget.comptes,
                             ),
                           );
                         },
@@ -386,7 +500,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               } else if (estNegative) {
                 bulleColor = Colors.red; // Rouge pour les montants négatifs
               } else if (compteId.isNotEmpty) {
-                final compte = comptes.firstWhere(
+                final compte = widget.comptes.firstWhere(
                   (c) => c['id'].toString() == compteId.toString(),
                   orElse: () => <String, Object>{},
                 );
@@ -556,11 +670,12 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
 
                                                 // Utiliser le mois sélectionné pour le calcul du statut
                                                 DateTime dateReference =
-                                                    selectedMonthKey != null
+                                                    widget.selectedMonthKey !=
+                                                            null
                                                         ? DateFormat(
                                                             'yyyy-MM',
-                                                          ).parse(
-                                                            selectedMonthKey!)
+                                                          ).parse(widget
+                                                            .selectedMonthKey!)
                                                         : DateTime.now();
 
                                                 // CORRECTION : Utiliser une date de création fixe au lieu du mois consulté
@@ -771,7 +886,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                              else if (editionMode) ...[
+                              else if (widget.editionMode) ...[
                                 IconButton(
                                   icon: const Icon(
                                     Icons.edit,
@@ -779,7 +894,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                     size: 20,
                                   ),
                                   tooltip: 'Renommer',
-                                  onPressed: () => onRename?.call(
+                                  onPressed: () => widget.onRename?.call(
                                     categorie['id'],
                                     enveloppe['id'],
                                   ),
@@ -791,7 +906,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                                     size: 20,
                                   ),
                                   tooltip: 'Supprimer',
-                                  onPressed: () => onDelete?.call(
+                                  onPressed: () => widget.onDelete?.call(
                                     categorie['id'],
                                     enveloppe['id'],
                                   ),
@@ -863,7 +978,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 ),
               );
 
-              return editionMode
+              return widget.editionMode
                   ? cardWidget
                   : InkWell(
                       onTap: () {
@@ -872,7 +987,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                           isScrollControlled: true,
                           builder: (_) => AssignationBottomSheet(
                             enveloppe: enveloppe,
-                            comptes: comptes,
+                            comptes: widget.comptes,
                           ),
                         );
                       },

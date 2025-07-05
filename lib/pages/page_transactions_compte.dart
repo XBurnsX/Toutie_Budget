@@ -88,6 +88,20 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
     setState(() => _isLoading = true);
     final user = FirebaseService().auth.currentUser;
     if (user == null) return;
+    // Utilisation du cache pour la première page
+    if (_transactions.isEmpty && _lastDoc == null) {
+      final cached = await CacheService.getTransactions(
+          FirebaseService(), widget.compte.id);
+      if (cached.isNotEmpty) {
+        setState(() {
+          _transactions.addAll(cached.take(pageSize));
+          _hasMore = cached.length > pageSize;
+          _isLoading = false;
+          _firstLoadDone = true;
+        });
+        return;
+      }
+    }
     Query query = FirebaseFirestore.instance
         .collection('transactions')
         .where('userId', isEqualTo: user.uid)
@@ -109,6 +123,12 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
       _isLoading = false;
       _firstLoadDone = true;
     });
+    // Mettre à jour le cache si c'est la première page
+    if (_transactions.length <= pageSize) {
+      CacheService.invalidateTransactions(widget.compte.id);
+      CacheService.getTransactions(
+          FirebaseService(), widget.compte.id); // met à jour le cache
+    }
   }
 
   void _fetchSearchPage() async {
@@ -239,7 +259,9 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Transactions - ${widget.compte.nom}'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor ??
+            const Color(0xFF18191A),
+        elevation: 0,
       ),
       body: _buildTransactionsCompteContent(context),
     );
