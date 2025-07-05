@@ -47,9 +47,9 @@ class ChampEnveloppe extends StatelessWidget {
       selectedItemBuilder: (context) {
         return items.map((item) {
           if (item.value == null) {
-            return const Center(child: Text('Aucune'));
+            return const Text('Aucune');
           }
-          return Center(child: item.child!);
+          return item.child ?? const SizedBox.shrink();
         }).toList();
       },
       decoration: InputDecoration(
@@ -58,11 +58,11 @@ class ChampEnveloppe extends StatelessWidget {
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           vertical: 10.0,
-          horizontal: 50.0,
+          horizontal: 12.0,
         ),
       ),
       isExpanded: true,
-      alignment: Alignment.center,
+      alignment: Alignment.centerLeft,
       dropdownColor: dropdownColor,
     );
   }
@@ -135,22 +135,20 @@ class ChampEnveloppe extends StatelessWidget {
         items.add(
           DropdownMenuItem<String>(
             value: env['id'],
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(env['nom'], overflow: TextOverflow.ellipsis),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${solde.toStringAsFixed(2)} \$',
-                    style: TextStyle(
-                      color: couleurCompte,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(env['nom'], overflow: TextOverflow.ellipsis),
+                const SizedBox(width: 6),
+                Text(
+                  '${solde.toStringAsFixed(2)} \$',
+                  style: TextStyle(
+                    color: couleurCompte,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );

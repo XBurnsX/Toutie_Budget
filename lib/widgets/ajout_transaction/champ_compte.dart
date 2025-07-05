@@ -27,51 +27,47 @@ class ChampCompte extends StatelessWidget {
       items: listeComptesAffichables.map((Compte compte) {
         return DropdownMenuItem<String>(
           value: compte.id,
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Color(compte.couleur),
-                    shape: BoxShape.circle,
-                  ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Color(compte.couleur),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  compte.nom,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                compte.nom,
+                style: Theme.of(context).textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         );
       }).toList(),
       selectedItemBuilder: (context) {
         return listeComptesAffichables.map((compte) {
-          return Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Color(compte.couleur),
-                    shape: BoxShape.circle,
-                  ),
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Color(compte.couleur),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  compte.nom,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                compte.nom,
+                style: Theme.of(context).textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           );
         }).toList();
       },
@@ -88,7 +84,7 @@ class ChampCompte extends StatelessWidget {
         ),
       ),
       isExpanded: true,
-      alignment: Alignment.center,
+      alignment: Alignment.centerLeft,
       dropdownColor: dropdownColor,
     );
   }

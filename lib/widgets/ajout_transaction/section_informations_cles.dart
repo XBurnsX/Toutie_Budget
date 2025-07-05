@@ -192,7 +192,7 @@ class SectionInformationsCles extends StatelessWidget {
                   ),
                 ),
                 textCapitalization: TextCapitalization.sentences,
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.left,
                 maxLines: null,
               ),
               alignementVerticalIcone: CrossAxisAlignment.start,
@@ -214,12 +214,10 @@ class SectionInformationsCles extends StatelessWidget {
           .map((TypeMouvementFinancier type) {
         return DropdownMenuItem<TypeMouvementFinancier>(
           value: type,
-          child: Center(
-            child: Text(
-              _libellePourTypeMouvement(type),
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
+          child: Text(
+            _libellePourTypeMouvement(type),
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.left,
           ),
         );
       }).toList(),
@@ -236,6 +234,7 @@ class SectionInformationsCles extends StatelessWidget {
       ),
       isExpanded: true,
       dropdownColor: dropdownColor,
+      alignment: Alignment.centerLeft,
     );
   }
 
@@ -250,11 +249,9 @@ class SectionInformationsCles extends StatelessWidget {
       items: listeMarqueurs.map((String marqueur) {
         return DropdownMenuItem<String>(
           value: marqueur,
-          child: Center(
-            child: Text(
-              marqueur,
-              textAlign: TextAlign.center,
-            ),
+          child: Text(
+            marqueur,
+            textAlign: TextAlign.left,
           ),
         );
       }).toList(),
@@ -266,6 +263,7 @@ class SectionInformationsCles extends StatelessWidget {
       ),
       isExpanded: true,
       dropdownColor: dropdownColor,
+      alignment: Alignment.centerLeft,
     );
   }
 
@@ -298,7 +296,10 @@ class SectionInformationsCles extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Center(child: widgetContenu),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: widgetContenu,
+          ),
         ],
       ),
     );

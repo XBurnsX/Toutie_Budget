@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
+import 'package:toutie_budget/services/argent_service.dart';
+
+// Utilisé pour la détection des couleurs négatives/positives si besoin.
+// ignore: unused_import
+import 'package:toutie_budget/services/color_service.dart';
 
 class AssignationBottomSheet extends StatefulWidget {
   final Map<String, dynamic> enveloppe;
@@ -15,6 +20,9 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
   late TextEditingController _ctrl;
   String? _compteId;
   late double _montantNecessaire;
+
+  // Conserve une référence vers le BuildContext du bottom-sheet pour les dialogs
+  late BuildContext _sheetContext;
 
   @override
   void initState() {
@@ -82,6 +90,8 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    _sheetContext = context;
+
     final comptesDisponibles = widget.comptes.where((c) {
       final typeStr = (c['type'] ?? '').toString().toLowerCase();
       return (typeStr.contains('chèque') || typeStr.contains('cheque')) &&
@@ -101,7 +111,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    _ctrl.text = _montantNecessaire.toStringAsFixed(2);
+                    _ctrl.text = '${_montantNecessaire.toStringAsFixed(2)} \$';
                   });
                 },
                 child: const Text('Assigné'),
@@ -152,9 +162,184 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
             ],
           ),
           const SizedBox(height: 8),
-          NumericKeyboard(controller: _ctrl, onClear: () => _ctrl.clear()),
+          NumericKeyboard(
+            controller: _ctrl,
+            onClear: () => _ctrl.clear(),
+            onDone: _effectuerAssignation,
+          ),
         ],
       ),
     );
+  }
+
+  // ========  LOGIQUE D'ASSIGNATION  ========
+
+  double _parseMontant(String text) {
+    final cleaned =
+        text.replaceAll(RegExp(r'[^0-9\-,\.]'), '').replaceAll(',', '.').trim();
+    return double.tryParse(cleaned) ?? 0.0;
+  }
+
+  bool _peutAssigner() => _compteId != null;
+
+  void _afficherErreur(String message) {
+    showDialog(
+      context: _sheetContext,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          'Erreur',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 20,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 16,
+            color: Colors.white70,
+            height: 1.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check, size: 20, color: Colors.white),
+            label: const Text(
+              'OK',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(_sheetContext).colorScheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.of(_sheetContext).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _afficherMessageErreurMelangeFonds() {
+    showDialog(
+      context: _sheetContext,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          "Impossible d'ajouter de l'argent",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 20,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          "Cette enveloppe contient déjà de l'argent provenant d'un autre compte.\nVous ne pouvez pas mélanger les fonds.",
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white70,
+            height: 1.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check, size: 20, color: Colors.white),
+            label: const Text(
+              'OK',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(_sheetContext).colorScheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.of(_sheetContext).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _effectuerAssignation() async {
+    if (!_peutAssigner()) {
+      _afficherErreur('Veuillez sélectionner un compte.');
+      return;
+    }
+
+    final montantDouble = _parseMontant(_ctrl.text);
+
+    if (montantDouble <= 0) {
+      _afficherErreur('Le montant doit être supérieur à 0.');
+      return;
+    }
+
+    final compte = widget.comptes.firstWhere(
+      (c) => c['id'] == _compteId,
+      orElse: () => <String, Object>{},
+    );
+
+    final pretAPlacer = (compte['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
+
+    if (pretAPlacer < montantDouble) {
+      _afficherErreur('Solde insuffisant dans le compte sélectionné.');
+      return;
+    }
+
+    try {
+      await ArgentService().virerArgent(
+        sourceId: _compteId!,
+        destinationId: widget.enveloppe['id'].toString(),
+        montant: montantDouble,
+      );
+
+      if (mounted) {
+        Navigator.of(_sheetContext).pop();
+        ScaffoldMessenger.of(_sheetContext).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Assignation de ${montantDouble.toStringAsFixed(2)} \$ réussie',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('mélanger') ||
+          errorMsg.contains('provient') ||
+          errorMsg.contains('autre compte')) {
+        _afficherMessageErreurMelangeFonds();
+      } else {
+        _afficherErreur('Erreur lors de l\'assignation : $e');
+      }
+    }
   }
 }
