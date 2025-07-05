@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../models/compte.dart';
-import '../services/firebase_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;

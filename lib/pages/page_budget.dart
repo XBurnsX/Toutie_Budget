@@ -126,7 +126,7 @@ class _PageBudgetState extends State<PageBudget> {
                 final aSituationsUrgence =
                     _aSituationsUrgence(comptesNonArchives, categories);
 
-                return Container(
+                return SizedBox(
                   width: double.infinity,
                   height: double.infinity,
                   child: Row(
@@ -376,7 +376,7 @@ class _PageBudgetState extends State<PageBudget> {
                       SizedBox(
                         width: 400,
                         child: Container(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           height: double.infinity,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

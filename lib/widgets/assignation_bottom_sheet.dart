@@ -54,8 +54,9 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
         try {
           final temp = DateTime.parse(env['objectif_date']);
           cible = DateTime(now.year, temp.month, temp.day);
-          if (cible.isBefore(now))
+          if (cible.isBefore(now)) {
             cible = DateTime(now.year + 1, temp.month, temp.day);
+          }
         } catch (_) {
           cible = DateTime(now.year, 12, 31);
         }
@@ -234,7 +235,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
-                      _ctrl.text = '${_montantNecessaire.toStringAsFixed(2)}';
+                      _ctrl.text = _montantNecessaire.toStringAsFixed(2);
                     });
                   },
                   child: const Text('Montant suggéré'),

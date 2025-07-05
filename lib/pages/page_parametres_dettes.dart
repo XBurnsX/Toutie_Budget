@@ -3,7 +3,6 @@ import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/services/calcul_pret_service.dart';
-import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 

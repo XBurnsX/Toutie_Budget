@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -20,6 +19,7 @@ import 'pages/page_pret_personnel.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'themes/dropdown_theme_extension.dart';
 import 'firebase_options.dart';
+import 'services/investissement_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +31,9 @@ void main() async {
   // Initialiser le service de thème
   final themeService = ThemeService();
   await themeService.loadTheme();
+
+  // Démarrer le service d'investissement
+  InvestissementService().startService();
 
   runApp(MyApp(themeService: themeService));
 }

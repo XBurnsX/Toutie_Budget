@@ -107,8 +107,9 @@ class ChampEnveloppe extends StatelessWidget {
           .where((e) => _estEnveloppeAffichable(e as Map<String, dynamic>))
           .toList();
 
-      if (enveloppesVisibles.isEmpty)
+      if (enveloppesVisibles.isEmpty) {
         continue; // Rien à afficher pour cette catégorie
+      }
 
       // Ajouter un séparateur/entête pour la catégorie
       items.add(

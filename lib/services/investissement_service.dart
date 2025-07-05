@@ -1,502 +1,300 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../models/action_investissement.dart';
+import '../models/transaction_model.dart' as app_model;
+import 'alpha_vantage_service.dart';
 import 'firebase_service.dart';
 
 class InvestissementService {
-  // TODO: Remplace par ta clé API FinancialModelingPrep
-  // Obtenir gratuitement sur https://financialmodelingprep.com/
-  // Gratuit : 250 requêtes/jour
-  static const String _apiKey = 'aMnielp03sER1Gfj0pYvYyQuOlPjMFTg';
-  static const String _baseUrl = 'https://financialmodelingprep.com/api/v3';
-
   final FirebaseService _firebaseService = FirebaseService();
+  final AlphaVantageService _alphaVantage = AlphaVantageService();
 
-  // Charger les données d'un compte d'investissement
-  Future<Map<String, dynamic>> chargerDonneesCompte(String compteId) async {
+  // Singleton pattern
+  static final InvestissementService _instance =
+      InvestissementService._internal();
+  factory InvestissementService() => _instance;
+  InvestissementService._internal();
+
+  // Démarrer le service d'investissement
+  void startService() {
+    _alphaVantage.startBatchUpdate();
+    print('🚀 Service d\'investissement démarré');
+  }
+
+  // Arrêter le service
+  void stopService() {
+    _alphaVantage.stopBatchUpdate();
+    print('⏹️ Service d\'investissement arrêté');
+  }
+
+  // Ajouter une action à un compte
+  Future<void> ajouterAction({
+    required String compteId,
+    required String symbol,
+    required double quantite,
+    required double prixAchat,
+    required DateTime dateAchat,
+  }) async {
     try {
-      print('📂 Chargement des données pour le compte: $compteId');
+      // Créer la transaction d'achat
+      final transaction = app_model.Transaction(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: app_model.TypeTransaction.depense,
+        typeMouvement: app_model.TypeMouvementFinancier.depenseNormale,
+        montant: -(quantite * prixAchat), // Montant négatif pour un achat
+        compteId: compteId,
+        date: dateAchat,
+        tiers: symbol,
+        enveloppeId: null,
+        note:
+            'Action: $symbol - Quantité: $quantite - Prix: \$${prixAchat.toStringAsFixed(2)}',
+      );
 
-      // Récupérer les actions depuis Firebase
-      final actionsSnapshot = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('actions')
-          .get();
+      // Sauvegarder la transaction
+      await _firebaseService.ajouterTransaction(transaction);
 
-      print('📊 ${actionsSnapshot.docs.length} actions trouvées dans Firebase');
+      // Sauvegarder les détails de l'action
+      await _firebaseService.firestore.collection('actions').add({
+        'compteId': compteId,
+        'symbol': symbol,
+        'quantite': quantite,
+        'prixAchat': prixAchat,
+        'dateAchat': dateAchat.toIso8601String(),
+        'dateCreation': DateTime.now().toIso8601String(),
+      });
 
-      List<ActionInvestissement> actions = [];
-      double cashDisponible = 0.0;
-      double valeurTotale = 0.0;
-      double dernierChangement = 0.0;
+      // Ajouter le symbole à la queue de mise à jour Alpha Vantage
+      _alphaVantage.addSymbolToQueue(symbol);
 
-      // Charger le cash disponible
-      final cashDoc = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('cash')
-          .doc('disponible')
-          .get();
-
-      if (cashDoc.exists) {
-        cashDisponible = (cashDoc.data()?['montant'] ?? 0.0).toDouble();
-        valeurTotale += cashDisponible;
-      }
-
-      // Traiter chaque action
-      for (var doc in actionsSnapshot.docs) {
-        print('📋 Traitement de l\'action: ${doc.id}');
-        print('📋 Données Firebase: ${doc.data()}');
-
-        final action = ActionInvestissement.fromMap({
-          'id': doc.id,
-          ...doc.data(),
-        });
-
-        print(
-            '✅ Action créée: ${action.symbole} - ${action.nombre} actions à ${action.prixMoyen.toStringAsFixed(2)}\$');
-
-        // Mettre à jour le prix actuel depuis l'API
-        final prixActuel = await _obtenirPrixActuel(action.symbole);
-        if (prixActuel > 0) {
-          final nouvelleValeur = action.nombre * prixActuel;
-          final ancienneValeur = action.valeurActuelle;
-          final variation = prixActuel > 0
-              ? ((prixActuel - action.prixMoyen) / action.prixMoyen) * 100
-              : 0.0;
-
-          final actionMiseAJour = action.copyWith(
-            prixActuel: prixActuel,
-            valeurActuelle: nouvelleValeur,
-            variation: variation,
-            dateDerniereMiseAJour: DateTime.now(),
-          );
-
-          // Sauvegarder la mise à jour
-          await _firebaseService.firestore
-              .collection('investissements')
-              .doc(compteId)
-              .collection('actions')
-              .doc(action.id)
-              .update(actionMiseAJour.toMap());
-
-          actions.add(actionMiseAJour);
-          valeurTotale += nouvelleValeur;
-          dernierChangement += (nouvelleValeur - ancienneValeur);
-        } else {
-          actions.add(action);
-          valeurTotale += action.valeurActuelle;
-        }
-      }
-
-      print(
-          '📈 Résumé: ${actions.length} actions, valeur totale: ${valeurTotale.toStringAsFixed(2)}\$');
-
-      return {
-        'actions': actions,
-        'cash': cashDisponible,
-        'valeurTotale': valeurTotale,
-        'dernierChangement': dernierChangement,
-      };
+      print('✅ Action $symbol ajoutée au compte $compteId');
     } catch (e) {
-      print('❌ Erreur lors du chargement: $e');
-      throw Exception('Erreur lors du chargement des données: $e');
+      print('❌ Erreur ajout action: $e');
+      rethrow;
     }
   }
 
-  // Charger l'historique pour le graphique
-  Future<List<Map<String, double>>> chargerHistorique(String compteId) async {
+  // Supprimer une action
+  Future<void> supprimerAction({
+    required String actionId,
+    required String compteId,
+    required double quantite,
+    required double prixVente,
+    required DateTime dateVente,
+  }) async {
     try {
-      final historiqueSnapshot = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('historique')
-          .orderBy('date')
-          .limit(30) // Derniers 30 jours
+      // Récupérer les détails de l'action
+      final actionDoc = await _firebaseService.firestore
+          .collection('actions')
+          .doc(actionId)
           .get();
-
-      List<Map<String, double>> spots = [];
-      int index = 0;
-
-      for (var doc in historiqueSnapshot.docs) {
-        final data = doc.data();
-        final date = DateTime.parse(data['date']);
-        final valeur = (data['valeur'] ?? 0.0).toDouble();
-
-        spots.add({'x': index.toDouble(), 'y': valeur});
-        index++;
+      if (!actionDoc.exists) {
+        throw Exception('Action non trouvée');
       }
 
-      return spots;
+      final actionData = actionDoc.data()!;
+      final symbol = actionData['symbol'] as String;
+
+      // Créer la transaction de vente
+      final transaction = app_model.Transaction(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: app_model.TypeTransaction.revenu,
+        typeMouvement: app_model.TypeMouvementFinancier.revenuNormal,
+        montant: quantite * prixVente, // Montant positif pour une vente
+        compteId: compteId,
+        date: dateVente,
+        tiers: symbol,
+        enveloppeId: null,
+        note:
+            'Action: $symbol - Quantité: $quantite - Prix: \$${prixVente.toStringAsFixed(2)}',
+      );
+
+      // Sauvegarder la transaction
+      await _firebaseService.ajouterTransaction(transaction);
+
+      // Supprimer l'action
+      await _firebaseService.firestore
+          .collection('actions')
+          .doc(actionId)
+          .delete();
+
+      print('✅ Action $symbol supprimée du compte $compteId');
     } catch (e) {
+      print('❌ Erreur suppression action: $e');
+      rethrow;
+    }
+  }
+
+  // Récupérer toutes les actions d'un compte
+  Future<List<Map<String, dynamic>>> getActions(String compteId) async {
+    try {
+      final querySnapshot = await _firebaseService.firestore
+          .collection('actions')
+          .where('compteId', isEqualTo: compteId)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('❌ Erreur récupération actions: $e');
       return [];
     }
   }
 
-  // Ajouter une nouvelle transaction
-  Future<void> ajouterTransaction({
-    required String symbole,
-    required int nombre,
-    required double prix,
-    required String compteId,
-  }) async {
+  // Calculer la performance d'une action
+  Future<Map<String, dynamic>> calculerPerformanceAction(
+      String symbol, double quantite, double prixAchat) async {
     try {
-      print('🟣 [SERVICE] Ajout transaction dans le compte: $compteId');
-      final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
-      final transaction = TransactionInvestissement(
-        id: transactionId,
-        type: 'achat',
-        nombre: nombre,
-        prix: prix,
-        date: DateTime.now(),
-      );
+      // Récupérer le prix actuel
+      final prixActuel = await _alphaVantage.getCurrentPrice(symbol);
 
-      // Vérifier si l'action existe déjà
-      final actionDoc = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('actions')
-          .doc(symbole)
-          .get();
-
-      if (actionDoc.exists) {
-        // Mettre à jour l'action existante
-        final actionExistante = ActionInvestissement.fromMap({
-          'id': actionDoc.id,
-          ...actionDoc.data()!,
-        });
-
-        final nouveauNombre = actionExistante.nombre + nombre;
-        final nouveauPrixMoyen =
-            ((actionExistante.prixMoyen * actionExistante.nombre) +
-                    (prix * nombre)) /
-                nouveauNombre;
-        final nouvellesTransactions = [
-          ...actionExistante.transactions,
-          transaction
-        ];
-
-        final actionMiseAJour = actionExistante.copyWith(
-          nombre: nouveauNombre,
-          prixMoyen: nouveauPrixMoyen,
-          transactions: nouvellesTransactions,
-        );
-
-        await _firebaseService.firestore
-            .collection('investissements')
-            .doc(compteId)
-            .collection('actions')
-            .doc(symbole)
-            .update(actionMiseAJour.toMap());
-      } else {
-        // Créer une nouvelle action
-        final nouvelleAction = ActionInvestissement(
-          id: symbole,
-          symbole: symbole,
-          nombre: nombre,
-          prixMoyen: prix,
-          prixActuel: prix,
-          valeurActuelle: nombre * prix,
-          variation: 0.0,
-          dateDerniereMiseAJour: DateTime.now(),
-          transactions: [transaction],
-        );
-
-        await _firebaseService.firestore
-            .collection('investissements')
-            .doc(compteId)
-            .collection('actions')
-            .doc(symbole)
-            .set(nouvelleAction.toMap());
+      if (prixActuel == null) {
+        return {
+          'valeurActuelle': 0.0,
+          'gainPerte': 0.0,
+          'performance': 0.0,
+          'prixActuel': null,
+          'prixDisponible': false,
+        };
       }
 
-      // Ajouter à l'historique
-      await _ajouterHistorique(compteId);
-    } catch (e) {
-      throw Exception('Erreur lors de l\'ajout de la transaction: $e');
-    }
-  }
-
-  // Obtenir le prix actuel d'une action via l'API
-  Future<double> _obtenirPrixActuel(String symbole) async {
-    // Vérifier si l'API est configurée
-    if (_apiKey == 'YOUR_FINANCIAL_MODELING_PREP_API_KEY') {
-      print('⚠️ API non configurée. Utilise le prix stocké pour $symbole');
-      return 0.0; // Retourner 0 pour utiliser le prix stocké
-    }
-
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/quote/$symbole?apikey=$_apiKey'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is List && data.isNotEmpty) {
-          return (data[0]['price'] ?? 0.0).toDouble();
-        }
-      } else if (response.statusCode == 401) {
-        print('❌ Clé API invalide pour FinancialModelingPrep');
-      } else if (response.statusCode == 429) {
-        print('⚠️ Limite de requêtes API atteinte (250/jour)');
-      }
-      return 0.0;
-    } catch (e) {
-      print('Erreur API pour $symbole: $e');
-      return 0.0;
-    }
-  }
-
-  // Ajouter une entrée à l'historique
-  Future<void> _ajouterHistorique(String compteId) async {
-    try {
-      final donnees = await chargerDonneesCompte(compteId);
-      final valeurTotale = donnees['valeurTotale'] ?? 0.0;
-
-      await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('historique')
-          .add({
-        'date': DateTime.now().toIso8601String(),
-        'valeur': valeurTotale,
-      });
-    } catch (e) {
-      print('Erreur lors de l\'ajout à l\'historique: $e');
-    }
-  }
-
-  // Mettre à jour tous les prix (pour les mises à jour automatiques)
-  Future<void> mettreAJourPrix(String compteId) async {
-    try {
-      final actionsSnapshot = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('actions')
-          .get();
-
-      for (var doc in actionsSnapshot.docs) {
-        final action = ActionInvestissement.fromMap({
-          'id': doc.id,
-          ...doc.data(),
-        });
-
-        final prixActuel = await _obtenirPrixActuel(action.symbole);
-        if (prixActuel > 0) {
-          final nouvelleValeur = action.nombre * prixActuel;
-          final variation = prixActuel > 0
-              ? ((prixActuel - action.prixMoyen) / action.prixMoyen) * 100
-              : 0.0;
-
-          final actionMiseAJour = action.copyWith(
-            prixActuel: prixActuel,
-            valeurActuelle: nouvelleValeur,
-            variation: variation,
-            dateDerniereMiseAJour: DateTime.now(),
-          );
-
-          await _firebaseService.firestore
-              .collection('investissements')
-              .doc(compteId)
-              .collection('actions')
-              .doc(action.id)
-              .update(actionMiseAJour.toMap());
-        }
-      }
-
-      // Ajouter à l'historique après mise à jour
-      await _ajouterHistorique(compteId);
-    } catch (e) {
-      throw Exception('Erreur lors de la mise à jour des prix: $e');
-    }
-  }
-
-  // Mise à jour batch de tous les prix d'actions du compte
-  Future<void> batchUpdatePrix(String compteId) async {
-    try {
-      print('🔄 Début batch update pour le compte: $compteId');
-
-      final actionsSnapshot = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('actions')
-          .get();
-
-      if (actionsSnapshot.docs.isEmpty) {
-        print('ℹ️ Aucune action trouvée pour le batch update');
-        return;
-      }
-
-      final symboles = actionsSnapshot.docs.map((doc) => doc.id).toList();
-      print('📊 Actions à mettre à jour: ${symboles.join(', ')}');
-
-      // Requête batch pour TOUTES les actions en une fois
-      final joined = symboles.join(',');
-      final url = '$_baseUrl/quote/$joined?apikey=$_apiKey';
-      print('🌐 URL batch request: $url');
-
-      final response = await http.get(Uri.parse(url));
-      print('📡 Réponse API: ${response.statusCode}');
-
-      Map<String, double> prixMap = {};
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is List) {
-          print('✅ ${data.length} prix reçus de l\'API');
-          for (var item in data) {
-            final symbole = item['symbol'];
-            final prix = (item['price'] ?? 0.0).toDouble();
-            prixMap[symbole] = prix;
-            print('💰 $symbole: ${prix.toStringAsFixed(2)}\$');
-          }
-        }
-      } else {
-        print('❌ Erreur API: ${response.statusCode} - ${response.body}');
-        return;
-      }
-
-      // Mise à jour de toutes les actions avec les nouveaux prix
-      double valeurTotale = 0.0;
-      int actionsMiseAJour = 0;
-
-      for (var doc in actionsSnapshot.docs) {
-        final action = ActionInvestissement.fromMap({
-          'id': doc.id,
-          ...doc.data(),
-        });
-
-        final prixActuel = prixMap[action.symbole] ?? action.prixActuel;
-        if (prixActuel > 0) {
-          final nouvelleValeur = action.nombre * prixActuel;
-          final variation = action.prixMoyen > 0
-              ? ((prixActuel - action.prixMoyen) / action.prixMoyen) * 100
-              : 0.0;
-
-          final actionMiseAJour = action.copyWith(
-            prixActuel: prixActuel,
-            valeurActuelle: nouvelleValeur,
-            variation: variation,
-            dateDerniereMiseAJour: DateTime.now(),
-          );
-
-          await _firebaseService.firestore
-              .collection('investissements')
-              .doc(compteId)
-              .collection('actions')
-              .doc(action.id)
-              .update(actionMiseAJour.toMap());
-
-          valeurTotale += nouvelleValeur;
-          actionsMiseAJour++;
-        } else {
-          valeurTotale += action.valeurActuelle;
-        }
-      }
-
-      // Ajouter le cash disponible
-      final cashDoc = await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('cash')
-          .doc('disponible')
-          .get();
-      if (cashDoc.exists) {
-        valeurTotale += (cashDoc.data()?['montant'] ?? 0.0).toDouble();
-      }
-
-      // Ajouter à l'historique
-      await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('historique')
-          .add({
-        'date': DateTime.now().toIso8601String(),
-        'valeur': valeurTotale,
-      });
-
-      print(
-          '✅ Batch update terminé: $actionsMiseAJour actions mises à jour, valeur totale: ${valeurTotale.toStringAsFixed(2)}\$');
-    } catch (e) {
-      print('❌ Erreur batch update: $e');
-      throw Exception('Erreur batch update: $e');
-    }
-  }
-
-  // Calculer la performance globale du portefeuille
-  Future<Map<String, dynamic>> calculerPerformanceGlobale(
-      String compteId) async {
-    try {
-      final donnees = await chargerDonneesCompte(compteId);
-      final actions = donnees['actions'] ?? [];
-      final cash = donnees['cash'] ?? 0.0;
-
-      double valeurTotaleActuelle = cash;
-      double valeurTotaleInvestie = cash;
-      double gainPerteTotal = 0.0;
-
-      for (var action in actions) {
-        valeurTotaleActuelle += action.valeurActuelle;
-        valeurTotaleInvestie += action.nombre * action.prixMoyen;
-        gainPerteTotal +=
-            (action.valeurActuelle - (action.nombre * action.prixMoyen));
-      }
-
-      double performancePourcentage = 0.0;
-      if (valeurTotaleInvestie > 0) {
-        performancePourcentage =
-            ((valeurTotaleActuelle - valeurTotaleInvestie) /
-                    valeurTotaleInvestie) *
-                100;
-      }
+      final valeurActuelle = quantite * prixActuel;
+      final valeurAchat = quantite * prixAchat;
+      final gainPerte = valeurActuelle - valeurAchat;
+      final performance =
+          prixAchat > 0 ? ((prixActuel - prixAchat) / prixAchat) * 100 : 0.0;
 
       return {
-        'valeurActuelle': valeurTotaleActuelle,
-        'valeurInvestie': valeurTotaleInvestie,
-        'gainPerte': gainPerteTotal,
-        'performancePourcentage': performancePourcentage,
-        'cash': cash,
+        'valeurActuelle': valeurActuelle,
+        'gainPerte': gainPerte,
+        'performance': performance,
+        'prixActuel': prixActuel,
+        'prixDisponible': true,
       };
     } catch (e) {
+      print('❌ Erreur calcul performance $symbol: $e');
       return {
         'valeurActuelle': 0.0,
-        'valeurInvestie': 0.0,
         'gainPerte': 0.0,
-        'performancePourcentage': 0.0,
-        'cash': 0.0,
+        'performance': 0.0,
+        'prixActuel': null,
+        'prixDisponible': false,
       };
     }
   }
 
-  // Calculer la performance d'une action spécifique
-  Map<String, dynamic> calculerPerformanceAction(ActionInvestissement action) {
-    final valeurInvestie = action.nombre * action.prixMoyen;
-    final gainPerte = action.valeurActuelle - valeurInvestie;
-    final performancePourcentage = action.prixMoyen > 0
-        ? ((action.prixActuel - action.prixMoyen) / action.prixMoyen) * 100
-        : 0.0;
+  // Calculer la performance globale d'un compte
+  Future<Map<String, dynamic>> calculerPerformanceCompte(
+      String compteId) async {
+    try {
+      final actions = await getActions(compteId);
 
-    return {
-      'valeurInvestie': valeurInvestie,
-      'gainPerte': gainPerte,
-      'performancePourcentage': performancePourcentage,
-      'prixMoyen': action.prixMoyen,
-      'prixActuel': action.prixActuel,
-    };
+      double totalValeurAchat = 0.0;
+      double totalValeurActuelle = 0.0;
+      double totalGainPerte = 0.0;
+      int actionsAvecPrix = 0;
+
+      for (final action in actions) {
+        final symbol = action['symbol'] as String;
+        final quantite = (action['quantite'] as num).toDouble();
+        final prixAchat = (action['prixAchat'] as num).toDouble();
+
+        final performance =
+            await calculerPerformanceAction(symbol, quantite, prixAchat);
+
+        totalValeurAchat += quantite * prixAchat;
+
+        if (performance['prixDisponible'] == true) {
+          totalValeurActuelle += performance['valeurActuelle'];
+          totalGainPerte += performance['gainPerte'];
+          actionsAvecPrix++;
+        }
+      }
+
+      final performanceGlobale = totalValeurAchat > 0
+          ? (totalGainPerte / totalValeurAchat) * 100
+          : 0.0;
+
+      return {
+        'totalValeurAchat': totalValeurAchat,
+        'totalValeurActuelle': totalValeurActuelle,
+        'totalGainPerte': totalGainPerte,
+        'performanceGlobale': performanceGlobale,
+        'nombreActions': actions.length,
+        'actionsAvecPrix': actionsAvecPrix,
+      };
+    } catch (e) {
+      print('❌ Erreur calcul performance compte: $e');
+      return {
+        'totalValeurAchat': 0.0,
+        'totalValeurActuelle': 0.0,
+        'totalGainPerte': 0.0,
+        'performanceGlobale': 0.0,
+        'nombreActions': 0,
+        'actionsAvecPrix': 0,
+      };
+    }
   }
 
-  Future<void> supprimerAction(String compteId, String symbole) async {
+  // Forcer une mise à jour des prix
+  Future<void> forcerMiseAJour() async {
+    await _alphaVantage.forceUpdate();
+  }
+
+  // Obtenir les statistiques du service
+  Map<String, dynamic> getStats() {
+    return _alphaVantage.getStats();
+  }
+
+  // Obtenir le temps jusqu'à la prochaine mise à jour
+  String getNextUpdateTime() {
+    return _alphaVantage.getNextUpdateTime();
+  }
+
+  // Récupérer l'historique des prix d'une action
+  Future<List<Map<String, dynamic>>> getHistoriquePrix(String symbol,
+      {int limit = 30}) async {
     try {
-      print('🗑️ Suppression de l\'action $symbole du compte $compteId');
-      await _firebaseService.firestore
-          .collection('investissements')
-          .doc(compteId)
-          .collection('actions')
-          .doc(symbole)
-          .delete();
+      final querySnapshot = await _firebaseService.firestore
+          .collection('historique_prix')
+          .where('symbol', isEqualTo: symbol)
+          .orderBy('date', descending: true)
+          .limit(limit)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'prix': (data['prix'] as num).toDouble(),
+          'date': DateTime.parse(data['date']),
+          'source': data['source'],
+        };
+      }).toList();
     } catch (e) {
-      print('❌ Erreur lors de la suppression de l\'action: $e');
-      rethrow;
+      print('❌ Erreur récupération historique prix $symbol: $e');
+      return [];
     }
+  }
+
+  // Ajouter des actions de test pour le développement
+  Future<void> ajouterActionsTest(String compteId) async {
+    final actionsTest = [
+      {'symbol': 'AAPL', 'quantite': 10, 'prixAchat': 150.0},
+      {'symbol': 'MSFT', 'quantite': 5, 'prixAchat': 300.0},
+      {'symbol': 'GOOGL', 'quantite': 2, 'prixAchat': 2500.0},
+      {'symbol': 'TSLA', 'quantite': 3, 'prixAchat': 800.0},
+      {'symbol': 'RY.TO', 'quantite': 20, 'prixAchat': 120.0},
+    ];
+
+    for (final action in actionsTest) {
+      await ajouterAction(
+        compteId: compteId,
+        symbol: action['symbol'] as String,
+        quantite: (action['quantite'] as num).toDouble(),
+        prixAchat: (action['prixAchat'] as num).toDouble(),
+        dateAchat: DateTime.now().subtract(Duration(days: 30)),
+      );
+    }
+
+    print('✅ Actions de test ajoutées');
   }
 }

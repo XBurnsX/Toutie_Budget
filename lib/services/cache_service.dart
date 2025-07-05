@@ -235,12 +235,8 @@ class CacheService {
                 'Cache SQLite: ${cachedTransactions.length} transactions pour compte $compteId',
           );
 
-          if (_transactionsCache == null) {
-            _transactionsCache = {};
-          }
-          if (_lastTransactionsUpdate == null) {
-            _lastTransactionsUpdate = {};
-          }
+          _transactionsCache ??= {};
+          _lastTransactionsUpdate ??= {};
 
           _transactionsCache![compteId] = cachedTransactions;
           _lastTransactionsUpdate![compteId] = DateTime.now();
@@ -266,12 +262,8 @@ class CacheService {
     // Charger depuis Firestore
     final transactions = await service.lireTransactions(compteId).first;
 
-    if (_transactionsCache == null) {
-      _transactionsCache = {};
-    }
-    if (_lastTransactionsUpdate == null) {
-      _lastTransactionsUpdate = {};
-    }
+    _transactionsCache ??= {};
+    _lastTransactionsUpdate ??= {};
 
     _transactionsCache![compteId] = transactions;
     _lastTransactionsUpdate![compteId] = DateTime.now();
@@ -345,12 +337,8 @@ class CacheService {
     try {
       final transactions = await service.lireTransactions(compteId).first;
 
-      if (_transactionsCache == null) {
-        _transactionsCache = {};
-      }
-      if (_lastTransactionsUpdate == null) {
-        _lastTransactionsUpdate = {};
-      }
+      _transactionsCache ??= {};
+      _lastTransactionsUpdate ??= {};
 
       _transactionsCache![compteId] = transactions;
       _lastTransactionsUpdate![compteId] = DateTime.now();

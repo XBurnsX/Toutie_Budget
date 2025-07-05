@@ -25,17 +25,17 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
   // Pagination
   static const int pageSize = 25;
   static const int searchPageSize = 10;
-  List<app_model.Transaction> _transactions = [];
+  final List<app_model.Transaction> _transactions = [];
   DocumentSnapshot? _lastDoc;
   bool _hasMore = true;
   bool _isLoading = false;
   bool _firstLoadDone = false;
 
   // Recherche pro
-  List<app_model.Transaction> _searchResults = [];
+  final List<app_model.Transaction> _searchResults = [];
   DocumentSnapshot? _lastSearchDoc;
   bool _hasMoreSearch = true;
-  bool _isSearching = false;
+  final bool _isSearching = false;
   bool _searchLoading = false;
 
   final ScrollController _scrollController = ScrollController();

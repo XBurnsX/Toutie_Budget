@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../models/transaction_model.dart' as app_model;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/cache_service.dart';
 
 class PageStatistiques extends StatefulWidget {

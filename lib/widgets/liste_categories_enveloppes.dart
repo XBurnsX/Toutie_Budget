@@ -828,8 +828,9 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                     (cible.month -
                                                         maintenant.month) +
                                                     1;
-                                            if (moisRestants < 1)
+                                            if (moisRestants < 1) {
                                               moisRestants = 1;
+                                            }
 
                                             double montantMensuelNecessaire =
                                                 montantObjectif / moisRestants;
