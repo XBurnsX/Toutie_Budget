@@ -10,6 +10,49 @@ import 'package:intl/intl.dart';
 import 'package:toutie_budget/models/transaction_model.dart' as app_model;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class CompteAReboursProchaineMAJ extends StatefulWidget {
+  final InvestissementService investissementService;
+
+  const CompteAReboursProchaineMAJ({
+    super.key,
+    required this.investissementService,
+  });
+
+  @override
+  State<CompteAReboursProchaineMAJ> createState() =>
+      _CompteAReboursProchaineMAJState();
+}
+
+class _CompteAReboursProchaineMAJState
+    extends State<CompteAReboursProchaineMAJ> {
+  Timer? _timer;
+  String _tempsRestant = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        // S'assurer que le widget est toujours à l'écran
+        setState(() {
+          _tempsRestant = widget.investissementService.getNextUpdateTime();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text('Prochaine MAJ: $_tempsRestant');
+  }
+}
+
 class PageInvestissement extends StatefulWidget {
   final String compteId;
 
@@ -27,8 +70,6 @@ class _PageInvestissementState extends State<PageInvestissement> {
   Map<String, dynamic> _performanceCompte = {};
   final List<Map<String, dynamic>> _historiquePrix = [];
   bool _isLoading = true;
-  String _nextUpdateTime = '';
-  Timer? _updateTimer;
   Compte? _compte;
 
   // Variables pour le graphique
@@ -39,21 +80,11 @@ class _PageInvestissementState extends State<PageInvestissement> {
   void initState() {
     super.initState();
     _chargerDonnees().then((_) => _checkPremiereOuverture());
-    _demarrerMiseAJourAutomatique();
   }
 
   @override
   void dispose() {
-    _updateTimer?.cancel();
     super.dispose();
-  }
-
-  void _demarrerMiseAJourAutomatique() {
-    _updateTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        _nextUpdateTime = _investissementService.getNextUpdateTime();
-      });
-    });
   }
 
   Future<void> _chargerDonnees() async {
@@ -619,7 +650,8 @@ class _PageInvestissementState extends State<PageInvestissement> {
               children: [
                 Text(
                     'Requêtes aujourd\'hui: ${stats['requestsToday'] ?? 0}/500'),
-                Text('Prochaine MAJ: $_nextUpdateTime'),
+                CompteAReboursProchaineMAJ(
+                    investissementService: _investissementService),
               ],
             ),
           ],
@@ -694,104 +726,110 @@ class _PageInvestissementState extends State<PageInvestissement> {
   }
 
   Widget _buildSoldeGraphique() {
-  // On utilise un FutureBuilder pour lire l'historique sauvegardé dans Firestore
-  return FutureBuilder<QuerySnapshot>(
-    future: _firebaseService.firestore
-        .collection('historique_portefeuille')
-        .where('compteId', isEqualTo: widget.compteId)
-        .orderBy('date', descending: true)
-        .limit(30)
-        .get(),
-    builder: (context, snapshot) {
-      // Pendant le chargement de l'historique...
-      if (snapshot.connectionState == ConnectionState.waiting) {
+    // On utilise un FutureBuilder pour lire l'historique sauvegardé dans Firestore
+    return FutureBuilder<QuerySnapshot>(
+      future: _firebaseService.firestore
+          .collection('historique_portefeuille')
+          .where('compteId', isEqualTo: widget.compteId)
+          .orderBy('date', descending: true)
+          .limit(30)
+          .get(),
+      builder: (context, snapshot) {
+        // Pendant le chargement de l'historique...
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SizedBox(
+              height: 200, // Hauteur fixe pour éviter les sauts d'interface
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        // S'il n'y a pas d'historique du tout (ex: premier jour d'utilisation)
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          // On affiche le graphique "plat" avec la valeur actuelle
+          return _buildGraphiqueAvecValeurActuelle();
+        }
+
+        // On a un historique ! On prépare les points pour le graphique.
+        final docs = snapshot.data!.docs.reversed
+            .toList(); // Remettre en ordre chronologique
+        final List<FlSpot> spots = [];
+        for (int i = 0; i < docs.length; i++) {
+          final data = docs[i].data() as Map<String, dynamic>;
+          spots.add(FlSpot(i.toDouble(), (data['valeur'] as num).toDouble()));
+        }
+
+        // Le dernier point du graphique doit TOUJOURS être la valeur "live"
+        final valeurActuelle = _performanceCompte['totalValeurActuelle'] ?? 0.0;
+        final cash = _compte?.pretAPlacer ?? 0.0;
+        final valeurTotaleAujourdhui = valeurActuelle + cash;
+
+        // On vérifie que la date du dernier snapshot correspond à aujourd'hui avant de remplacer.
+        final aujourdhuiKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        if (spots.isNotEmpty &&
+            (docs.last.data() as Map<String, dynamic>)['date'] ==
+                aujourdhuiKey) {
+          spots[spots.length - 1] =
+              FlSpot((spots.length - 1).toDouble(), valeurTotaleAujourdhui);
+        }
+
+        // On retourne la carte finale avec le graphique
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: SizedBox(
-            height: 200, // Hauteur fixe pour éviter les sauts d'interface
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        );
-      }
-
-      // S'il n'y a pas d'historique du tout (ex: premier jour d'utilisation)
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        // On affiche le graphique "plat" avec la valeur actuelle
-        return _buildGraphiqueAvecValeurActuelle();
-      }
-
-      // On a un historique ! On prépare les points pour le graphique.
-      final docs = snapshot.data!.docs.reversed.toList(); // Remettre en ordre chronologique
-      final List<FlSpot> spots = [];
-      for (int i = 0; i < docs.length; i++) {
-        final data = docs[i].data() as Map<String, dynamic>;
-        spots.add(FlSpot(i.toDouble(), (data['valeur'] as num).toDouble()));
-      }
-
-      // Le dernier point du graphique doit TOUJOURS être la valeur "live"
-      final valeurActuelle = _performanceCompte['totalValeurActuelle'] ?? 0.0;
-      final cash = _compte?.pretAPlacer ?? 0.0;
-      final valeurTotaleAujourdhui = valeurActuelle + cash;
-
-      // On vérifie que la date du dernier snapshot correspond à aujourd'hui avant de remplacer.
-      final aujourdhuiKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      if (spots.isNotEmpty && (docs.last.data() as Map<String, dynamic>)['date'] == aujourdhuiKey) {
-         spots[spots.length - 1] = FlSpot((spots.length - 1).toDouble(), valeurTotaleAujourdhui);
-      }
-
-
-      // On retourne la carte finale avec le graphique
-      return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Évolution du portefeuille', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 160,
-                child: LineChart(
-                  LineChartData(
-                    gridData: FlGridData(show: false),
-                    titlesData: FlTitlesData(show: false),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: spots,
-                        isCurved: true,
-                        color: Colors.greenAccent,
-                        barWidth: 3,
-                        dotData: FlDotData(show: false),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: Colors.greenAccent.withOpacity(0.2),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Évolution du portefeuille',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 160,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: false),
+                      titlesData: FlTitlesData(show: false),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: Colors.greenAccent,
+                          barWidth: 3,
+                          dotData: FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: Colors.greenAccent.withOpacity(0.2),
+                          ),
                         ),
-                      ),
-                    ],
-                    lineTouchData: LineTouchData(
-                      touchTooltipData: LineTouchTooltipData(
-                        getTooltipItems: (touchedSpots) {
-                          return touchedSpots.map((spot) {
-                            return LineTooltipItem(
-                              '${spot.y.toStringAsFixed(2)} \$',
-                              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            );
-                          }).toList();
-                        },
+                      ],
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              return LineTooltipItem(
+                                '${spot.y.toStringAsFixed(2)} \$',
+                                const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
+                              );
+                            }).toList();
+                          },
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _buildCashDisponible() {
     final cash = _compte?.pretAPlacer ?? 0.0;
