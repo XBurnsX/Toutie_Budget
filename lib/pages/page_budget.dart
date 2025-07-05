@@ -62,7 +62,7 @@ class _PageBudgetState extends State<PageBudget> {
   ) {
     double total = 0.0;
 
-    // Comptes chèques avec prêt à placer négatif
+    // Comptes chèques avec prêt à placer négatif (exclure cartes de crédit)
     for (var compte in comptes) {
       if (compte.pretAPlacer < 0 && compte.type == 'Chèque') {
         total += compte.pretAPlacer.abs();
@@ -108,11 +108,26 @@ class _PageBudgetState extends State<PageBudget> {
               return const Center(child: CircularProgressIndicator());
             }
             final comptes = snapshot.data ?? [];
+            debugPrint('DEBUG: Total comptes chargés: ${comptes.length}');
+            for (var compte in comptes) {
+              debugPrint(
+                  'DEBUG: Compte "${compte.nom}" - Type: ${compte.type} - Archivé: ${compte.estArchive} - Prêt à placer: ${compte.pretAPlacer}');
+            }
+
             final comptesNonArchives =
                 comptes.where((c) => !c.estArchive).toList();
+            debugPrint(
+                'DEBUG: Comptes non archivés: ${comptesNonArchives.length}');
+
             final comptesChequesPretAPlacer = comptesNonArchives
                 .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
                 .toList();
+            debugPrint(
+                'DEBUG: Comptes chèques prêt à placer: ${comptesChequesPretAPlacer.length}');
+            for (var compte in comptesChequesPretAPlacer) {
+              debugPrint(
+                  'DEBUG: Compte dans bandeau "${compte.nom}" - Type: ${compte.type} - Prêt à placer: ${compte.pretAPlacer}');
+            }
             return StreamBuilder<List<Categorie>>(
               stream: FirebaseService().lireCategories(),
               builder: (context, catSnapshot) {
@@ -120,10 +135,10 @@ class _PageBudgetState extends State<PageBudget> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final categories = catSnapshot.data ?? [];
-                final montantNegatif =
-                    _calculerMontantNegatifTotal(comptes, categories);
+                final montantNegatif = _calculerMontantNegatifTotal(
+                    comptesNonArchives, categories);
                 final aSituationsUrgence =
-                    _aSituationsUrgence(comptes, categories);
+                    _aSituationsUrgence(comptesNonArchives, categories);
 
                 return Container(
                   width: double.infinity,

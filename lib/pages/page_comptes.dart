@@ -11,6 +11,7 @@ import 'package:toutie_budget/models/dette.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/compte.dart';
+import '../services/firebase_monitor_service.dart';
 
 /// Page d'affichage des comptes bancaires et d'investissement
 class PageComptes extends StatelessWidget {
@@ -45,8 +46,20 @@ class PageComptes extends StatelessWidget {
     return StreamBuilder<List<Compte>>(
       stream: FirebaseService().lireComptes(),
       builder: (context, snapshot) {
+        print('=== STREAMBUILDER COMPTES ===');
+        print('HasData: ${snapshot.hasData}');
+        print('HasError: ${snapshot.hasError}');
+        print('Error: ${snapshot.error}');
+        print('Data length: ${snapshot.data?.length ?? 0}');
+
         final comptes =
             (snapshot.data ?? []).where((c) => c.estArchive == false).toList();
+
+        print('Comptes non archivés: ${comptes.length}');
+        for (var compte in comptes) {
+          print(
+              '- ${compte.nom} (${compte.type}) - Archivé: ${compte.estArchive}');
+        }
 
         // Séparation par type
         final cheques = comptes.where((c) => c.type == 'Chèque').toList();
@@ -384,6 +397,12 @@ class PageComptes extends StatelessWidget {
   }
 
   void _showCompteMenu(BuildContext context, Compte compte, bool isCheque) {
+    print('=== MENU COMPTE OUVERT ===');
+    print('Compte: ${compte.nom}');
+    print('Type: ${compte.type}');
+    print('ID: ${compte.id}');
+    print('IsCheque: $isCheque');
+
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -425,6 +444,8 @@ class PageComptes extends StatelessWidget {
                   style: TextStyle(color: Colors.red),
                 ),
                 onTap: () {
+                  print('=== BOUTON SUPPRIMER CLIQUÉ ===');
+                  print('Compte: ${compte.nom}');
                   Navigator.pop(context);
                   _confirmDelete(context, compte);
                 },
@@ -437,6 +458,11 @@ class PageComptes extends StatelessWidget {
   }
 
   void _confirmDelete(BuildContext context, Compte compte) {
+    print('=== CONFIRMATION SUPPRESSION ===');
+    print('Compte à supprimer: ${compte.nom}');
+    print('Type: ${compte.type}');
+    print('ID: ${compte.id}');
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -454,23 +480,61 @@ class PageComptes extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(context).pop();
                 try {
-                  // Archiver le compte en utilisant updateCompte
+                  print('=== DÉBUT SUPPRESSION ===');
+                  print('Type de compte: ${compte.type}');
+                  print('Nom du compte: ${compte.nom}');
+                  print('ID du compte: ${compte.id}');
+                  print('Est archivé actuellement: ${compte.estArchive}');
+
+                  // Logger la suppression
+                  final user = FirebaseService().auth.currentUser;
+                  final userId = user?.uid ?? 'anonymous';
+                  print('Utilisateur connecté: $userId');
+
+                  FirebaseMonitorService.logWrite(
+                    collection: 'comptes',
+                    document: compte.id,
+                    count: 1,
+                    userId: userId,
+                    details:
+                        'Suppression/archivage du compte: ${compte.nom} (Type: ${compte.type})',
+                  );
+
+                  print('Tentative d\'archivage...');
+
+                  // Utiliser la même logique d'archivage pour tous les types de comptes
                   await FirebaseService().updateCompte(compte.id, {
                     'estArchive': true,
                     'dateSuppression': DateTime.now().toIso8601String(),
                   });
+
+                  print('=== SUPPRESSION RÉUSSIE ===');
+                  print('Compte supprimé avec succès: ${compte.nom}');
+                  print('Type de compte: ${compte.type}');
+                  print('ID du compte: ${compte.id}');
+
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Compte supprimé avec succès'),
+                      SnackBar(
+                        content:
+                            Text('Compte ${compte.nom} supprimé avec succès'),
+                        backgroundColor: Colors.green,
                       ),
                     );
                   }
                 } catch (e) {
+                  print('=== ERREUR DE SUPPRESSION ===');
+                  print('Erreur lors de la suppression: $e');
+                  print('Type d\'erreur: ${e.runtimeType}');
+                  print('Stack trace: ${StackTrace.current}');
+
                   if (context.mounted) {
                     ScaffoldMessenger.of(
                       context,
-                    ).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+                    ).showSnackBar(SnackBar(
+                      content: Text('Erreur lors de la suppression: $e'),
+                      backgroundColor: Colors.red,
+                    ));
                   }
                 }
               },
