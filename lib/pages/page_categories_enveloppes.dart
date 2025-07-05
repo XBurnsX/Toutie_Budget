@@ -446,7 +446,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Catégories & Enveloppes'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
           actions: [
             IconButton(
               icon: Icon(_editionMode ? Icons.check : Icons.edit),
@@ -524,7 +524,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Catégories & Enveloppes'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
         actions: [
           IconButton(
             icon: Icon(_editionMode ? Icons.check : Icons.edit),

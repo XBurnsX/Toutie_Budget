@@ -29,64 +29,77 @@ class _PageStatistiquesState extends State<PageStatistiques> {
   }
 
   Future<void> _chargerStatistiques() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
+
     final firebaseService = FirebaseService();
+
+    // Utiliser le cache pour les comptes et catégories
+    final comptes = await CacheService.getComptes(firebaseService);
+    final categories = await CacheService.getCategories(firebaseService);
+
     final debutMois = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final finMois = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-    final comptes = (await CacheService.getComptes(firebaseService))
-        .where((c) => c.type == 'Chèque')
-        .toList();
-    final categories = await CacheService.getCategories(firebaseService);
+
     Map<String, double> enveloppesUtilisation = {};
     Map<String, double> tiersUtilisation = {};
     double revenus = 0.0;
     double depenses = 0.0;
+
+    // Parcourir toutes les transactions du mois
     for (var compte in comptes) {
-      // Nouvelle requête optimisée : ne charger que les transactions du mois
-      final snap = await FirebaseFirestore.instance
-          .collection('transactions')
-          .where('userId', isEqualTo: compte.userId)
-          .where('compteId', isEqualTo: compte.id)
-          .where('date', isGreaterThanOrEqualTo: debutMois)
-          .where('date', isLessThanOrEqualTo: finMois)
-          .get();
-      final transactions = snap.docs
-          .map((doc) => app_model.Transaction.fromJson(
-              doc.data() as Map<String, dynamic>))
-          .toList();
+      // Utiliser le cache pour les transactions
+      final transactions =
+          await CacheService.getTransactions(firebaseService, compte.id);
+
       for (var transaction in transactions) {
-        if (transaction.type == app_model.TypeTransaction.depense) {
-          depenses += transaction.montant;
-          String enveloppeNom = 'Enveloppe inconnue';
-          for (var categorie in categories) {
-            for (var enveloppe in categorie.enveloppes) {
-              if (enveloppe.id == transaction.enveloppeId) {
-                enveloppeNom = enveloppe.nom;
-                break;
+        if (transaction.date.isAfter(
+              debutMois.subtract(const Duration(days: 1)),
+            ) &&
+            transaction.date.isBefore(finMois.add(const Duration(days: 1)))) {
+          if (transaction.type == app_model.TypeTransaction.depense) {
+            depenses += transaction.montant;
+
+            // Trouver le nom de l'enveloppe pour les statistiques
+            String enveloppeNom = 'Enveloppe inconnue';
+            for (var categorie in categories) {
+              for (var enveloppe in categorie.enveloppes) {
+                if (enveloppe.id == transaction.enveloppeId) {
+                  enveloppeNom = enveloppe.nom;
+                  break;
+                }
               }
             }
-          }
-          enveloppesUtilisation[enveloppeNom] =
-              (enveloppesUtilisation[enveloppeNom] ?? 0) + transaction.montant;
-          if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
-            tiersUtilisation[transaction.tiers!] =
-                (tiersUtilisation[transaction.tiers!] ?? 0) +
+
+            enveloppesUtilisation[enveloppeNom] =
+                (enveloppesUtilisation[enveloppeNom] ?? 0) +
                     transaction.montant;
+
+            // Statistiques des tiers
+            if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
+              tiersUtilisation[transaction.tiers!] =
+                  (tiersUtilisation[transaction.tiers!] ?? 0) +
+                      transaction.montant;
+            }
+          } else {
+            revenus += transaction.montant;
           }
-        } else {
-          revenus += transaction.montant;
         }
       }
     }
+
+    // Trier et prendre le top 10
     final sortedEnveloppes = enveloppesUtilisation.entries
         .where((entry) => entry.key != 'Enveloppe inconnue')
         .toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final sortedTiers = tiersUtilisation.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
+
     setState(() {
-      _topEnveloppes = sortedEnveloppes.take(5).toList();
-      _topTiers = sortedTiers.take(5).toList();
+      _topEnveloppes = sortedEnveloppes.take(10).toList();
+      _topTiers = sortedTiers.take(10).toList();
       _totalRevenus = revenus;
       _totalDepenses = depenses;
       _isLoading = false;
@@ -119,8 +132,12 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Statistiques - ${DateFormat('MMMM yyyy', 'fr_FR').format(_selectedMonth)}',
-        ),
+            'Statistiques - ${DateFormat('MMMM yyyy', 'fr_FR').format(_selectedMonth)}'),
+        backgroundColor: const Color(0xFF18191A), // Couleur fixe
+        foregroundColor: Colors.white, // Forcer la couleur du texte
+        elevation: 0,
+        surfaceTintColor:
+            const Color(0xFF18191A), // Forcer la couleur de surface
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
@@ -128,7 +145,6 @@ class _PageStatistiquesState extends State<PageStatistiques> {
             tooltip: 'Choisir le mois',
           ),
         ],
-        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -569,9 +585,9 @@ class _PageStatistiquesWebState extends State<PageStatistiquesWeb> {
     final debutMois = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final finMois = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
 
-    // Récupérer toutes les données
-    final comptes = await firebaseService.lireComptes().first;
-    final categories = await firebaseService.lireCategories().first;
+    // Utiliser le cache pour les comptes et catégories
+    final comptes = await CacheService.getComptes(firebaseService);
+    final categories = await CacheService.getCategories(firebaseService);
 
     // Statistiques des enveloppes et tiers
     Map<String, double> enveloppesUtilisation = {};
@@ -581,8 +597,9 @@ class _PageStatistiquesWebState extends State<PageStatistiquesWeb> {
 
     // Parcourir toutes les transactions du mois
     for (var compte in comptes) {
+      // Utiliser le cache pour les transactions
       final transactions =
-          await firebaseService.lireTransactions(compte.id).first;
+          await CacheService.getTransactions(firebaseService, compte.id);
 
       for (var transaction in transactions) {
         if (transaction.date.isAfter(

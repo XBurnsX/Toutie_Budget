@@ -86,36 +86,48 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
   void _fetchNextPage() async {
     if (_isLoading || !_hasMore) return;
     setState(() => _isLoading = true);
-    final user = FirebaseService().auth.currentUser;
+
+    final firebaseService = FirebaseService();
+    final user = firebaseService.auth.currentUser;
     if (user == null) return;
+
     // Utilisation du cache pour la première page
     if (_transactions.isEmpty && _lastDoc == null) {
-      final cached = await CacheService.getTransactions(
-          FirebaseService(), widget.compte.id);
-      if (cached.isNotEmpty) {
-        setState(() {
-          _transactions.addAll(cached.take(pageSize));
-          _hasMore = cached.length > pageSize;
-          _isLoading = false;
-          _firstLoadDone = true;
-        });
-        return;
+      try {
+        final cached = await CacheService.getTransactions(
+            firebaseService, widget.compte.id);
+        if (cached.isNotEmpty) {
+          setState(() {
+            _transactions.addAll(cached.take(pageSize));
+            _hasMore = cached.length > pageSize;
+            _isLoading = false;
+            _firstLoadDone = true;
+          });
+          return;
+        }
+      } catch (e) {
+        // Si le cache échoue, continuer avec la requête directe
       }
     }
+
+    // Requête optimisée avec index composite
     Query query = FirebaseFirestore.instance
         .collection('transactions')
         .where('userId', isEqualTo: user.uid)
         .where('compteId', isEqualTo: widget.compte.id)
         .orderBy('date', descending: true)
         .limit(pageSize);
+
     if (_lastDoc != null) {
       query = query.startAfterDocument(_lastDoc!);
     }
+
     final snap = await query.get();
     final newTransactions = snap.docs
         .map((doc) =>
             app_model.Transaction.fromJson(doc.data() as Map<String, dynamic>))
         .toList();
+
     setState(() {
       _transactions.addAll(newTransactions);
       _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
@@ -123,11 +135,12 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
       _isLoading = false;
       _firstLoadDone = true;
     });
+
     // Mettre à jour le cache si c'est la première page
     if (_transactions.length <= pageSize) {
       CacheService.invalidateTransactions(widget.compte.id);
-      CacheService.getTransactions(
-          FirebaseService(), widget.compte.id); // met à jour le cache
+      // Mettre à jour le cache en arrière-plan
+      CacheService.getTransactions(firebaseService, widget.compte.id);
     }
   }
 
@@ -259,9 +272,10 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Transactions - ${widget.compte.nom}'),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor ??
-            const Color(0xFF18191A),
+        backgroundColor: const Color(0xFF18191A),
+        foregroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: const Color(0xFF18191A),
       ),
       body: _buildTransactionsCompteContent(context),
     );

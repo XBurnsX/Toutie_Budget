@@ -32,7 +32,7 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
   Widget build(BuildContext context) {
     final appBar = AppBar(
       title: const Text('Prêt personnel'),
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      elevation: 0,
       bottom: TabBar(
         controller: _tabController,
         tabs: const [

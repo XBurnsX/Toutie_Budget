@@ -40,7 +40,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
       return Scaffold(
         appBar: AppBar(
           title: Text(_type == 'Dette' ? 'Créer une dette' : 'Créer un compte'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
           actions: [
             IconButton(
               icon: const Icon(Icons.check),
@@ -98,7 +98,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_type == 'Dette' ? 'Créer une dette' : 'Créer un compte'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.check),

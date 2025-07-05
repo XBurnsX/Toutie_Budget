@@ -31,7 +31,7 @@ class _PageParametresState extends State<PageParametres> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Paramètres'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
         ),
         body: Center(
           child: ConstrainedBox(
@@ -44,7 +44,7 @@ class _PageParametresState extends State<PageParametres> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Paramètres'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
       ),
       body: _buildParametresContent(context),
     );

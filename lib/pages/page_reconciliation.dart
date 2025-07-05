@@ -145,7 +145,10 @@ class _PageReconciliationState extends State<PageReconciliation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Réconciliation')),
+      appBar: AppBar(
+        title: const Text('Réconciliation'),
+        elevation: 0,
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),

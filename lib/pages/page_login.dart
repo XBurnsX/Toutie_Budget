@@ -48,6 +48,10 @@ class _PageLoginState extends State<PageLogin> {
 
   Widget _buildWebVersion() {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Connexion'),
+        elevation: 0,
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(

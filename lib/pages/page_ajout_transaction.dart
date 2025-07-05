@@ -318,6 +318,10 @@ class _EcranAjoutTransactionRefactoredState
                 ? 'Modifier Transaction'
                 : 'Ajouter Transaction',
           ),
+          backgroundColor: const Color(0xFF18191A),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          surfaceTintColor: const Color(0xFF18191A),
         ),
         body: Consumer<AjoutTransactionController>(
           builder: (context, controller, child) {
@@ -405,7 +409,7 @@ class _EcranAjoutTransactionRefactoredState
                 Container(
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
+                    color: const Color(0xFF18191A),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),

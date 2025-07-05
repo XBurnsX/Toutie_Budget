@@ -329,6 +329,7 @@ class _PageParametresDettesState extends State<PageParametresDettes> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Paramètres de la dette'),
+        elevation: 0,
         actions: [
           IconButton(
             icon: Icon(_montreSimulateur ? Icons.calculate : Icons.science),

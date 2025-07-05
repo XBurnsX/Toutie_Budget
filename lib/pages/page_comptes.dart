@@ -22,7 +22,7 @@ class PageComptes extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Mes comptes'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
         ),
         body: Center(
           child: ConstrainedBox(
@@ -35,7 +35,7 @@ class PageComptes extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes comptes'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
       ),
       body: _buildComptesContent(context),
     );
@@ -160,8 +160,6 @@ class PageComptes extends StatelessWidget {
                         ...dettesManuelles,
                         ...dettesAutomatiques,
                       ];
-
-
 
                       if (dettesAfficher.isNotEmpty) {
                         return Column(

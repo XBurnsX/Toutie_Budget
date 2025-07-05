@@ -167,7 +167,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Définir un objectif'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),

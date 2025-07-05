@@ -13,8 +13,7 @@ class PageSituationsUrgence extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Situations d\'urgence'),
-        backgroundColor: Colors.red[700],
-        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: StreamBuilder<List<Compte>>(
         stream: FirebaseService().lireComptes(),
@@ -44,16 +43,14 @@ class PageSituationsUrgence extends StatelessWidget {
                   <Map<String, dynamic>>[];
 
               for (var categorie in categories) {
-                final enveloppesNegatives = categorie.enveloppes
-                    .where((env) => env.solde < 0)
-                    .toList();
+                final enveloppesNegatives =
+                    categorie.enveloppes.where((env) => env.solde < 0).toList();
                 if (enveloppesNegatives.isNotEmpty) {
                   categoriesAvecEnveloppesNegatives.add({
                     'id': categorie.id,
                     'nom': categorie.nom,
-                    'enveloppes': enveloppesNegatives
-                        .map((e) => e.toMap())
-                        .toList(),
+                    'enveloppes':
+                        enveloppesNegatives.map((e) => e.toMap()).toList(),
                   });
                 }
               }
@@ -253,9 +250,8 @@ class PageSituationsUrgence extends StatelessWidget {
                               orElse: () => <String, dynamic>{},
                             );
                             if (enveloppe.isNotEmpty) {
-                              montantNegatif = (enveloppe['solde'] ?? 0.0)
-                                  .toDouble()
-                                  .abs();
+                              montantNegatif =
+                                  (enveloppe['solde'] ?? 0.0).toDouble().abs();
                               break;
                             }
                           }

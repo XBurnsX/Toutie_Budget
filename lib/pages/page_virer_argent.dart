@@ -369,7 +369,10 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Virer de l\'argent'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: const Color(0xFF18191A),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          surfaceTintColor: const Color(0xFF18191A),
         ),
         body: Center(
           child: ConstrainedBox(
@@ -382,7 +385,10 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Virer de l\'argent'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: const Color(0xFF18191A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: const Color(0xFF18191A),
       ),
       body: _buildVirerArgentContent(context),
     );

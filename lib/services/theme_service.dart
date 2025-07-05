@@ -60,9 +60,10 @@ class ThemeService extends ChangeNotifier {
         seedColor: primaryColor,
         brightness: Brightness.dark,
         background: const Color(0xFF18191A),
+        surface: const Color(0xFF18191A),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: primaryColor,
+        backgroundColor: const Color(0xFF18191A),
         foregroundColor: Colors.white,
         elevation: 0,
       ),

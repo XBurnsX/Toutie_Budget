@@ -31,6 +31,7 @@ class _PageArchivageState extends State<PageArchivage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Archivage'),
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -55,9 +56,8 @@ class _PageArchivageState extends State<PageArchivage>
     return StreamBuilder<List<Compte>>(
       stream: FirebaseService().lireComptes(),
       builder: (context, snapshot) {
-        final archives = (snapshot.data ?? [])
-            .where((c) => c.estArchive == true)
-            .toList();
+        final archives =
+            (snapshot.data ?? []).where((c) => c.estArchive == true).toList();
         if (archives.isEmpty) {
           return const Center(
             child: Text(

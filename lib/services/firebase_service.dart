@@ -909,17 +909,18 @@ class FirebaseService {
     if (user == null) {
       return Stream.value([]);
     }
-    // Requête optimisée : filtrer d'abord par userId, puis par compteId
-    // Cela évite l'index composite en utilisant un seul where + orderBy
+
+    // Requête optimisée avec index composite : userId + compteId + date
     return firestore
         .collection('transactions')
         .where('userId', isEqualTo: user.uid)
+        .where('compteId', isEqualTo: compteId)
         .orderBy('date', descending: true)
+        .limit(100) // Limiter à 100 transactions par compte
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => app_model.Transaction.fromJson(doc.data()))
-              .where((transaction) => transaction.compteId == compteId) // Filtrer côté client
               .toList(),
         );
   }

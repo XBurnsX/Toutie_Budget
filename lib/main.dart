@@ -55,7 +55,7 @@ class MyApp extends StatelessWidget {
               colorScheme: ColorScheme.dark(
                 primary: themeService.primaryColor,
                 secondary: themeService.primaryColor,
-                surface: const Color(0xFF232526),
+                surface: const Color(0xFF18191A), // Même couleur que l'AppBar
               ),
               cardTheme: CardThemeData(
                 color: const Color(0xFF232526),

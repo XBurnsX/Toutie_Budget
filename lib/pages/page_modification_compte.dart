@@ -101,7 +101,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Modifier le compte'),
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
         ),
         body: Center(
           child: ConstrainedBox(
@@ -114,7 +114,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Modifier le compte'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
       ),
       body: _buildModificationCompteContent(context),
     );

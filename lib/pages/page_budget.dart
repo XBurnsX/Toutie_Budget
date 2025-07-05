@@ -39,16 +39,15 @@ class _PageBudgetState extends State<PageBudget> {
 
   Future<void> _triggerRollover() async {
     final bool rolloverProcessed = await _rolloverService.processRollover();
-    if (rolloverProcessed) {
-      if (mounted) {
-        setState(() {
-          refreshKey++; // Force a refresh of the UI
-        });
-      }
+    if (rolloverProcessed && mounted) {
+      setState(() {
+        refreshKey++; // Force a refresh of the UI
+      });
     }
   }
 
   Future<void> handleMonthChange(DateTime date) async {
+    if (!mounted) return;
     setState(() {
       selectedMonth = date;
     });
@@ -103,10 +102,10 @@ class _PageBudgetState extends State<PageBudget> {
   Widget build(BuildContext context) {
     if (kIsWeb) {
       return Scaffold(
-        body: FutureBuilder<List<Compte>>(
-          future: CacheService.getComptes(FirebaseService()),
+        body: StreamBuilder<List<Compte>>(
+          stream: FirebaseService().lireComptes(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
+            if (!snapshot.hasData || !mounted) {
               return const Center(child: CircularProgressIndicator());
             }
             final comptes = snapshot.data ?? [];
@@ -115,9 +114,12 @@ class _PageBudgetState extends State<PageBudget> {
             final comptesChequesPretAPlacer = comptesNonArchives
                 .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
                 .toList();
-            return FutureBuilder<List<Categorie>>(
-              future: CacheService.getCategories(FirebaseService()),
+            return StreamBuilder<List<Categorie>>(
+              stream: FirebaseService().lireCategories(),
               builder: (context, catSnapshot) {
+                if (!mounted) {
+                  return const Center(child: CircularProgressIndicator());
+                }
                 final categories = catSnapshot.data ?? [];
                 final montantNegatif =
                     _calculerMontantNegatifTotal(comptes, categories);
@@ -414,115 +416,90 @@ class _PageBudgetState extends State<PageBudget> {
       );
     }
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              // Sélecteur de mois avec padding
-              Positioned(
-                left: 25,
-                top: 0,
-                bottom: 0,
-                child: MonthPickerWidget(
-                  selectedMonth: selectedMonth,
-                  onChanged: handleMonthChange,
-                ),
+      appBar: AppBar(
+        title: Text('Budget'),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: SvgPicture.asset(
+              'assets/icons/transfert_argent.svg',
+              width: 25,
+              height: 25,
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).iconTheme.color ?? Colors.white,
+                BlendMode.srcIn,
               ),
-              // Actions à droite (icône paramètres tout à droite)
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
+            ),
+            tooltip: 'Virer de l\'argent',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PageVirerArgent(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: SvgPicture.asset(
+              'assets/icons/gerer_categorie.svg',
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).iconTheme.color ?? Colors.white,
+                BlendMode.srcIn,
+              ),
+            ),
+            tooltip: 'Catégories',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PageCategoriesEnveloppes(),
+                ),
+              );
+            },
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.menu),
+            tooltip: 'Menu',
+            onSelected: (value) async {
+              if (value == 'pret_personnel') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const PagePretPersonnel(),
+                  ),
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'pret_personnel',
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      icon: SvgPicture.asset(
-                        'assets/icons/transfert_argent.svg',
-                        width: 25,
-                        height: 25,
-                        colorFilter: ColorFilter.mode(
-                          Theme.of(context).iconTheme.color ?? Colors.white,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                      tooltip: 'Virer de l\'argent',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const PageVirerArgent(),
-                          ),
-                        );
-                      },
-                    ),
-                    IconButton(
-                      icon: SvgPicture.asset(
-                        'assets/icons/gerer_categorie.svg',
-                        width: 20,
-                        height: 20,
-                        colorFilter: ColorFilter.mode(
-                          Theme.of(context).iconTheme.color ?? Colors.white,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                      tooltip: 'Catégories',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const PageCategoriesEnveloppes(),
-                          ),
-                        );
-                      },
-                    ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.menu),
-                      tooltip: 'Menu',
-                      onSelected: (value) async {
-                        if (value == 'pret_personnel') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PagePretPersonnel(),
-                            ),
-                          );
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem<String>(
-                          value: 'pret_personnel',
-                          child: Row(
-                            children: [
-                              Icon(Icons.account_balance_wallet, size: 20),
-                              SizedBox(width: 8),
-                              Text('Prêt personnel'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings),
-                      tooltip: 'Paramètres',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const PageParametres(),
-                          ),
-                        );
-                      },
-                    ),
+                    Icon(Icons.account_balance_wallet, size: 20),
+                    SizedBox(width: 8),
+                    Text('Prêt personnel'),
                   ],
                 ),
               ),
             ],
           ),
-        ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Paramètres',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PageParametres(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
-      body: FutureBuilder<List<Compte>>(
-        future: CacheService.getComptes(FirebaseService()),
+      body: StreamBuilder<List<Compte>>(
+        stream: FirebaseService().lireComptes(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (!snapshot.hasData || !mounted) {
             return const Center(child: CircularProgressIndicator());
           }
           final comptes = snapshot.data ?? [];
@@ -534,9 +511,12 @@ class _PageBudgetState extends State<PageBudget> {
               ),
             );
           }
-          return FutureBuilder<List<Categorie>>(
-            future: CacheService.getCategories(FirebaseService()),
+          return StreamBuilder<List<Categorie>>(
+            stream: FirebaseService().lireCategories(),
             builder: (context, catSnapshot) {
+              if (!mounted) {
+                return const Center(child: CircularProgressIndicator());
+              }
               final categories = catSnapshot.data ?? [];
               final montantNegatif = _calculerMontantNegatifTotal(
                 comptes,
@@ -549,6 +529,14 @@ class _PageBudgetState extends State<PageBudget> {
 
               return Column(
                 children: [
+                  // Sélecteur de mois en haut
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: MonthPickerWidget(
+                      selectedMonth: selectedMonth,
+                      onChanged: handleMonthChange,
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   ...comptes
                       .where(
@@ -699,21 +687,13 @@ class _PageBudgetState extends State<PageBudget> {
                                       color: Colors.white70,
                                     ),
                                   ),
-                                  const Text(
-                                    'Situation en besoin de votre attention',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.white60,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
                                 ],
                               ),
                             ),
                             const Icon(
                               Icons.arrow_forward_ios,
-                              color: Colors.white70,
-                              size: 18,
+                              color: Colors.white,
+                              size: 16,
                             ),
                           ],
                         ),
@@ -721,18 +701,16 @@ class _PageBudgetState extends State<PageBudget> {
                     ),
                   ],
 
-                  const SizedBox(height: 50),
+                  // Liste des enveloppes/dépenses
                   Expanded(
                     child: ListeCategoriesEnveloppes(
                       categories: categories
-                          .map(
-                            (c) => {
-                              'id': c.id,
-                              'nom': c.nom,
-                              'enveloppes':
-                                  c.enveloppes.map((e) => e.toMap()).toList(),
-                            },
-                          )
+                          .map((c) => {
+                                'id': c.id,
+                                'nom': c.nom,
+                                'enveloppes':
+                                    c.enveloppes.map((e) => e.toMap()).toList(),
+                              })
                           .toList(),
                       comptes: comptes
                           .map((compte) => {
