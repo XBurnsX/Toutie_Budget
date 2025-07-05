@@ -8,6 +8,7 @@ import 'package:toutie_budget/pages/page_parametres_dettes.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/models/dette.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/compte.dart';
 
@@ -17,37 +18,59 @@ class PageComptes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Mes comptes'),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: _buildComptesContent(context),
+          ),
+        ),
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mes comptes'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+      ),
+      body: _buildComptesContent(context),
+    );
+  }
+
+  Widget _buildComptesContent(BuildContext context) {
     return StreamBuilder<List<Compte>>(
       stream: FirebaseService().lireComptes(),
       builder: (context, snapshot) {
-        final comptes = (snapshot.data ?? [])
-            .where((c) => c.estArchive == false)
-            .toList();
+        final comptes =
+            (snapshot.data ?? []).where((c) => c.estArchive == false).toList();
 
         // Séparation par type
         final cheques = comptes.where((c) => c.type == 'Chèque').toList();
-        final credits = comptes
-            .where((c) => c.type == 'Carte de crédit')
-            .toList();
-        final dettesManuelles = comptes
-            .where((c) => c.type == 'Dette')
-            .toList();
-        final investissements = comptes
-            .where((c) => c.type == 'Investissement')
-            .toList();
+        final credits =
+            comptes.where((c) => c.type == 'Carte de crédit').toList();
+        final dettesManuelles =
+            comptes.where((c) => c.type == 'Dette').toList();
+        final investissements =
+            comptes.where((c) => c.type == 'Investissement').toList();
 
         return Column(
           children: [
-            SizedBox(height: 45),
+            if (!kIsWeb) SizedBox(height: 45),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Mes comptes',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
+                  if (!kIsWeb)
+                    Text(
+                      'Mes comptes',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
                   ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).push(
@@ -121,9 +144,8 @@ class PageComptes extends StatelessWidget {
                     builder: (context, dettesSnapshot) {
                       final dettesActives = dettesSnapshot.data ?? [];
                       // On récupère les IDs des dettes qui sont déjà gérées comme des comptes manuels
-                      final idsDettesManuelles = dettesManuelles
-                          .map((c) => c.id)
-                          .toSet();
+                      final idsDettesManuelles =
+                          dettesManuelles.map((c) => c.id).toSet();
 
                       // Filtrer pour n'afficher que les dettes contractées qui ne sont PAS déjà des comptes manuels
                       final dettesAutomatiques = dettesActives
@@ -139,7 +161,7 @@ class PageComptes extends StatelessWidget {
                         ...dettesAutomatiques,
                       ];
 
-                      // Debug silencieux
+
 
                       if (dettesAfficher.isNotEmpty) {
                         return Column(
@@ -240,7 +262,7 @@ class PageComptes extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
         elevation: 2,
-        color: const Color(0xFF232526), // Même couleur que les enveloppes
+        color: const Color(0xFF313334),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -476,7 +498,7 @@ class PageComptes extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
         elevation: 2,
-        color: const Color(0xFF232526), // Même couleur que les enveloppes
+        color: const Color(0xFF313334),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -580,6 +602,117 @@ class PageComptes extends StatelessWidget {
                   isDetteManuelle ? Icons.settings : Icons.account_balance,
                   color: Colors.grey[400],
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CompteCardWidget extends StatelessWidget {
+  final Compte compte;
+  final Color defaultColor;
+  final BuildContext contextParent;
+  final bool isCheque;
+  final void Function()? onTap;
+  final void Function()? onLongPress;
+
+  const CompteCardWidget({
+    super.key,
+    required this.compte,
+    required this.defaultColor,
+    required this.contextParent,
+    required this.isCheque,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(compte.couleur);
+    final isDette = compte.type == 'Dette';
+    final soldeAffiche = compte.solde;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: 2,
+        color: const Color(0xFF313334),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        compte.nom,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        compte.type,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${soldeAffiche.toStringAsFixed(2)} \$',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: soldeAffiche >= 0
+                            ? Colors.green[700]
+                            : Colors.red[700],
+                      ),
+                    ),
+                    if (isCheque)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Prêt à placer: ${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.black,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: Colors.grey[400]),
               ],
             ),
           ),

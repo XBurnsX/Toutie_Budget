@@ -3,6 +3,7 @@ import '../models/categorie.dart';
 import '../services/firebase_service.dart';
 import 'page_set_objectif.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class PageCategoriesEnveloppes extends StatefulWidget {
   const PageCategoriesEnveloppes({super.key});
@@ -441,10 +442,89 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Catégories & Enveloppes'),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          actions: [
+            IconButton(
+              icon: Icon(_editionMode ? Icons.check : Icons.edit),
+              tooltip: _editionMode ? 'Terminer l\'édition' : 'Mode édition',
+              onPressed: () async {
+                if (_editionMode) {
+                  try {
+                    _categoriesSubscription?.pause();
+                    for (int i = 0; i < _categories.length; i++) {
+                      final cat = _categories[i];
+                      await FirebaseService()
+                          .firestore
+                          .collection('categories')
+                          .doc(cat.id)
+                          .update({'ordre': i});
+                    }
+                    setState(() {
+                      _editionMode = false;
+                    });
+                    _categoriesSubscription?.resume();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Erreur lors de la sauvegarde de l\'ordre'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  _categoriesSubscription?.pause();
+                  setState(() {
+                    _editionMode = true;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.white),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                                'Maintenez et déplacez les éléments pour réorganiser leur position'),
+                          ),
+                        ],
+                      ),
+                      duration: Duration(seconds: 4),
+                    ),
+                  );
+                }
+              },
+            ),
+            if (_editionMode)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                child: Icon(Icons.drag_handle, color: Colors.white54, size: 24),
+              ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Créer une catégorie',
+              onPressed: () => _ajouterCategorie(_categories),
+            ),
+          ],
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: _buildCategoriesEnveloppesContent(context),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Catégories & Enveloppes'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         actions: [
           IconButton(
             icon: Icon(_editionMode ? Icons.check : Icons.edit),
@@ -452,10 +532,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
             onPressed: () async {
               if (_editionMode) {
                 try {
-                  // Désactiver temporairement la synchronisation
                   _categoriesSubscription?.pause();
-
-                  // Mettre à jour l'ordre de toutes les catégories
                   for (int i = 0; i < _categories.length; i++) {
                     final cat = _categories[i];
                     await FirebaseService()
@@ -464,27 +541,22 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                         .doc(cat.id)
                         .update({'ordre': i});
                   }
-
                   setState(() {
                     _editionMode = false;
                   });
-
-                  // Réactiver la synchronisation
                   _categoriesSubscription?.resume();
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text(
-                          'Erreur lors de la sauvegarde de l\'ordre',
-                        ),
+                        content:
+                            Text('Erreur lors de la sauvegarde de l\'ordre'),
                         backgroundColor: Colors.red,
                       ),
                     );
                   }
                 }
               } else {
-                // Désactiver la synchronisation en mode édition
                 _categoriesSubscription?.pause();
                 setState(() {
                   _editionMode = true;
@@ -497,8 +569,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Maintenez et déplacez les éléments pour réorganiser leur position',
-                          ),
+                              'Maintenez et déplacez les éléments pour réorganiser leur position'),
                         ),
                       ],
                     ),
@@ -520,64 +591,68 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_editionMode)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: Card(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.1),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                color: Theme.of(context).colorScheme.primary,
+      body: _buildCategoriesEnveloppesContent(context),
+    );
+  }
+
+  Widget _buildCategoriesEnveloppesContent(BuildContext context) {
+    return _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_editionMode)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Card(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(0.1),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Maintenez et déplacez les éléments pour réorganiser leur position',
+                                style: TextStyle(fontSize: 14),
                               ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  'Maintenez et déplacez les éléments pour réorganiser leur position',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  const SizedBox(height: 40),
-                  Expanded(
-                    child: _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ReorderableListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _categories.length,
-                            onReorder: _reorderCategories,
-                            buildDefaultDragHandles:
-                                false, // On utilise une poignée personnalisée
-                            itemBuilder: (context, index) {
-                              final categorie = _categories[index];
-                              return _buildCategorieItem(
-                                categorie,
-                                index: index,
-                                key: ValueKey(categorie.id),
-                              );
-                            },
-                          ),
                   ),
-                ],
-              ),
+                const SizedBox(height: 40),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ReorderableListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _categories.length,
+                          onReorder: _reorderCategories,
+                          buildDefaultDragHandles:
+                              false, // On utilise une poignée personnalisée
+                          itemBuilder: (context, index) {
+                            final categorie = _categories[index];
+                            return _buildCategorieItem(
+                              categorie,
+                              index: index,
+                              key: ValueKey(categorie.id),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
-    );
+          );
   }
 
   Widget _buildCategorieItem(Categorie categorie, {Key? key, int? index}) {

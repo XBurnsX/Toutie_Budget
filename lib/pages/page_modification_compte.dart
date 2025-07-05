@@ -4,6 +4,7 @@ import '../models/compte.dart';
 import '../services/firebase_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Page de modification d'un compte existant
 class PageModificationCompte extends StatefulWidget {
@@ -68,8 +69,7 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
         },
         onValueChanged: (value) {
           setState(() {
-            final double parsedValue =
-                double.tryParse(
+            final double parsedValue = double.tryParse(
                   value
                       .replaceAll('\$', '')
                       .replaceAll(' ', '')
@@ -97,212 +97,204 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Modifier le compte'),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: _buildModificationCompteContent(context),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Modifier le compte'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            tooltip: 'Valider',
-            onPressed: () async {
-              if (_nom.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Veuillez entrer un nom'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              // La valeur _pretAPlacer est maintenant directement issue du champ de texte
-              await FirebaseService().updateCompte(widget.compte.id, {
-                'nom': _nom,
-                'type': _type,
-                'solde': _solde,
-                'pretAPlacer': _pretAPlacer,
-                'couleur': _couleur.value,
-              });
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
+        backgroundColor: Theme.of(context).colorScheme.surface,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              const SizedBox(height: 50),
-              TextFormField(
-                initialValue: _nom,
-                decoration: const InputDecoration(
-                  labelText: 'Nom du compte',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Veuillez entrer un nom'
-                    : null,
-                onChanged: (value) => setState(() => _nom = value),
+      body: _buildModificationCompteContent(context),
+    );
+  }
+
+  Widget _buildModificationCompteContent(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          children: [
+            const SizedBox(height: 50),
+            TextFormField(
+              initialValue: _nom,
+              decoration: const InputDecoration(
+                labelText: 'Nom du compte',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _type,
-                dropdownColor: Theme.of(context).dropdownColor,
-                decoration: const InputDecoration(
-                  labelText: 'Type de compte',
-                  border: OutlineInputBorder(),
-                ),
-                items: _types
-                    .map(
-                      (type) =>
-                          DropdownMenuItem(value: type, child: Text(type)),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _type = value ?? 'Chèque';
-                  });
-                },
+              validator: (value) => value == null || value.isEmpty
+                  ? 'Veuillez entrer un nom'
+                  : null,
+              onChanged: (value) => setState(() => _nom = value),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _type,
+              dropdownColor: Theme.of(context).dropdownColor,
+              decoration: const InputDecoration(
+                labelText: 'Type de compte',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: () => _ouvrirClavierNumerique(pourPretAPlacer: false),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Solde',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _soldeController.text.isEmpty
-                                  ? '0.00'
-                                  : _soldeController.text,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Text('\$', style: TextStyle(fontSize: 16)),
-                    ],
-                  ),
+              items: _types
+                  .map(
+                    (type) => DropdownMenuItem(value: type, child: Text(type)),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _type = value ?? 'Chèque';
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => _ouvrirClavierNumerique(pourPretAPlacer: false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
                 ),
-              ),
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: () => _ouvrirClavierNumerique(pourPretAPlacer: true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Prêt à placer',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _pretAPlacerController.text.isEmpty
-                                  ? '0.00'
-                                  : _pretAPlacerController.text,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Text('\$', style: TextStyle(fontSize: 16)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    const Text(
-                      'Couleur du compte',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _couleur,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white, width: 2),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Solde',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Choisir une couleur'),
-                                content: SingleChildScrollView(
-                                  child: ColorPicker(
-                                    pickerColor: _couleur,
-                                    onColorChanged: (color) =>
-                                        setState(() => _couleur = color),
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Valider'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                          child: const Text('Changer'),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            _soldeController.text.isEmpty
+                                ? '0.00'
+                                : _soldeController.text,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
                     ),
+                    const Text('\$', style: TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => _ouvrirClavierNumerique(pourPretAPlacer: true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Prêt à placer',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _pretAPlacerController.text.isEmpty
+                                ? '0.00'
+                                : _pretAPlacerController.text,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Text('\$', style: TextStyle(fontSize: 16)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Couleur du compte',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _couleur,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Choisir une couleur'),
+                              content: SingleChildScrollView(
+                                child: ColorPicker(
+                                  pickerColor: _couleur,
+                                  onColorChanged: (color) =>
+                                      setState(() => _couleur = color),
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Valider'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        child: const Text('Changer'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

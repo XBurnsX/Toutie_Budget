@@ -10,6 +10,7 @@ import '../widgets/ajout_transaction/section_informations_cles.dart';
 import '../widgets/ajout_transaction/section_fractionnement.dart';
 import '../widgets/ajout_transaction/bouton_sauvegarder.dart';
 import '../widgets/modale_fractionnement.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class EcranAjoutTransactionRefactored extends StatefulWidget {
   final List<String> comptesExistants;
@@ -296,6 +297,18 @@ class _EcranAjoutTransactionRefactoredState
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: _buildAjoutTransactionContent(context),
+        ),
+      );
+    }
+    return _buildAjoutTransactionContent(context);
+  }
+
+  Widget _buildAjoutTransactionContent(BuildContext context) {
     return ChangeNotifierProvider.value(
       value: _controller,
       child: Scaffold(

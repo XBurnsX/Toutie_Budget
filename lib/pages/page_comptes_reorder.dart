@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:toutie_budget/models/compte.dart';
+import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/dette_service.dart';
 import 'page_creation_compte.dart';
 import 'page_transactions_compte.dart';
 import 'page_modification_compte.dart';
 import 'page_reconciliation.dart';
+import 'page_parametres_dettes.dart';
+import 'page_pret_personnel.dart';
 
 class PageComptesReorder extends StatefulWidget {
   const PageComptesReorder({super.key});
@@ -49,6 +53,8 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
           final cheques = comptes.where((c) => c.type == 'Chèque').toList();
           final credits =
               comptes.where((c) => c.type == 'Carte de crédit').toList();
+          final dettesManuelles =
+              comptes.where((c) => c.type == 'Dette').toList();
           final investissements =
               comptes.where((c) => c.type == 'Investissement').toList();
 
@@ -57,11 +63,67 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
             children: [
               _buildSection('Comptes chèques', Colors.blue, cheques),
               _buildSection('Cartes de crédit', Colors.purple, credits),
+              // Section Dettes - combine les dettes manuelles et les dettes de la collection dettes
+              _buildDettesSection(dettesManuelles),
               _buildSection('Investissement', Colors.green, investissements),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildDettesSection(List<Compte> dettesManuelles) {
+    return StreamBuilder<List<Dette>>(
+      stream: DetteService().dettesActives(),
+      builder: (context, dettesSnapshot) {
+        final dettesActives = dettesSnapshot.data ?? [];
+        // On récupère les IDs des dettes qui sont déjà gérées comme des comptes manuels
+        final idsDettesManuelles = dettesManuelles.map((c) => c.id).toSet();
+
+        // Filtrer pour n'afficher que les dettes contractées qui ne sont PAS déjà des comptes manuels
+        final dettesAutomatiques = dettesActives
+            .where(
+              (d) => d.type == 'dette' && !idsDettesManuelles.contains(d.id),
+            )
+            .toList();
+
+        final dettesAfficher = [
+          ...dettesManuelles,
+          ...dettesAutomatiques,
+        ];
+
+        if (dettesAfficher.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+              child: Text(
+                'Dettes',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+            ...dettesAfficher.map((item) {
+              if (item is Compte) {
+                // Dette manuelle (compte)
+                return _buildCard(item, Colors.red);
+              } else if (item is Dette) {
+                // Dette de la collection dettes
+                return _buildDetteCard(item);
+              }
+              return const SizedBox.shrink();
+            }),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
     );
   }
 
@@ -207,6 +269,129 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                 ),
                 const SizedBox(width: 8),
                 editing
+                    ? const Icon(Icons.drag_handle, color: Colors.white54)
+                    : Icon(Icons.chevron_right, color: Colors.grey[400]),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetteCard(Dette dette) {
+    final color = Colors.red; // Couleur rouge pour les dettes
+    final isDetteManuelle =
+        dette.estManuelle; // Vérifier si c'est une dette manuelle
+
+    return Container(
+      key: ValueKey(dette.id),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: 2,
+        color: const Color(0xFF232526),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _editionMode
+              ? null
+              : () {
+                  // Navigation conditionnelle selon le type de dette
+                  if (isDetteManuelle) {
+                    // Dette manuelle → PageParametresDettes
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PageParametresDettes(dette: dette),
+                      ),
+                    );
+                  } else {
+                    // Dette automatique → PagePretPersonnel (section Prêts & Dettes)
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PagePretPersonnel(),
+                      ),
+                    );
+                  }
+                },
+          onLongPress:
+              _editionMode ? null : null, // Pas de menu pour les dettes
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dette.type == 'dette'
+                            ? 'Dette : ${dette.nomTiers}'
+                            : 'Prêt à ${dette.nomTiers}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dette.type == 'dette'
+                            ? 'Dette contractée'
+                            : 'Prêt accordé',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      (dette.type == 'dette'
+                          ? '-${dette.solde.abs().toStringAsFixed(2)} \$'
+                          : '+${dette.solde.abs().toStringAsFixed(2)} \$'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: dette.type == 'dette'
+                            ? Colors.red[700]
+                            : Colors.green[700],
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Initial: '
+                        '${dette.type == 'dette' ? '-' : '+'}'
+                        '${dette.montantInitial.abs().toStringAsFixed(2)} \$',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                _editionMode
                     ? const Icon(Icons.drag_handle, color: Colors.white54)
                     : Icon(Icons.chevron_right, color: Colors.grey[400]),
               ],

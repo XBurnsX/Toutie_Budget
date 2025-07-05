@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -18,10 +19,13 @@ import 'pages/page_ajout_transaction.dart';
 import 'pages/page_pret_personnel.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'themes/dropdown_theme_extension.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await initializeDateFormatting('fr_CA', null);
 
   // Initialiser le service de thème
@@ -98,7 +102,7 @@ class MyApp extends StatelessWidget {
                 DropdownThemeExtension(
                   dropdownColor:
                       Color.lerp(const Color(0xFF232526), Colors.black, 0.15) ??
-                      const Color(0xFF232526),
+                          const Color(0xFF232526),
                 ),
               ],
             ),

@@ -11,6 +11,11 @@ import 'page_pret_personnel.dart';
 import 'page_parametres.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'page_situations_urgence.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'page_statistiques.dart';
+import 'page_ajout_transaction.dart';
+import 'page_comptes.dart';
+import 'page_transactions_compte.dart';
 
 /// Page d'affichage du budget et des enveloppes
 class PageBudget extends StatefulWidget {
@@ -95,6 +100,319 @@ class _PageBudgetState extends State<PageBudget> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        body: StreamBuilder<List<Compte>>(
+          stream: FirebaseService().lireComptes(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final comptes = snapshot.data ?? [];
+            final comptesNonArchives =
+                comptes.where((c) => !c.estArchive).toList();
+            final comptesChequesPretAPlacer = comptesNonArchives
+                .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
+                .toList();
+            return StreamBuilder<List<Categorie>>(
+              key: ValueKey(refreshKey),
+              stream: FirebaseService().lireCategories(),
+              builder: (context, catSnapshot) {
+                final categories = catSnapshot.data ?? [];
+                final montantNegatif =
+                    _calculerMontantNegatifTotal(comptes, categories);
+                final aSituationsUrgence =
+                    _aSituationsUrgence(comptes, categories);
+
+                return Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Colonne gauche (comptes/menu) - 400px fixe
+                      SizedBox(
+                        width: 400,
+                        child: Container(
+                          color: Theme.of(context).colorScheme.surface,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 32),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                child: Text(
+                                  'Budget',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                child: GestureDetector(
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          EcranAjoutTransactionRefactored(
+                                        comptesExistants: comptesNonArchives
+                                            .map((c) => c.nom)
+                                            .toList(),
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Ajouter une transaction',
+                                    style: TextStyle(
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 32, thickness: 1),
+                              // Cards de comptes (hors archivés, tous types)
+                              Expanded(
+                                child: ListView(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 0),
+                                  children: comptesNonArchives
+                                      .map((compte) => CompteCardWidget(
+                                            compte: compte,
+                                            defaultColor: Color(compte.couleur),
+                                            contextParent: context,
+                                            isCheque: compte.type == 'Chèque',
+                                            onTap: () {
+                                              if (compte.type == 'Dette') {
+                                                // Navigation dette
+                                              } else {
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        PageTransactionsCompte(
+                                                            compte: compte),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            onLongPress: () {},
+                                          ))
+                                      .toList(),
+                                ),
+                              ),
+                              // Liens/boutons en bas à gauche
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    left: 8, right: 8, bottom: 16, top: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ListTile(
+                                      leading: const Icon(Icons.swap_horiz,
+                                          color: Colors.white),
+                                      title: const Text('Virer argent',
+                                          style:
+                                              TextStyle(color: Colors.white)),
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const PageVirerArgent()),
+                                      ),
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(
+                                          Icons.account_balance_wallet,
+                                          color: Colors.white),
+                                      title: const Text('Prêt personnel',
+                                          style:
+                                              TextStyle(color: Colors.white)),
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const PagePretPersonnel()),
+                                      ),
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.settings,
+                                          color: Colors.white),
+                                      title: const Text('Paramètres',
+                                          style:
+                                              TextStyle(color: Colors.white)),
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const PageParametres()),
+                                      ),
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.category,
+                                          color: Colors.white),
+                                      title: const Text('Gérer enveloppes',
+                                          style:
+                                              TextStyle(color: Colors.white)),
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const PageCategoriesEnveloppes()),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Espace noir entre comptes et enveloppes - 150px fixe
+                      const SizedBox(width: 150),
+
+                      // Colonne centrale (enveloppes) - s'étire pour remplir l'espace
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 32, vertical: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Bandeaux prêt à placer (en haut)
+                              if (comptesChequesPretAPlacer.isNotEmpty)
+                                Center(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: comptesChequesPretAPlacer
+                                          .map((compte) => Container(
+                                                margin: const EdgeInsets.only(
+                                                    right: 16, bottom: 16),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 24,
+                                                        vertical: 16),
+                                                decoration: BoxDecoration(
+                                                  color: Color(compte.couleur),
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                  border: Border.all(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
+                                                      width: 2),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(compte.nom,
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 16,
+                                                            color:
+                                                                Colors.white)),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                        'Prêt à placer : ${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                                                        style: const TextStyle(
+                                                            fontSize: 14,
+                                                            color:
+                                                                Colors.white)),
+                                                  ],
+                                                ),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                                ),
+                              // Liste des enveloppes/dépenses
+                              Expanded(
+                                child: ListeCategoriesEnveloppes(
+                                  categories: categories
+                                      .map((c) => {
+                                            'id': c.id,
+                                            'nom': c.nom,
+                                            'enveloppes': c.enveloppes
+                                                .map((e) => e.toMap())
+                                                .toList(),
+                                          })
+                                      .toList(),
+                                  comptes: comptes
+                                      .map((compte) => {
+                                            'id': compte.id,
+                                            'nom': compte.nom,
+                                            'type': compte.type,
+                                            'estArchive': compte.estArchive,
+                                            'pretAPlacer': compte.pretAPlacer,
+                                            'couleur': compte.couleur,
+                                          })
+                                      .toList(),
+                                  selectedMonthKey: selectedMonthKey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Espace noir entre enveloppes et stats - 150px fixe
+                      const SizedBox(width: 150),
+
+                      // Colonne droite (statistiques) - 400px fixe, collée à droite
+                      SizedBox(
+                        width: 400,
+                        child: Container(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          height: double.infinity,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 32),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Statistiques',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: const PageStatistiquesWeb(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      );
+    }
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),

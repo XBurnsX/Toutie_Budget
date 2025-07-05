@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/services/argent_service.dart';
 
@@ -98,6 +99,175 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
           c['estArchive'] != true;
     }).toList();
 
+    // Design adaptatif selon la plateforme
+    if (kIsWeb) {
+      return _buildWebVersion(comptesDisponibles);
+    } else {
+      return _buildMobileVersion(comptesDisponibles);
+    }
+  }
+
+  Widget _buildWebVersion(List<Map<String, dynamic>> comptesDisponibles) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 600),
+      margin: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // En-tête
+            Row(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Assignation d\'argent',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Section compte
+            Text(
+              'Compte source',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: comptesDisponibles.any((c) => c['id'] == _compteId)
+                    ? _compteId
+                    : null,
+                hint: const Text('Sélectionner un compte'),
+                underline: const SizedBox(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                items: comptesDisponibles.map((c) {
+                  final pret = (c['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
+                  final color = Color(c['couleur'] as int? ?? 0xFF2196F3);
+                  return DropdownMenuItem(
+                    value: c['id'].toString(),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            c['nom']?.toString() ?? 'Compte',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${pret.toStringAsFixed(2)}\u00A0\$',
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => _compteId = val),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Section montant
+            Text(
+              'Montant à assigner',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _ctrl,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixText: '\$',
+                      hintText: '0.00',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _ctrl.text = '${_montantNecessaire.toStringAsFixed(2)}';
+                    });
+                  },
+                  child: const Text('Montant suggéré'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Boutons d'action
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Annuler'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _effectuerAssignation,
+                    child: const Text('Assigner'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileVersion(List<Map<String, dynamic>> comptesDisponibles) {
     return Padding(
       padding:
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),

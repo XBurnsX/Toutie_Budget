@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/dette.dart';
 import '../services/dette_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class PagePretPersonnel extends StatefulWidget {
   const PagePretPersonnel({super.key});
@@ -29,18 +30,38 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Prêts & Dettes'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'On me doit'),
-            Tab(text: 'Je dois'),
-            Tab(text: 'Archivés'),
-          ],
-        ),
+    final appBar = AppBar(
+      title: const Text('Prêt personnel'),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      bottom: TabBar(
+        controller: _tabController,
+        tabs: const [
+          Tab(text: 'On me doit'),
+          Tab(text: 'Je dois'),
+          Tab(text: 'Archivés'),
+        ],
       ),
+    );
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildListeDettes(type: 'pret', archive: false),
+                _buildListeDettes(type: 'dette', archive: false),
+                _buildListeDettes(type: null, archive: true),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Scaffold(
+      appBar: appBar,
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -61,8 +82,7 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final dettes =
-            snapshot.data
+        final dettes = snapshot.data
                 ?.where((d) => type == null || d.type == type)
                 .toList() ??
             [];
@@ -126,9 +146,8 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
                         dette.type == 'pret'
                             ? Icons.call_made
                             : Icons.call_received,
-                        color: dette.type == 'pret'
-                            ? Colors.green
-                            : Colors.orange,
+                        color:
+                            dette.type == 'pret' ? Colors.green : Colors.orange,
                         size: 24,
                       ),
                       const SizedBox(width: 12),
@@ -232,8 +251,8 @@ class _PagePretPersonnelState extends State<PagePretPersonnel>
                                   color: dette.solde == 0
                                       ? Colors.green
                                       : (dette.type == 'pret'
-                                            ? Colors.blue
-                                            : Colors.orange),
+                                          ? Colors.blue
+                                          : Colors.orange),
                                 ),
                               ),
                             ],

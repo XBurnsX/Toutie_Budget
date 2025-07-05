@@ -5,6 +5,7 @@ import '../services/argent_service.dart';
 import '../services/firebase_service.dart';
 import '../services/color_service.dart';
 import '../widgets/numeric_keyboard.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class PageVirerArgent extends StatefulWidget {
   const PageVirerArgent({
@@ -364,337 +365,358 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Virer de l\'argent'),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: _buildVirerArgentContent(context),
+          ),
+        ),
+      );
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('Virer de l\'argent')),
-      body: StreamBuilder<List<Compte>>(
-        stream: FirebaseService().lireComptes(),
-        builder: (context, comptesSnapshot) {
-          return StreamBuilder<List<Categorie>>(
-            stream: FirebaseService().lireCategories(),
-            builder: (context, catSnapshot) {
-              try {
-                if (comptesSnapshot.hasError || catSnapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Erreur : ${comptesSnapshot.error?.toString() ?? ''}\n${catSnapshot.error?.toString() ?? ''}',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  );
-                }
-                if (!comptesSnapshot.hasData || !catSnapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final comptes = comptesSnapshot.data!;
-                final enveloppes =
-                    catSnapshot.data!.expand((cat) => cat.enveloppes).toList();
+      appBar: AppBar(
+        title: const Text('Virer de l\'argent'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+      ),
+      body: _buildVirerArgentContent(context),
+    );
+  }
 
-                // Filtrer les comptes pour exclure les types 'Dette' et 'Investissement'
-                final comptesFilters = comptes
-                    .where(
-                      (compte) =>
-                          !compte.estArchive &&
-                          compte.type != 'Dette' &&
-                          compte.type != 'Investissement',
-                    )
-                    .toList();
-
-                final tout = [...comptesFilters, ...enveloppes];
-                if (tout.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Aucun compte ou enveloppe disponible',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  );
-                }
-
-                // Mettre à jour les objets source et destination
-                _updateObjectsFromSelection(tout);
-
-                Widget getNomAvecCouleur(dynamic obj) {
-                  if (obj is Compte) {
-                    return RichText(
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: "${obj.nom} -> ",
-                            style: TextStyle(
-                              color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color ??
-                                  Colors.black,
-                              fontSize: 16,
-                            ),
-                          ),
-                          TextSpan(
-                            text: "Prêt à placer",
-                            style: TextStyle(
-                              color: Color(obj.couleur),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else if (obj is Enveloppe) {
-                    return Text(
-                      obj.nom,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 16),
-                    );
-                  }
-                  return const Text(
-                    '',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 16),
-                  );
-                }
-
-                String getSolde(dynamic obj) {
-                  double solde = 0;
-                  if (obj is Compte) {
-                    solde = obj.pretAPlacer;
-                  } else if (obj is Enveloppe) {
-                    solde = obj.solde;
-                  }
-                  return '${solde.toStringAsFixed(2)} \$';
-                }
-
-                // Couleur basée sur le montant et le compte de provenance
-                Color getSoldeColor(dynamic obj) {
-                  // Obtenir le solde de l'objet
-                  double solde = 0.0;
-                  if (obj is Compte) {
-                    solde = obj.solde;
-                  } else if (obj is Enveloppe) {
-                    solde = obj.solde;
-                  }
-
-                  // Déterminer la couleur par défaut du compte de provenance
-                  Color couleurDefaut = Colors.grey;
-                  if (obj is Compte) {
-                    couleurDefaut = Color(obj.couleur);
-                  } else if (obj is Enveloppe) {
-                    // Si c'est une enveloppe, essayer de trouver le compte d'origine
-                    final compId = obj.provenanceCompteId;
-                    if (compId.isNotEmpty) {
-                      final compteProv = comptes.firstWhere(
-                        (c) => c.id == compId,
-                        orElse: () => Compte(
-                          id: '',
-                          nom: '',
-                          type: 'Chèque',
-                          solde: 0,
-                          couleur: Colors.grey.value,
-                          pretAPlacer: 0,
-                          dateCreation: DateTime.now(),
-                          estArchive: false,
-                        ),
-                      );
-                      couleurDefaut = Color(compteProv.couleur);
-                    }
-                  }
-
-                  // Utiliser le service de couleur pour appliquer les règles
-                  return ColorService.getCouleurMontant(solde, couleurDefaut);
-                }
-
-                return Column(
-                  children: [
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 16),
-                          child: Text(
-                            _montantController.text.isEmpty
-                                ? '0,00 \$'
-                                : '${_montantController.text} \$',
-                            style: const TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 0,
-                      ),
-                      child: Column(
-                        children: [
-                          DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            value: sourceId,
-                            decoration: const InputDecoration(
-                              labelText: 'Source',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: tout
-                                .where(
-                                  (obj) => getId(obj) != destinationId,
-                                ) // Exclure la destination sélectionnée
-                                .map<DropdownMenuItem<String>>(
-                                  (obj) => DropdownMenuItem(
-                                    value: getId(obj),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        getNomAvecCouleur(obj),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          getSolde(obj),
-                                          style: TextStyle(
-                                            color: getSoldeColor(obj),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            selectedItemBuilder: (BuildContext context) {
-                              return tout
-                                  .where((obj) => getId(obj) != destinationId)
-                                  .map<Widget>(
-                                    (obj) => Row(
-                                      children: [
-                                        Expanded(child: getNomAvecCouleur(obj)),
-                                        Text(
-                                          getSolde(obj),
-                                          style: TextStyle(
-                                            color: getSoldeColor(obj),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  .toList();
-                            },
-                            onChanged: (val) => setState(() {
-                              sourceId = val;
-                              source = getSelectedById(val, tout);
-                            }),
-                          ),
-                          if (sourceId != null) const SizedBox.shrink(),
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            value: destinationId,
-                            decoration: const InputDecoration(
-                              labelText: 'Destination',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: tout
-                                .where(
-                                  (obj) => getId(obj) != sourceId,
-                                ) // Exclure la source sélectionnée
-                                .map<DropdownMenuItem<String>>(
-                                  (obj) => DropdownMenuItem(
-                                    value: getId(obj),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        getNomAvecCouleur(obj),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          getSolde(obj),
-                                          style: TextStyle(
-                                            color: getSoldeColor(obj),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            selectedItemBuilder: (BuildContext context) {
-                              return tout
-                                  .where((obj) => getId(obj) != sourceId)
-                                  .map<Widget>(
-                                    (obj) => Row(
-                                      children: [
-                                        Expanded(child: getNomAvecCouleur(obj)),
-                                        Text(
-                                          getSolde(obj),
-                                          style: TextStyle(
-                                            color: getSoldeColor(obj),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  .toList();
-                            },
-                            onChanged: (val) => setState(() {
-                              destinationId = val;
-                              destination = getSelectedById(val, tout);
-                            }),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: NumericKeyboard(
-                        controller: _montantController,
-                        onValueChanged: (value) {
-                          setState(() {
-                            _montantController.text =
-                                value.replaceAll('\$', '').replaceAll(' ', '');
-                          });
-                        },
-                        showDecimal: true,
-                        showDone: false,
-                      ),
-                    ),
-                    // Bouton Virer ajouté
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      child: ElevatedButton(
-                        onPressed: _peutVirer() ? _effectuerVirement : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Virer',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              } catch (e, stack) {
+  Widget _buildVirerArgentContent(BuildContext context) {
+    return StreamBuilder<List<Compte>>(
+      stream: FirebaseService().lireComptes(),
+      builder: (context, comptesSnapshot) {
+        return StreamBuilder<List<Categorie>>(
+          stream: FirebaseService().lireCategories(),
+          builder: (context, catSnapshot) {
+            try {
+              if (comptesSnapshot.hasError || catSnapshot.hasError) {
                 return Center(
                   child: Text(
-                    'Exception : $e\n$stack',
+                    'Erreur : ${comptesSnapshot.error?.toString() ?? ''}\n${catSnapshot.error?.toString() ?? ''}',
                     style: const TextStyle(color: Colors.red),
                   ),
                 );
               }
-            },
-          );
-        },
-      ),
+              if (!comptesSnapshot.hasData || !catSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final comptes = comptesSnapshot.data!;
+              final enveloppes =
+                  catSnapshot.data!.expand((cat) => cat.enveloppes).toList();
+
+              // Filtrer les comptes pour exclure les types 'Dette' et 'Investissement'
+              final comptesFilters = comptes
+                  .where(
+                    (compte) =>
+                        !compte.estArchive &&
+                        compte.type != 'Dette' &&
+                        compte.type != 'Investissement',
+                  )
+                  .toList();
+
+              final tout = [...comptesFilters, ...enveloppes];
+              if (tout.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Aucun compte ou enveloppe disponible',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                );
+              }
+
+              // Mettre à jour les objets source et destination
+              _updateObjectsFromSelection(tout);
+
+              Widget getNomAvecCouleur(dynamic obj) {
+                if (obj is Compte) {
+                  return RichText(
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: "${obj.nom} -> ",
+                          style: TextStyle(
+                            color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge?.color ??
+                                Colors.black,
+                            fontSize: 16,
+                          ),
+                        ),
+                        TextSpan(
+                          text: "Prêt à placer",
+                          style: TextStyle(
+                            color: Color(obj.couleur),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (obj is Enveloppe) {
+                  return Text(
+                    obj.nom,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 16),
+                  );
+                }
+                return const Text(
+                  '',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 16),
+                );
+              }
+
+              String getSolde(dynamic obj) {
+                double solde = 0;
+                if (obj is Compte) {
+                  solde = obj.pretAPlacer;
+                } else if (obj is Enveloppe) {
+                  solde = obj.solde;
+                }
+                return '${solde.toStringAsFixed(2)} \$';
+              }
+
+              // Couleur basée sur le montant et le compte de provenance
+              Color getSoldeColor(dynamic obj) {
+                // Obtenir le solde de l'objet
+                double solde = 0.0;
+                if (obj is Compte) {
+                  solde = obj.solde;
+                } else if (obj is Enveloppe) {
+                  solde = obj.solde;
+                }
+
+                // Déterminer la couleur par défaut du compte de provenance
+                Color couleurDefaut = Colors.grey;
+                if (obj is Compte) {
+                  couleurDefaut = Color(obj.couleur);
+                } else if (obj is Enveloppe) {
+                  // Si c'est une enveloppe, essayer de trouver le compte d'origine
+                  final compId = obj.provenanceCompteId;
+                  if (compId.isNotEmpty) {
+                    final compteProv = comptes.firstWhere(
+                      (c) => c.id == compId,
+                      orElse: () => Compte(
+                        id: '',
+                        nom: '',
+                        type: 'Chèque',
+                        solde: 0,
+                        couleur: Colors.grey.value,
+                        pretAPlacer: 0,
+                        dateCreation: DateTime.now(),
+                        estArchive: false,
+                      ),
+                    );
+                    couleurDefaut = Color(compteProv.couleur);
+                  }
+                }
+
+                // Utiliser le service de couleur pour appliquer les règles
+                return ColorService.getCouleurMontant(solde, couleurDefaut);
+              }
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Text(
+                          _montantController.text.isEmpty
+                              ? '0,00 \$'
+                              : '${_montantController.text} \$',
+                          style: const TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 0,
+                    ),
+                    child: Column(
+                      children: [
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          value: sourceId,
+                          decoration: const InputDecoration(
+                            labelText: 'Source',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: tout
+                              .where(
+                                (obj) => getId(obj) != destinationId,
+                              ) // Exclure la destination sélectionnée
+                              .map<DropdownMenuItem<String>>(
+                                (obj) => DropdownMenuItem(
+                                  value: getId(obj),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      getNomAvecCouleur(obj),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        getSolde(obj),
+                                        style: TextStyle(
+                                          color: getSoldeColor(obj),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          selectedItemBuilder: (BuildContext context) {
+                            return tout
+                                .where((obj) => getId(obj) != destinationId)
+                                .map<Widget>(
+                                  (obj) => Row(
+                                    children: [
+                                      Expanded(child: getNomAvecCouleur(obj)),
+                                      Text(
+                                        getSolde(obj),
+                                        style: TextStyle(
+                                          color: getSoldeColor(obj),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                                .toList();
+                          },
+                          onChanged: (val) => setState(() {
+                            sourceId = val;
+                            source = getSelectedById(val, tout);
+                          }),
+                        ),
+                        if (sourceId != null) const SizedBox.shrink(),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          value: destinationId,
+                          decoration: const InputDecoration(
+                            labelText: 'Destination',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: tout
+                              .where(
+                                (obj) => getId(obj) != sourceId,
+                              ) // Exclure la source sélectionnée
+                              .map<DropdownMenuItem<String>>(
+                                (obj) => DropdownMenuItem(
+                                  value: getId(obj),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      getNomAvecCouleur(obj),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        getSolde(obj),
+                                        style: TextStyle(
+                                          color: getSoldeColor(obj),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          selectedItemBuilder: (BuildContext context) {
+                            return tout
+                                .where((obj) => getId(obj) != sourceId)
+                                .map<Widget>(
+                                  (obj) => Row(
+                                    children: [
+                                      Expanded(child: getNomAvecCouleur(obj)),
+                                      Text(
+                                        getSolde(obj),
+                                        style: TextStyle(
+                                          color: getSoldeColor(obj),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                                .toList();
+                          },
+                          onChanged: (val) => setState(() {
+                            destinationId = val;
+                            destination = getSelectedById(val, tout);
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: NumericKeyboard(
+                      controller: _montantController,
+                      onValueChanged: (value) {
+                        setState(() {
+                          _montantController.text =
+                              value.replaceAll('\$', '').replaceAll(' ', '');
+                        });
+                      },
+                      showDecimal: true,
+                      showDone: false,
+                    ),
+                  ),
+                  // Bouton Virer ajouté
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    child: ElevatedButton(
+                      onPressed: _peutVirer() ? _effectuerVirement : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Virer',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            } catch (e, stack) {
+              return Center(
+                child: Text(
+                  'Exception : $e\n$stack',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              );
+            }
+          },
+        );
+      },
     );
   }
 }
