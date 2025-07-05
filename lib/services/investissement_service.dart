@@ -1,6 +1,7 @@
 import '../models/transaction_model.dart' as app_model;
 import 'alpha_vantage_service.dart';
 import 'firebase_service.dart';
+import 'package:intl/intl.dart';
 
 class InvestissementService {
   final FirebaseService _firebaseService = FirebaseService();
@@ -387,6 +388,48 @@ class InvestissementService {
     } catch (e) {
       print('❌ Erreur ajout dividende: $e');
       rethrow;
+    }
+  }
+
+  // Sauvegarder un snapshot journalier du portefeuille
+  Future<void> sauvegarderSnapshotJournalier(String compteId) async {
+    final aujourdhui = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // 1. Vérifier si un snapshot a déjà été sauvegardé aujourd'hui
+    final snapshotExiste = await _firebaseService.firestore
+        .collection('historique_portefeuille')
+        .where('compteId', isEqualTo: compteId)
+        .where('date', isEqualTo: aujourdhui)
+        .limit(1)
+        .get();
+
+    // Si rien n'a été sauvegardé aujourd'hui, on le fait
+    if (snapshotExiste.docs.isEmpty) {
+      // 2. Calculer la valeur totale actuelle
+      final performance = await calculerPerformanceCompte(compteId);
+
+      // Il faut récupérer le compte pour avoir le cash.
+      final compteDoc = await _firebaseService.firestore
+          .collection('comptes')
+          .doc(compteId)
+          .get();
+      final pretAPlacer =
+          compteDoc.exists ? (compteDoc.data()?['pretAPlacer'] ?? 0.0) : 0.0;
+
+      final valeurTotale =
+          (performance['totalValeurActuelle'] ?? 0.0) + pretAPlacer;
+
+      // 3. Sauvegarder le snapshot dans Firestore
+      if (valeurTotale > 0) {
+        await _firebaseService.firestore
+            .collection('historique_portefeuille')
+            .add({
+          'compteId': compteId,
+          'date': aujourdhui,
+          'valeur': valeurTotale,
+        });
+        print('📸 Snapshot du $aujourdhui sauvegardé ! Valeur: $valeurTotale');
+      }
     }
   }
 }

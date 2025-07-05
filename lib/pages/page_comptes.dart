@@ -5,6 +5,7 @@ import 'package:toutie_budget/pages/page_modification_compte.dart';
 import 'package:toutie_budget/pages/page_reconciliation.dart';
 import 'package:toutie_budget/pages/page_pret_personnel.dart';
 import 'package:toutie_budget/pages/page_parametres_dettes.dart';
+import 'package:toutie_budget/pages/page_investissement.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/models/dette.dart';
@@ -310,6 +311,12 @@ class PageComptes extends StatelessWidget {
                   ),
                 );
               }
+            } else if (compte.type == 'Investissement') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PageInvestissement(compteId: compte.id),
+                ),
+              );
             } else {
               Navigator.of(context).push(
                 MaterialPageRoute(

@@ -8,6 +8,7 @@ import 'dart:async';
 import '../widgets/ajout_transaction/bouton_sauvegarder.dart';
 import 'package:intl/intl.dart';
 import 'package:toutie_budget/models/transaction_model.dart' as app_model;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PageInvestissement extends StatefulWidget {
   final String compteId;
@@ -30,10 +31,14 @@ class _PageInvestissementState extends State<PageInvestissement> {
   Timer? _updateTimer;
   Compte? _compte;
 
+  // Variables pour le graphique
+  List<List<Map<String, dynamic>>> _historiquePrixPourGraphique = [];
+  List<app_model.Transaction> _transactionsPourGraphique = [];
+
   @override
   void initState() {
     super.initState();
-    _chargerDonnees();
+    _chargerDonnees().then((_) => _checkPremiereOuverture());
     _demarrerMiseAJourAutomatique();
   }
 
@@ -78,10 +83,25 @@ class _PageInvestissementState extends State<PageInvestissement> {
       final performance = await _investissementService
           .calculerPerformanceCompte(widget.compteId);
 
+      // NOUVEAU : Charger les données pour le graphique
+      final transactions =
+          await _firebaseService.lireTransactions(widget.compteId).first;
+      final historiques = await Future.wait(actions.map((a) =>
+          _investissementService.getHistoriquePrix(a['symbol'], limit: 30)));
+
+      // On sauvegarde le snapshot du jour si nécessaire
+      await _investissementService
+          .sauvegarderSnapshotJournalier(widget.compteId);
+
       setState(() {
         _compte = compte;
         _actions = actions;
         _performanceCompte = performance;
+
+        // NOUVEAU : Sauvegarder les données du graphique dans l'état
+        _transactionsPourGraphique = transactions;
+        _historiquePrixPourGraphique = historiques;
+
         _isLoading = false;
       });
     } catch (e) {
@@ -90,6 +110,135 @@ class _PageInvestissementState extends State<PageInvestissement> {
         _isLoading = false;
       });
     }
+  }
+
+  void _checkPremiereOuverture() async {
+    if (_actions.isEmpty && (_compte?.pretAPlacer ?? 0) == 0) {
+      await Future.delayed(Duration(milliseconds: 300));
+      if (mounted) _showPopupPremiereOuverture();
+    }
+  }
+
+  void _showPopupPremiereOuverture() {
+    List<Map<String, dynamic>> actionsInit = [];
+    final symbolController = TextEditingController();
+    final quantiteController = TextEditingController();
+    final prixController = TextEditingController();
+    final cashController = TextEditingController();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: Text('Possédez-vous déjà des actions ?'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Ajoutez vos actions actuelles et le cash disponible.'),
+                  SizedBox(height: 12),
+                  ...actionsInit.map((a) => ListTile(
+                        title: Text('${a['symbol']}'),
+                        subtitle: Text(
+                            'Quantité: ${a['quantite']} | Prix moyen: ${a['prix']}'),
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete),
+                          onPressed: () {
+                            setState(() => actionsInit.remove(a));
+                          },
+                        ),
+                      )),
+                  Divider(),
+                  TextField(
+                    controller: symbolController,
+                    decoration: InputDecoration(labelText: 'Symbole'),
+                  ),
+                  TextField(
+                    controller: quantiteController,
+                    decoration: InputDecoration(labelText: 'Quantité'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: prixController,
+                    decoration: InputDecoration(labelText: 'Prix moyen (\$)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final symbol = symbolController.text.trim().toUpperCase();
+                      final quantite =
+                          double.tryParse(quantiteController.text) ?? 0;
+                      final prix = double.tryParse(prixController.text) ?? 0;
+                      if (symbol.isNotEmpty && quantite > 0 && prix > 0) {
+                        setState(() {
+                          actionsInit.add({
+                            'symbol': symbol,
+                            'quantite': quantite,
+                            'prix': prix,
+                          });
+                          symbolController.clear();
+                          quantiteController.clear();
+                          prixController.clear();
+                        });
+                      }
+                    },
+                    child: Text('Ajouter action'),
+                  ),
+                  Divider(),
+                  TextField(
+                    controller: cashController,
+                    decoration: InputDecoration(
+                        labelText: 'Cash disponible initial (\$)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Ignorer'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  // Créditer le cash saisi uniquement
+                  final cashSaisi = double.tryParse(cashController.text) ?? 0;
+                  if (cashSaisi > 0) {
+                    await _firebaseService.firestore
+                        .collection('comptes')
+                        .doc(widget.compteId)
+                        .update({'pretAPlacer': cashSaisi});
+                  }
+                  // Ajouter les actions directement (sans transaction d'achat)
+                  for (final a in actionsInit) {
+                    await _firebaseService.firestore.collection('actions').add({
+                      'compteId': widget.compteId,
+                      'symbol': a['symbol'],
+                      'quantite': a['quantite'],
+                      'prixAchat': a['prix'],
+                      'dateAchat': DateTime.now().toIso8601String(),
+                      'dateCreation': DateTime.now().toIso8601String(),
+                    });
+                  }
+                  // Forcer la mise à jour pour TOUTES les nouvelles actions en une seule fois
+                  if (actionsInit.isNotEmpty) {
+                    await _investissementService.forcerMiseAJour();
+                  }
+                  Navigator.pop(context);
+                  _chargerDonnees();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Portefeuille initialisé !')),
+                  );
+                },
+                child: Text('Valider'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _ajouterAction() async {
@@ -479,76 +628,170 @@ class _PageInvestissementState extends State<PageInvestissement> {
     );
   }
 
-  Widget _buildSoldeGraphique() {
-    return FutureBuilder<List<app_model.Transaction>>(
-      future: FirebaseService().lireTransactions(widget.compteId).first,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Card(
-            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: SizedBox(
-                height: 160,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-          );
-        }
-        final transactions = snapshot.data!;
-        // Trier par date croissante
-        transactions.sort((a, b) => a.date.compareTo(b.date));
-        List<double> soldeHistorique = [];
-        double solde = 0.0;
-        DateTime? firstDate;
-        // On commence à 0
-        soldeHistorique.add(0.0);
-        for (final t in transactions) {
-          if (firstDate == null) firstDate = t.date;
-          solde += t.montant;
-          soldeHistorique.add(solde);
-        }
-        // Si aucune transaction, on garde juste 0
-        if (soldeHistorique.length == 1) soldeHistorique.add(0.0);
-        return Card(
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Évolution du solde (réel)',
-                    style: Theme.of(context).textTheme.titleMedium),
-                SizedBox(height: 12),
-                SizedBox(
-                  height: 160,
-                  child: LineChart(
-                    LineChartData(
-                      gridData: FlGridData(show: false),
-                      titlesData: FlTitlesData(show: false),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: [
-                            for (int i = 0; i < soldeHistorique.length; i++)
-                              FlSpot(i.toDouble(), soldeHistorique[i]),
-                          ],
-                          isCurved: true,
-                          color: Colors.greenAccent,
-                          barWidth: 3,
-                          dotData: FlDotData(show: false),
-                        ),
-                      ],
+  // Fonction helper pour le cas où il n'y a pas d'historique
+  Widget _buildGraphiqueAvecValeurActuelle() {
+    final valeurActionsActuelle =
+        _performanceCompte['totalValeurActuelle'] ?? 0.0;
+    final cashDisponible = _compte?.pretAPlacer ?? 0.0;
+    final valeurTotalePortefeuille = valeurActionsActuelle + cashDisponible;
+
+    if (valeurTotalePortefeuille == 0.0) return const SizedBox.shrink();
+
+    final List<FlSpot> spots = List.generate(
+        30, (i) => FlSpot(i.toDouble(), valeurTotalePortefeuille));
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Évolution du portefeuille',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 160,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(show: false),
+                  titlesData: FlTitlesData(show: false),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: Colors.greenAccent,
+                      barWidth: 3,
+                      dotData: FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: Colors.greenAccent.withOpacity(0.2),
+                      ),
+                    ),
+                  ],
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          return LineTooltipItem(
+                            '${spot.y.toStringAsFixed(2)} \$',
+                            const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          );
+                        }).toList();
+                      },
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
+
+  Widget _buildSoldeGraphique() {
+  // On utilise un FutureBuilder pour lire l'historique sauvegardé dans Firestore
+  return FutureBuilder<QuerySnapshot>(
+    future: _firebaseService.firestore
+        .collection('historique_portefeuille')
+        .where('compteId', isEqualTo: widget.compteId)
+        .orderBy('date', descending: true)
+        .limit(30)
+        .get(),
+    builder: (context, snapshot) {
+      // Pendant le chargement de l'historique...
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SizedBox(
+            height: 200, // Hauteur fixe pour éviter les sauts d'interface
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+
+      // S'il n'y a pas d'historique du tout (ex: premier jour d'utilisation)
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        // On affiche le graphique "plat" avec la valeur actuelle
+        return _buildGraphiqueAvecValeurActuelle();
+      }
+
+      // On a un historique ! On prépare les points pour le graphique.
+      final docs = snapshot.data!.docs.reversed.toList(); // Remettre en ordre chronologique
+      final List<FlSpot> spots = [];
+      for (int i = 0; i < docs.length; i++) {
+        final data = docs[i].data() as Map<String, dynamic>;
+        spots.add(FlSpot(i.toDouble(), (data['valeur'] as num).toDouble()));
+      }
+
+      // Le dernier point du graphique doit TOUJOURS être la valeur "live"
+      final valeurActuelle = _performanceCompte['totalValeurActuelle'] ?? 0.0;
+      final cash = _compte?.pretAPlacer ?? 0.0;
+      final valeurTotaleAujourdhui = valeurActuelle + cash;
+
+      // On vérifie que la date du dernier snapshot correspond à aujourd'hui avant de remplacer.
+      final aujourdhuiKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      if (spots.isNotEmpty && (docs.last.data() as Map<String, dynamic>)['date'] == aujourdhuiKey) {
+         spots[spots.length - 1] = FlSpot((spots.length - 1).toDouble(), valeurTotaleAujourdhui);
+      }
+
+
+      // On retourne la carte finale avec le graphique
+      return Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Évolution du portefeuille', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 160,
+                child: LineChart(
+                  LineChartData(
+                    gridData: FlGridData(show: false),
+                    titlesData: FlTitlesData(show: false),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: spots,
+                        isCurved: true,
+                        color: Colors.greenAccent,
+                        barWidth: 3,
+                        dotData: FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: Colors.greenAccent.withOpacity(0.2),
+                        ),
+                      ),
+                    ],
+                    lineTouchData: LineTouchData(
+                      touchTooltipData: LineTouchTooltipData(
+                        getTooltipItems: (touchedSpots) {
+                          return touchedSpots.map((spot) {
+                            return LineTooltipItem(
+                              '${spot.y.toStringAsFixed(2)} \$',
+                              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            );
+                          }).toList();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildCashDisponible() {
     final cash = _compte?.pretAPlacer ?? 0.0;
@@ -689,43 +932,49 @@ class _PageInvestissementState extends State<PageInvestissement> {
               onRefresh: _chargerDonnees,
               child: SingleChildScrollView(
                 physics: AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildPerformanceCard(),
-                    _buildSoldeGraphique(),
-                    _buildCashDisponible(),
-                    Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: Text('Mes actions',
-                          style: Theme.of(context).textTheme.titleMedium),
-                    ),
-                    if (_actions.isEmpty)
-                      Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            Icon(Icons.trending_up,
-                                size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text('Aucune action',
-                                style:
-                                    Theme.of(context).textTheme.headlineSmall),
-                            SizedBox(height: 8),
-                            Text(
-                                'Ajoutez votre première action en appuyant sur le bouton +',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey)),
-                          ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 700),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildPerformanceCard(),
+                        _buildSoldeGraphique(),
+                        _buildCashDisponible(),
+                        Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          child: Text('Mes actions',
+                              style: Theme.of(context).textTheme.titleMedium),
                         ),
-                      )
-                    else
-                      ...(_actions
-                          .map((action) => _buildActionCard(action))
-                          .toList()),
-                    SizedBox(height: 100),
-                  ],
+                        if (_actions.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                Icon(Icons.trending_up,
+                                    size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text('Aucune action',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall),
+                                SizedBox(height: 8),
+                                Text(
+                                    'Ajoutez votre première action en appuyant sur le bouton +',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          )
+                        else
+                          ...(_actions
+                              .map((action) => _buildActionCard(action))
+                              .toList()),
+                        SizedBox(height: 100),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
