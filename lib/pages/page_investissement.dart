@@ -6,6 +6,7 @@ import '../services/firebase_service.dart';
 import '../services/investissement_service.dart';
 import 'dart:async';
 import '../widgets/ajout_transaction/bouton_sauvegarder.dart';
+import 'package:intl/intl.dart';
 
 class PageInvestissement extends StatefulWidget {
   final String compteId;
@@ -283,6 +284,98 @@ class _PageInvestissementState extends State<PageInvestissement> {
     }
   }
 
+  Future<void> _ajouterDividende() async {
+    final montantController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    String? selectedSymbol;
+    final actions = _actions;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Ajouter un dividende'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              value: selectedSymbol,
+              items: actions
+                  .map<DropdownMenuItem<String>>(
+                      (a) => DropdownMenuItem<String>(
+                            value: a['symbol'] as String,
+                            child: Text(a['symbol'] as String),
+                          ))
+                  .toList(),
+              onChanged: (val) => selectedSymbol = val,
+              decoration: InputDecoration(labelText: 'Symbole'),
+            ),
+            SizedBox(height: 12),
+            TextField(
+              controller: montantController,
+              decoration: InputDecoration(labelText: 'Montant reçu (\$)'),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                Text('Date : '),
+                Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      selectedDate = picked;
+                      (context as Element).markNeedsBuild();
+                    }
+                  },
+                  child: Text('Changer'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final montant = double.tryParse(
+                      montantController.text.replaceAll(',', '.')) ??
+                  0.0;
+              if (selectedSymbol == null || montant <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Veuillez remplir tous les champs')),
+                );
+                return;
+              }
+              // Créer une transaction de dividende
+              await _investissementService.ajouterDividende(
+                compteId: widget.compteId,
+                symbol: selectedSymbol!,
+                montant: montant,
+                date: selectedDate,
+              );
+              Navigator.pop(context);
+              _chargerDonnees();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Dividende ajouté au cash disponible')),
+              );
+            },
+            child: Text('Ajouter'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPerformanceCard() {
     final stats = _investissementService.getStats();
 
@@ -492,12 +585,7 @@ class _PageInvestissementState extends State<PageInvestissement> {
                   Text(
                       'Prix actuel: \$${prixActuel?.toStringAsFixed(2) ?? 'N/A'}'),
                   Text(
-                    'Performance: ${performancePercent.toStringAsFixed(2)}%',
-                    style: TextStyle(
-                      color:
-                          performancePercent >= 0 ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    'Prix moyen: \$${prixAchat.toStringAsFixed(2)}',
                   ),
                 ] else ...[
                   Text('Prix non disponible',
@@ -505,22 +593,40 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 ],
               ],
             ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '\$${valeurActuelle.toStringAsFixed(2)}',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+            trailing: SizedBox(
+              width: 90,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '\$${valeurActuelle.toStringAsFixed(2)}',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                    ),
+                    Text(
+                      '\$${gainPerte.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: gainPerte >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                    Text(
+                      'Performance: ${performancePercent.toStringAsFixed(2)}%',
+                      style: TextStyle(
+                        color:
+                            performancePercent >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '\$${gainPerte.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    color: gainPerte >= 0 ? Colors.green : Colors.red,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              ),
             ),
             onLongPress: () => _supprimerAction(actionId, symbol, quantite),
           ),
@@ -535,6 +641,11 @@ class _PageInvestissementState extends State<PageInvestissement> {
       appBar: AppBar(
         title: Text('Investissement'),
         actions: [
+          IconButton(
+            icon: Icon(Icons.add),
+            tooltip: 'Ajouter un dividende',
+            onPressed: _ajouterDividende,
+          ),
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: _forcerMiseAJour,

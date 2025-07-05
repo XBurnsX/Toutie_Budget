@@ -342,4 +342,51 @@ class InvestissementService {
 
     print('✅ Actions de test ajoutées');
   }
+
+  // Ajouter un dividende à un compte d'investissement
+  Future<void> ajouterDividende({
+    required String compteId,
+    required String symbol,
+    required double montant,
+    required DateTime date,
+  }) async {
+    try {
+      // Créer la transaction de dividende
+      final transaction = app_model.Transaction(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: app_model.TypeTransaction.revenu,
+        typeMouvement: app_model.TypeMouvementFinancier.revenuNormal,
+        montant: montant, // Montant positif
+        compteId: compteId,
+        date: date,
+        tiers: symbol,
+        enveloppeId: null,
+        note: 'Dividende reçu sur $symbol',
+      );
+
+      // Sauvegarder la transaction
+      await _firebaseService.ajouterTransaction(transaction);
+
+      // Ajouter le montant au cash disponible (pretAPlacer)
+      final compteDoc = await _firebaseService.firestore
+          .collection('comptes')
+          .doc(compteId)
+          .get();
+      if (!compteDoc.exists) throw Exception('Compte non trouvé');
+      final compteData = compteDoc.data()!;
+      final pretAPlacer = (compteData['pretAPlacer'] ?? 0).toDouble();
+      final nouveauPretAPlacer = pretAPlacer + montant;
+      await _firebaseService.firestore
+          .collection('comptes')
+          .doc(compteId)
+          .update({
+        'pretAPlacer': nouveauPretAPlacer,
+      });
+
+      print('✅ Dividende $montant ajouté au cash du compte $compteId');
+    } catch (e) {
+      print('❌ Erreur ajout dividende: $e');
+      rethrow;
+    }
+  }
 }

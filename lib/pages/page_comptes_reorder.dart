@@ -10,6 +10,7 @@ import 'page_reconciliation.dart';
 import 'page_parametres_dettes.dart';
 import 'page_pret_personnel.dart';
 import 'page_investissement.dart';
+import 'package:toutie_budget/services/investissement_service.dart';
 
 class PageComptesReorder extends StatefulWidget {
   const PageComptesReorder({super.key});
@@ -181,111 +182,245 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
 
   Widget _buildCard(Compte compte, Color color, {bool editing = false}) {
     final isCheque = compte.type == 'Chèque';
-    final soldeAffiche = compte.solde;
-
-    return Container(
-      key: ValueKey(compte.id),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        elevation: 2,
-        color: const Color(0xFF232526),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: editing
-              ? null
-              : () {
-                  if (compte.type == 'Investissement') {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PageInvestissement(compteId: compte.id),
-                      ),
-                    );
-                  } else {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PageTransactionsCompte(compte: compte),
-                      ),
-                    );
-                  }
-                },
-          onLongPress:
-              editing ? null : () => _showCompteMenu(context, compte, isCheque),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Color(compte.couleur),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    double cashDisponible = compte.pretAPlacer;
+    if (compte.type == 'Investissement') {
+      return FutureBuilder<Map<String, dynamic>>(
+        future: InvestissementService().calculerPerformanceCompte(compte.id),
+        builder: (context, snapshot) {
+          double valeurActions = 0.0;
+          if (snapshot.hasData) {
+            valeurActions =
+                (snapshot.data?['totalValeurActuelle'] ?? 0.0) as double;
+          }
+          final soldeAffiche = valeurActions + cashDisponible;
+          return Container(
+            key: ValueKey(compte.id),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 2,
+              color: const Color(0xFF232526),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: editing
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PageInvestissement(compteId: compte.id),
+                          ),
+                        );
+                      },
+                onLongPress: editing
+                    ? null
+                    : () => _showCompteMenu(context, compte, isCheque),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      Text(
-                        compte.nom,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        width: 4,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Color(compte.couleur),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        compte.type,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              compte.nom,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              compte.type,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
                       ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? SizedBox(
+                                  width: 40,
+                                  height: 16,
+                                  child: Center(
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)))
+                              : Text(
+                                  '${soldeAffiche.toStringAsFixed(2)} \$',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: soldeAffiche >= 0
+                                        ? Colors.green[700]
+                                        : Colors.red[700],
+                                  ),
+                                ),
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Color(compte.couleur),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'CASH : ${cashDisponible.toStringAsFixed(2)} \$',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      editing
+                          ? const Icon(Icons.drag_handle, color: Colors.white54)
+                          : Icon(Icons.chevron_right, color: Colors.grey[400]),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${soldeAffiche.toStringAsFixed(2)} \$',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: soldeAffiche >= 0
-                            ? Colors.green[700]
-                            : Colors.red[700],
-                      ),
-                    ),
-                    if (isCheque)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Color(compte.couleur),
-                          borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      double soldeAffiche = compte.solde;
+      if (compte.type == 'Investissement') {
+        // On va chercher la valeur totale des actions + cash disponible
+        // Pour l'instant, on affiche solde + cash, mais il faudrait idéalement requêter la vraie valeur des actions
+        // (On peut améliorer avec un service ou un cache si besoin)
+        // TODO: Remplacer par la vraie valeur des actions si dispo
+        soldeAffiche = compte.solde + cashDisponible;
+      }
+
+      return Container(
+        key: ValueKey(compte.id),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Card(
+          elevation: 2,
+          color: const Color(0xFF232526),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: editing
+                ? null
+                : () {
+                    if (compte.type == 'Investissement') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PageInvestissement(compteId: compte.id),
                         ),
-                        child: Text(
-                          'Prêt à placer: ${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                      );
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PageTransactionsCompte(compte: compte),
+                        ),
+                      );
+                    }
+                  },
+            onLongPress: editing
+                ? null
+                : () => _showCompteMenu(context, compte, isCheque),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Color(compte.couleur),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          compte.nom,
                           style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          compte.type,
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${soldeAffiche.toStringAsFixed(2)} \$',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: soldeAffiche >= 0
+                              ? Colors.green[700]
+                              : Colors.red[700],
+                        ),
                       ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                editing
-                    ? const Icon(Icons.drag_handle, color: Colors.white54)
-                    : Icon(Icons.chevron_right, color: Colors.grey[400]),
-              ],
+                      if (isCheque || compte.type == 'Investissement')
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Color(compte.couleur),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            compte.type == 'Investissement'
+                                ? 'CASH : ${cashDisponible.toStringAsFixed(2)} \$'
+                                : 'Prêt à placer: ${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  editing
+                      ? const Icon(Icons.drag_handle, color: Colors.white54)
+                      : Icon(Icons.chevron_right, color: Colors.grey[400]),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   Widget _buildDetteCard(Dette dette) {
