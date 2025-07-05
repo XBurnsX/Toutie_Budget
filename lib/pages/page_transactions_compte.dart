@@ -167,7 +167,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
 
               // Regrouper les transactions par date (formatée)
               final Map<String, List<app_model.Transaction>>
-              transactionsParDate = {};
+                  transactionsParDate = {};
               final Map<String, DateTime> dateStringToDateTime = {};
 
               for (final t in transactionsFiltrees) {
@@ -214,7 +214,11 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                       children: [
                         TextField(
                           controller: _searchController,
-                          onChanged: _onSearchChanged,
+                          onSubmitted: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 16,
@@ -370,23 +374,22 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                 ),
                                 ...transactionsParDate[date]!.map((t) {
                                   final isDepense = t.type.estDepense;
-                                  final montantColor = isDepense
-                                      ? Colors.red
-                                      : Colors.green;
+                                  final montantColor =
+                                      isDepense ? Colors.red : Colors.green;
                                   String sousTitre = '';
                                   // --- Ajout pour transaction fractionnée ---
                                   if (t.estFractionnee == true &&
                                       t.sousItems != null &&
                                       t.sousItems!.isNotEmpty) {
                                     // Afficher la liste des enveloppes et montants avec format demandé
-                                    final enveloppesFormatees = t.sousItems!.map((
+                                    final enveloppesFormatees =
+                                        t.sousItems!.map((
                                       item,
                                     ) {
-                                      final nomEnv =
-                                          enveloppeIdToNom[item['enveloppeId']] ??
+                                      final nomEnv = enveloppeIdToNom[
+                                              item['enveloppeId']] ??
                                           'Enveloppe inconnue';
-                                      final montant =
-                                          (item['montant'] as num?)
+                                      final montant = (item['montant'] as num?)
                                               ?.toDouble() ??
                                           0.0;
                                       return '$nomEnv - ${montant.toStringAsFixed(0)}\$';
@@ -394,22 +397,18 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                     sousTitre = enveloppesFormatees.join(' , ');
                                   } else if (t.typeMouvement ==
                                       app_model
-                                          .TypeMouvementFinancier
-                                          .pretAccorde) {
+                                          .TypeMouvementFinancier.pretAccorde) {
                                     sousTitre = 'Prêt accordé';
                                   } else if (t.typeMouvement ==
-                                      app_model
-                                          .TypeMouvementFinancier
+                                      app_model.TypeMouvementFinancier
                                           .detteContractee) {
                                     sousTitre = 'Dette contractée';
                                   } else if (t.typeMouvement ==
-                                      app_model
-                                          .TypeMouvementFinancier
+                                      app_model.TypeMouvementFinancier
                                           .remboursementRecu) {
                                     sousTitre = 'Remboursement reçu';
                                   } else if (t.typeMouvement ==
-                                      app_model
-                                          .TypeMouvementFinancier
+                                      app_model.TypeMouvementFinancier
                                           .remboursementEffectue) {
                                     sousTitre = 'Remboursement effectué';
                                   } else if (t.enveloppeId != null &&
@@ -427,37 +426,37 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                     onLongPress: () async {
                                       final result =
                                           await showModalBottomSheet<String>(
-                                            context: context,
-                                            builder: (context) => SafeArea(
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  ListTile(
-                                                    leading: Icon(
-                                                      Icons.delete,
-                                                      color: Colors.red,
-                                                    ),
-                                                    title: Text(
-                                                      'Annuler la transaction',
-                                                      style: TextStyle(
-                                                        color: Colors.red,
-                                                      ),
-                                                    ),
-                                                    onTap: () => Navigator.of(
-                                                      context,
-                                                    ).pop('delete'),
+                                        context: context,
+                                        builder: (context) => SafeArea(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              ListTile(
+                                                leading: Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                ),
+                                                title: Text(
+                                                  'Annuler la transaction',
+                                                  style: TextStyle(
+                                                    color: Colors.red,
                                                   ),
-                                                  ListTile(
-                                                    leading: Icon(Icons.close),
-                                                    title: Text('Annuler'),
-                                                    onTap: () => Navigator.of(
-                                                      context,
-                                                    ).pop(),
-                                                  ),
-                                                ],
+                                                ),
+                                                onTap: () => Navigator.of(
+                                                  context,
+                                                ).pop('delete'),
                                               ),
-                                            ),
-                                          );
+                                              ListTile(
+                                                leading: Icon(Icons.close),
+                                                title: Text('Annuler'),
+                                                onTap: () => Navigator.of(
+                                                  context,
+                                                ).pop(),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
                                       if (result == 'delete') {
                                         await annulerTransaction(context, t);
                                       }
@@ -467,10 +466,10 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                                         MaterialPageRoute(
                                           builder: (context) =>
                                               EcranAjoutTransactionRefactored(
-                                                comptesExistants: const [],
-                                                transactionExistante: t,
-                                                modeModification: true,
-                                              ),
+                                            comptesExistants: const [],
+                                            transactionExistante: t,
+                                            modeModification: true,
+                                          ),
                                         ),
                                       );
                                     },
