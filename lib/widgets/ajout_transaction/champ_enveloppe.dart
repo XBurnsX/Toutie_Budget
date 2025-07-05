@@ -44,16 +44,25 @@ class ChampEnveloppe extends StatelessWidget {
       value: valeurActuelle,
       items: items,
       onChanged: (String? newValue) => onEnveloppeChanged(newValue),
+      selectedItemBuilder: (context) {
+        return items.map((item) {
+          if (item.value == null) {
+            return const Center(child: Text('Aucune'));
+          }
+          return Center(child: item.child!);
+        }).toList();
+      },
       decoration: InputDecoration(
         hintText: 'Optionnel',
         border: InputBorder.none,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           vertical: 10.0,
-          horizontal: 10.0,
+          horizontal: 50.0,
         ),
       ),
       isExpanded: true,
+      alignment: Alignment.center,
       dropdownColor: dropdownColor,
     );
   }
@@ -101,20 +110,22 @@ class ChampEnveloppe extends StatelessWidget {
       items.add(
         DropdownMenuItem<String>(
           value: env['id'],
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(env['nom'], overflow: TextOverflow.ellipsis),
-              ),
-              Text(
-                '${solde.toStringAsFixed(2)} \$',
-                style: TextStyle(
-                  color: couleurCompte,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(env['nom'], overflow: TextOverflow.ellipsis),
+                const SizedBox(width: 6),
+                Text(
+                  '${solde.toStringAsFixed(2)} \$',
+                  style: TextStyle(
+                    color: couleurCompte,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );

@@ -22,8 +22,7 @@ class ChampTiers extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Utiliser la même couleur que les cartes du thème
-    final cardColor =
-        Theme.of(context).cardTheme.color ??
+    final cardColor = Theme.of(context).cardTheme.color ??
         (Theme.of(context).brightness == Brightness.dark
             ? Colors.grey[850]!
             : Colors.white);
@@ -60,117 +59,116 @@ class ChampTiers extends StatelessWidget {
           return suggestionsStandard;
         }
       },
-      fieldViewBuilder:
-          (
-            BuildContext context,
-            TextEditingController fieldTextEditingController,
-            FocusNode fieldFocusNode,
-            VoidCallback onFieldSubmitted,
-          ) {
-            // Synchronisation avec le controller principal
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (context.mounted &&
-                  controller.text != fieldTextEditingController.text) {
-                fieldTextEditingController.text = controller.text;
-              }
-            });
+      fieldViewBuilder: (
+        BuildContext context,
+        TextEditingController fieldTextEditingController,
+        FocusNode fieldFocusNode,
+        VoidCallback onFieldSubmitted,
+      ) {
+        // Synchronisation avec le controller principal
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted &&
+              controller.text != fieldTextEditingController.text) {
+            fieldTextEditingController.text = controller.text;
+          }
+        });
 
-            fieldTextEditingController.addListener(() {
-              if (context.mounted &&
-                  controller.text != fieldTextEditingController.text) {
-                controller.text = fieldTextEditingController.text;
-                // Forcer la validation du contrôleur
-                ajoutController.notifyListeners();
-              }
-            });
+        fieldTextEditingController.addListener(() {
+          if (context.mounted &&
+              controller.text != fieldTextEditingController.text) {
+            controller.text = fieldTextEditingController.text;
+            // Forcer la validation du contrôleur
+            ajoutController.notifyListeners();
+          }
+        });
 
-            return TextField(
-              controller: fieldTextEditingController,
-              focusNode: fieldFocusNode,
-              decoration: InputDecoration(
-                hintText:
+        return TextField(
+          controller: fieldTextEditingController,
+          focusNode: fieldFocusNode,
+          decoration: InputDecoration(
+            hintText: typeMouvementSelectionne ==
+                        TypeMouvementFinancier.detteContractee ||
                     typeMouvementSelectionne ==
-                            TypeMouvementFinancier.detteContractee ||
-                        typeMouvementSelectionne ==
-                            TypeMouvementFinancier.remboursementEffectue
-                    ? 'Nom du prêteur'
-                    : 'Payé à / Reçu de',
-                hintStyle: TextStyle(
-                  color: Theme.of(context).hintColor.withOpacity(0.7),
-                  fontSize: 16,
-                ),
-                prefixIcon: Icon(
-                  typeMouvementSelectionne ==
-                              TypeMouvementFinancier.detteContractee ||
-                          typeMouvementSelectionne ==
-                              TypeMouvementFinancier.remboursementEffectue
-                      ? Icons.account_balance
-                      : Icons.person_outline,
-                  color: Theme.of(context).hintColor,
-                  size: 20,
-                ),
-                suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: fieldTextEditingController,
-                  builder: (context, value, child) {
-                    return value.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.clear,
-                              color: Theme.of(context).hintColor,
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              fieldTextEditingController.clear();
-                              controller.clear();
-                              ajoutController.notifyListeners();
-                            },
-                          )
-                        : Icon(
-                            Icons.arrow_drop_down,
-                            color: Theme.of(context).hintColor,
-                          );
-                  },
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).dividerColor.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).dividerColor.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).primaryColor,
-                    width: 2,
-                  ),
-                ),
-                filled: true,
-                fillColor: cardColor,
-                isDense: false,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 16.0,
-                  horizontal: 16.0,
-                ),
-              ),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
-              onChanged: (value) {
-                // Synchronisation immédiate lors de la saisie
-                if (controller.text != value) {
-                  controller.text = value;
-                  ajoutController.notifyListeners();
-                }
+                        TypeMouvementFinancier.remboursementEffectue
+                ? 'Nom du prêteur'
+                : 'Payé à / Reçu de',
+            hintStyle: TextStyle(
+              color: Theme.of(context).hintColor.withOpacity(0.7),
+              fontSize: 16,
+            ),
+            prefixIcon: Icon(
+              typeMouvementSelectionne ==
+                          TypeMouvementFinancier.detteContractee ||
+                      typeMouvementSelectionne ==
+                          TypeMouvementFinancier.remboursementEffectue
+                  ? Icons.account_balance
+                  : Icons.person_outline,
+              color: Theme.of(context).hintColor,
+              size: 20,
+            ),
+            suffixIcon: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: fieldTextEditingController,
+              builder: (context, value, child) {
+                return value.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: Theme.of(context).hintColor,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          fieldTextEditingController.clear();
+                          controller.clear();
+                          ajoutController.notifyListeners();
+                        },
+                      )
+                    : Icon(
+                        Icons.arrow_drop_down,
+                        color: Theme.of(context).hintColor,
+                      );
               },
-              onSubmitted: (_) => onFieldSubmitted(),
-            );
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(
+                color: Theme.of(context).dividerColor.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(
+                color: Theme.of(context).dividerColor.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(
+                color: Theme.of(context).primaryColor,
+                width: 2,
+              ),
+            ),
+            filled: true,
+            fillColor: cardColor,
+            isDense: false,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 16.0,
+              horizontal: 12.0,
+            ),
+          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+          textAlign: TextAlign.center,
+          onChanged: (value) {
+            // Synchronisation immédiate lors de la saisie
+            if (controller.text != value) {
+              controller.text = value;
+              ajoutController.notifyListeners();
+            }
           },
+          onSubmitted: (_) => onFieldSubmitted(),
+        );
+      },
       onSelected: (String selection) async {
         final String prefixeAjout = "Ajouter : ";
         if (selection.startsWith(prefixeAjout)) {

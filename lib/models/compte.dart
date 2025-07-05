@@ -10,6 +10,7 @@ class Compte {
   final DateTime dateCreation;
   final bool estArchive;
   final DateTime? dateSuppression; // Date d'archivage/suppression
+  final int? ordre;
 
   Compte({
     required this.id,
@@ -22,6 +23,7 @@ class Compte {
     required this.dateCreation,
     required this.estArchive,
     this.dateSuppression,
+    this.ordre,
   });
 
   Map<String, dynamic> toMap() {
@@ -35,6 +37,7 @@ class Compte {
       'dateCreation': dateCreation.toIso8601String(),
       'estArchive': estArchive,
       'dateSuppression': dateSuppression?.toIso8601String(),
+      'ordre': ordre,
     };
   }
 
@@ -54,6 +57,7 @@ class Compte {
       dateSuppression: map['dateSuppression'] != null
           ? DateTime.parse(map['dateSuppression'])
           : null,
+      ordre: map['ordre'],
     );
   }
 
@@ -72,7 +76,8 @@ class Compte {
           dateCreation == other.dateCreation &&
           estArchive == other.estArchive &&
           (dateSuppression?.hashCode ?? 0) ==
-              (other.dateSuppression?.hashCode ?? 0);
+              (other.dateSuppression?.hashCode ?? 0) &&
+          ordre == other.ordre;
 
   @override
   int get hashCode =>
@@ -85,5 +90,6 @@ class Compte {
       pretAPlacer.hashCode ^
       dateCreation.hashCode ^
       estArchive.hashCode ^
-      (dateSuppression?.hashCode ?? 0);
+      (dateSuppression?.hashCode ?? 0) ^
+      (ordre?.hashCode ?? 0);
 }

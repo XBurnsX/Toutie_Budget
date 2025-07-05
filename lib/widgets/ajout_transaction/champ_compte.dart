@@ -27,30 +27,54 @@ class ChampCompte extends StatelessWidget {
       items: listeComptesAffichables.map((Compte compte) {
         return DropdownMenuItem<String>(
           value: compte.id,
-          child: Row(
-            children: [
-              // Cercle coloré avec la couleur du compte
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: Color(compte.couleur),
-                  shape: BoxShape.circle,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Color(compte.couleur),
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Afficher le nom du compte
-              Expanded(
-                child: Text(
+                const SizedBox(width: 8),
+                Text(
                   compte.nom,
                   style: Theme.of(context).textTheme.bodyMedium,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }).toList(),
+      selectedItemBuilder: (context) {
+        return listeComptesAffichables.map((compte) {
+          return Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Color(compte.couleur),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  compte.nom,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
       onChanged: (String? newValue) {
         onCompteChanged(newValue);
       },
@@ -60,10 +84,11 @@ class ChampCompte extends StatelessWidget {
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           vertical: 10.0,
-          horizontal: 10.0,
+          horizontal: 12.0,
         ),
       ),
       isExpanded: true,
+      alignment: Alignment.center,
       dropdownColor: dropdownColor,
     );
   }

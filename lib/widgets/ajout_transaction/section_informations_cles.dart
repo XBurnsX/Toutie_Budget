@@ -54,13 +54,11 @@ class SectionInformationsCles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardColor =
-        Theme.of(context).cardTheme.color ??
+    final cardColor = Theme.of(context).cardTheme.color ??
         (Theme.of(context).brightness == Brightness.dark
             ? Colors.grey[850]!
             : Colors.white);
-    final cardShape =
-        Theme.of(context).cardTheme.shape ??
+    final cardShape = Theme.of(context).cardTheme.shape ??
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0));
 
     return Card(
@@ -72,6 +70,7 @@ class SectionInformationsCles extends StatelessWidget {
           children: <Widget>[
             // Champ Type Mouvement
             _buildChampDetail(
+              context,
               icone: Icons.compare_arrows,
               libelle: 'Transaction',
               widgetContenu: _buildDropdownTypeMouvement(context),
@@ -80,9 +79,9 @@ class SectionInformationsCles extends StatelessWidget {
 
             // Champ Tiers
             _buildChampDetail(
+              context,
               icone: Icons.person_outline,
-              libelle:
-                  typeMouvementSelectionne ==
+              libelle: typeMouvementSelectionne ==
                           TypeMouvementFinancier.detteContractee ||
                       typeMouvementSelectionne ==
                           TypeMouvementFinancier.remboursementEffectue
@@ -100,9 +99,9 @@ class SectionInformationsCles extends StatelessWidget {
 
             // Champ Compte
             _buildChampDetail(
+              context,
               icone: Icons.account_balance_wallet_outlined,
-              libelle:
-                  typeMouvementSelectionne ==
+              libelle: typeMouvementSelectionne ==
                       TypeMouvementFinancier.detteContractee
                   ? 'Vers Compte Actif'
                   : 'Compte',
@@ -117,6 +116,7 @@ class SectionInformationsCles extends StatelessWidget {
 
             // Champ Date
             _buildChampDetail(
+              context,
               icone: Icons.calendar_today_outlined,
               libelle: 'Date',
               widgetContenu: InkWell(
@@ -149,6 +149,7 @@ class SectionInformationsCles extends StatelessWidget {
             if (typeMouvementSelectionne ==
                 TypeMouvementFinancier.depenseNormale) ...[
               _buildChampDetail(
+                context,
                 icone: Icons.label_outline,
                 libelle: 'Enveloppe',
                 widgetContenu: ChampEnveloppe(
@@ -167,6 +168,7 @@ class SectionInformationsCles extends StatelessWidget {
 
             // Champ Marqueur
             _buildChampDetail(
+              context,
               icone: Icons.flag_outlined,
               libelle: 'Marqueur',
               widgetContenu: _buildDropdownMarqueur(context),
@@ -175,6 +177,7 @@ class SectionInformationsCles extends StatelessWidget {
 
             // Champ Note
             _buildChampDetail(
+              context,
               icone: Icons.notes_outlined,
               libelle: 'Note',
               widgetContenu: TextField(
@@ -189,6 +192,7 @@ class SectionInformationsCles extends StatelessWidget {
                   ),
                 ),
                 textCapitalization: TextCapitalization.sentences,
+                textAlign: TextAlign.center,
                 maxLines: null,
               ),
               alignementVerticalIcone: CrossAxisAlignment.start,
@@ -208,15 +212,17 @@ class SectionInformationsCles extends StatelessWidget {
       items: TypeMouvementFinancier.values
           .where((type) => type != TypeMouvementFinancier.ajustement)
           .map((TypeMouvementFinancier type) {
-            return DropdownMenuItem<TypeMouvementFinancier>(
-              value: type,
-              child: Text(
-                _libellePourTypeMouvement(type),
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            );
-          })
-          .toList(),
+        return DropdownMenuItem<TypeMouvementFinancier>(
+          value: type,
+          child: Center(
+            child: Text(
+              _libellePourTypeMouvement(type),
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }).toList(),
       onChanged: (TypeMouvementFinancier? newValue) {
         if (newValue != null) {
           onTypeMouvementChanged(newValue);
@@ -242,7 +248,15 @@ class SectionInformationsCles extends StatelessWidget {
     return DropdownButtonFormField<String>(
       value: marqueurSelectionne ?? listeMarqueurs.first,
       items: listeMarqueurs.map((String marqueur) {
-        return DropdownMenuItem<String>(value: marqueur, child: Text(marqueur));
+        return DropdownMenuItem<String>(
+          value: marqueur,
+          child: Center(
+            child: Text(
+              marqueur,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
       }).toList(),
       onChanged: onMarqueurChanged,
       decoration: const InputDecoration(
@@ -255,35 +269,36 @@ class SectionInformationsCles extends StatelessWidget {
     );
   }
 
-  Widget _buildChampDetail({
+  Widget _buildChampDetail(
+    BuildContext ctx, {
     required IconData icone,
     required String libelle,
     required Widget widgetContenu,
     CrossAxisAlignment alignementVerticalIcone = CrossAxisAlignment.center,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: alignementVerticalIcone,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0, top: 2.0),
-            child: Icon(icone, color: Colors.grey[600]),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: alignementVerticalIcone,
+            children: [
+              Icon(icone, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 12),
+              Text(
+                libelle,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(ctx).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              libelle,
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: widgetContenu,
-            ),
-          ),
+          const SizedBox(height: 6),
+          Center(child: widgetContenu),
         ],
       ),
     );

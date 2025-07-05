@@ -643,15 +643,16 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                 ),
               ),
             ] else ...[
-              IconButton(
-                icon: const Icon(
-                  Icons.add_circle_outline,
-                  color: Colors.white70,
-                  size: 22,
+              if (!isDette)
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: Colors.white70,
+                    size: 22,
+                  ),
+                  tooltip: 'Ajouter une enveloppe',
+                  onPressed: () => _ajouterEnveloppe(categorie),
                 ),
-                tooltip: 'Ajouter une enveloppe',
-                onPressed: () => _ajouterEnveloppe(categorie),
-              ),
             ],
           ],
         ),
