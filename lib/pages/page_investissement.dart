@@ -7,6 +7,7 @@ import '../services/investissement_service.dart';
 import 'dart:async';
 import '../widgets/ajout_transaction/bouton_sauvegarder.dart';
 import 'package:intl/intl.dart';
+import 'package:toutie_budget/models/transaction_model.dart' as app_model;
 
 class PageInvestissement extends StatefulWidget {
   final String compteId;
@@ -479,44 +480,73 @@ class _PageInvestissementState extends State<PageInvestissement> {
   }
 
   Widget _buildSoldeGraphique() {
-    // Données fictives pour l'exemple (remplacer par l'historique Firestore si dispo)
-    final List<double> soldeHistorique =
-        List.generate(30, (i) => 900 + i * 4 + (i % 5) * 10);
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Évolution du solde (30 jours)',
-                style: Theme.of(context).textTheme.titleMedium),
-            SizedBox(height: 12),
-            SizedBox(
-              height: 160,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(show: false),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: [
-                        for (int i = 0; i < soldeHistorique.length; i++)
-                          FlSpot(i.toDouble(), soldeHistorique[i]),
-                      ],
-                      isCurved: true,
-                      color: Colors.greenAccent,
-                      barWidth: 3,
-                      dotData: FlDotData(show: false),
-                    ),
-                  ],
-                ),
+    return FutureBuilder<List<app_model.Transaction>>(
+      future: FirebaseService().lireTransactions(widget.compteId).first,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Card(
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox(
+                height: 160,
+                child: Center(child: CircularProgressIndicator()),
               ),
             ),
-          ],
-        ),
-      ),
+          );
+        }
+        final transactions = snapshot.data!;
+        // Trier par date croissante
+        transactions.sort((a, b) => a.date.compareTo(b.date));
+        List<double> soldeHistorique = [];
+        double solde = 0.0;
+        DateTime? firstDate;
+        // On commence à 0
+        soldeHistorique.add(0.0);
+        for (final t in transactions) {
+          if (firstDate == null) firstDate = t.date;
+          solde += t.montant;
+          soldeHistorique.add(solde);
+        }
+        // Si aucune transaction, on garde juste 0
+        if (soldeHistorique.length == 1) soldeHistorique.add(0.0);
+        return Card(
+          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Évolution du solde (réel)',
+                    style: Theme.of(context).textTheme.titleMedium),
+                SizedBox(height: 12),
+                SizedBox(
+                  height: 160,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: false),
+                      titlesData: FlTitlesData(show: false),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: [
+                            for (int i = 0; i < soldeHistorique.length; i++)
+                              FlSpot(i.toDouble(), soldeHistorique[i]),
+                          ],
+                          isCurved: true,
+                          color: Colors.greenAccent,
+                          barWidth: 3,
+                          dotData: FlDotData(show: false),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
