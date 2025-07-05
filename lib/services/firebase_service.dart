@@ -75,6 +75,7 @@ class FirebaseService {
       userId: user.uid, // On force l'ID de l'utilisateur connecté
       nom: categorie.nom,
       enveloppes: categorie.enveloppes,
+      ordre: categorie.ordre,
     );
     await categoriesRef.doc(categorie.id).set(categorieAvecUser.toMap());
   }

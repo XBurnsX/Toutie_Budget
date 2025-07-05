@@ -149,12 +149,10 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     final updatedEnvs = widget.categorie.enveloppes
         .map((e) => e.id == updatedEnv.id ? updatedEnv : e)
         .toList();
-    final updatedCat = Categorie(
-      id: widget.categorie.id,
-      nom: widget.categorie.nom,
-      enveloppes: updatedEnvs,
-    );
-    await FirebaseService().ajouterCategorie(updatedCat);
+    await FirebaseService()
+        .categoriesRef
+        .doc(widget.categorie.id)
+        .update({'enveloppes': updatedEnvs.map((e) => e.toMap()).toList()});
 
     // Mettre à jour l'objectif local pour que l'affichage change
     setState(() {

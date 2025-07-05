@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'pie_chart_with_legend.dart';
+import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes
 class ListeCategoriesEnveloppes extends StatelessWidget {
@@ -185,7 +186,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                 } else {
                   barreColor = Colors.amber;
                 }
-                return Card(
+                final cardWidget = Card(
                   color: estNegative
                       ? Theme.of(
                           context,
@@ -343,6 +344,175 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                     ],
                   ),
                 );
+
+                return editionMode
+                    ? cardWidget
+                    : InkWell(
+                        onTap: () {
+                          final TextEditingController ctrl =
+                              TextEditingController(
+                                  text: objectif.toStringAsFixed(2));
+
+                          double _calculerMontantNecessaire(
+                              Map<String, dynamic> env) {
+                            final double objectifTotal =
+                                (env['objectif'] as num?)?.toDouble() ?? 0.0;
+                            final double soldeEnv =
+                                (env['solde'] as num?)?.toDouble() ?? 0.0;
+                            final String freq =
+                                (env['frequence_objectif']?.toString() ?? '')
+                                    .toLowerCase();
+
+                            DateTime now = DateTime.now();
+
+                            if (freq.contains('mensuel')) {
+                              return objectifTotal > 0
+                                  ? objectifTotal -
+                                      (soldeEnv < 0 ? 0 : soldeEnv)
+                                  : 0.0;
+                            }
+
+                            if (freq.contains('bihebdo')) {
+                              // 26 périodes par an -> 2 par mois moyen
+                              return objectifTotal;
+                            }
+
+                            if (freq.contains('annuel')) {
+                              DateTime cible;
+                              if (env['objectif_date'] != null) {
+                                try {
+                                  DateTime temp =
+                                      DateTime.parse(env['objectif_date']);
+                                  cible =
+                                      DateTime(now.year, temp.month, temp.day);
+                                  if (cible.isBefore(now)) {
+                                    cible = DateTime(
+                                        now.year + 1, temp.month, temp.day);
+                                  }
+                                } catch (_) {
+                                  cible = DateTime(now.year, 12, 31);
+                                }
+                              } else {
+                                cible = DateTime(now.year, 12, 31);
+                              }
+                              int moisRestants = (cible.year - now.year) * 12 +
+                                  (cible.month - now.month) +
+                                  1;
+                              if (moisRestants < 1) moisRestants = 1;
+                              return objectifTotal / moisRestants;
+                            }
+
+                            if (freq.contains('date') ||
+                                freq.contains('datefixe')) {
+                              if (env['objectif_date'] != null) {
+                                try {
+                                  DateTime dateCible =
+                                      DateTime.parse(env['objectif_date']);
+                                  int moisRestants =
+                                      (dateCible.year - now.year) * 12 +
+                                          (dateCible.month - now.month) +
+                                          1;
+                                  if (moisRestants < 1) moisRestants = 1;
+                                  double manquant = objectifTotal - soldeEnv;
+                                  if (manquant < 0) manquant = 0;
+                                  return manquant / moisRestants;
+                                } catch (_) {}
+                              }
+                            }
+
+                            return objectifTotal;
+                          }
+
+                          double montantNecessaire =
+                              _calculerMontantNecessaire(enveloppe);
+
+                          String? compteProvenanceId =
+                              enveloppe['provenance_compte_id'];
+
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (ctx) {
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                    bottom:
+                                        MediaQuery.of(ctx).viewInsets.bottom),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const SizedBox(width: 12),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            ctrl.text = montantNecessaire
+                                                .toStringAsFixed(2);
+                                          },
+                                          child: const Text('Assigné'),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        StatefulBuilder(
+                                          builder: (ctx, setStateSB) {
+                                            final List<Map<String, dynamic>>
+                                                comptesDisponibles = comptes
+                                                    .where((c) =>
+                                                        (c['type'] ==
+                                                            'Chèque') &&
+                                                        (c['estArchive'] !=
+                                                            true))
+                                                    .toList();
+                                            final items = comptesDisponibles
+                                                .map<DropdownMenuItem<String>>(
+                                                    (c) {
+                                              final nom =
+                                                  c['nom']?.toString() ??
+                                                      'Compte';
+                                              return DropdownMenuItem(
+                                                  value: c['id'].toString(),
+                                                  child: Text(nom));
+                                            }).toList();
+                                            final selected = items.any((i) =>
+                                                    i.value ==
+                                                    compteProvenanceId)
+                                                ? compteProvenanceId
+                                                : null;
+                                            return DropdownButton<String>(
+                                              value: selected,
+                                              hint: const Text('Compte'),
+                                              items: items,
+                                              onChanged: (val) =>
+                                                  setStateSB(() {
+                                                compteProvenanceId = val;
+                                              }),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 8),
+                                        OutlinedButton(
+                                          onPressed: () {
+                                            // Todo : navigation vers page détail
+                                          },
+                                          child: const Text('Détail'),
+                                        ),
+                                        const SizedBox(width: 12),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    NumericKeyboard(
+                                      controller: ctrl,
+                                      onClear: () => ctrl.clear(),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: cardWidget,
+                      );
               }
               // Pour les enveloppes avec objectif, barre latérale à droite
               Color barreColor;
@@ -388,7 +558,7 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
               } else {
                 bulleColor = Colors.amber;
               }
-              return Card(
+              final cardWidget = Card(
                 color: estNegative
                     ? Theme.of(
                         context,
@@ -845,6 +1015,168 @@ class ListeCategoriesEnveloppes extends StatelessWidget {
                   ],
                 ),
               );
+
+              return editionMode
+                  ? cardWidget
+                  : InkWell(
+                      onTap: () {
+                        final TextEditingController ctrl =
+                            TextEditingController(
+                                text: objectif.toStringAsFixed(2));
+
+                        double _calculerMontantNecessaire(
+                            Map<String, dynamic> env) {
+                          final double objectifTotal =
+                              (env['objectif'] as num?)?.toDouble() ?? 0.0;
+                          final double soldeEnv =
+                              (env['solde'] as num?)?.toDouble() ?? 0.0;
+                          final String freq =
+                              (env['frequence_objectif']?.toString() ?? '')
+                                  .toLowerCase();
+
+                          DateTime now = DateTime.now();
+
+                          if (freq.contains('mensuel')) {
+                            return objectifTotal > 0
+                                ? objectifTotal - (soldeEnv < 0 ? 0 : soldeEnv)
+                                : 0.0;
+                          }
+
+                          if (freq.contains('bihebdo')) {
+                            // 26 périodes par an -> 2 par mois moyen
+                            return objectifTotal;
+                          }
+
+                          if (freq.contains('annuel')) {
+                            DateTime cible;
+                            if (env['objectif_date'] != null) {
+                              try {
+                                DateTime temp =
+                                    DateTime.parse(env['objectif_date']);
+                                cible =
+                                    DateTime(now.year, temp.month, temp.day);
+                                if (cible.isBefore(now)) {
+                                  cible = DateTime(
+                                      now.year + 1, temp.month, temp.day);
+                                }
+                              } catch (_) {
+                                cible = DateTime(now.year, 12, 31);
+                              }
+                            } else {
+                              cible = DateTime(now.year, 12, 31);
+                            }
+                            int moisRestants = (cible.year - now.year) * 12 +
+                                (cible.month - now.month) +
+                                1;
+                            if (moisRestants < 1) moisRestants = 1;
+                            return objectifTotal / moisRestants;
+                          }
+
+                          if (freq.contains('date') ||
+                              freq.contains('datefixe')) {
+                            if (env['objectif_date'] != null) {
+                              try {
+                                DateTime dateCible =
+                                    DateTime.parse(env['objectif_date']);
+                                int moisRestants =
+                                    (dateCible.year - now.year) * 12 +
+                                        (dateCible.month - now.month) +
+                                        1;
+                                if (moisRestants < 1) moisRestants = 1;
+                                double manquant = objectifTotal - soldeEnv;
+                                if (manquant < 0) manquant = 0;
+                                return manquant / moisRestants;
+                              } catch (_) {}
+                            }
+                          }
+
+                          return objectifTotal;
+                        }
+
+                        double montantNecessaire =
+                            _calculerMontantNecessaire(enveloppe);
+
+                        String? compteProvenanceId =
+                            enveloppe['provenance_compte_id'];
+
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (ctx) {
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                  bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const SizedBox(width: 12),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          ctrl.text = montantNecessaire
+                                              .toStringAsFixed(2);
+                                        },
+                                        child: const Text('Mois'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      StatefulBuilder(
+                                        builder: (ctx, setStateSB) {
+                                          final List<Map<String, dynamic>>
+                                              comptesDisponibles = comptes
+                                                  .where((c) =>
+                                                      (c['type'] == 'Chèque') &&
+                                                      (c['estArchive'] != true))
+                                                  .toList();
+                                          final items = comptesDisponibles
+                                              .map<DropdownMenuItem<String>>(
+                                                  (c) {
+                                            final nom = c['nom']?.toString() ??
+                                                'Compte';
+                                            return DropdownMenuItem(
+                                                value: c['id'].toString(),
+                                                child: Text(nom));
+                                          }).toList();
+                                          final selected = items.any((i) =>
+                                                  i.value == compteProvenanceId)
+                                              ? compteProvenanceId
+                                              : null;
+                                          return DropdownButton<String>(
+                                            value: selected,
+                                            hint: const Text('Compte'),
+                                            items: items,
+                                            onChanged: (val) => setStateSB(() {
+                                              compteProvenanceId = val;
+                                            }),
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      OutlinedButton(
+                                        onPressed: () {
+                                          // À implémenter : navigation vers page détail
+                                        },
+                                        child: const Text('Détail'),
+                                      ),
+                                      const SizedBox(width: 12),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  NumericKeyboard(
+                                    controller: ctrl,
+                                    onClear: () => ctrl.clear(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      child: cardWidget,
+                    );
             }),
             const SizedBox(height: 24),
           ],
