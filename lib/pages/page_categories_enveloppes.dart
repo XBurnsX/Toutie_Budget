@@ -17,7 +17,6 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   List<Categorie> _categories = [];
   bool _isLoading = true;
   StreamSubscription<List<Categorie>>? _categoriesSubscription;
-  bool _isReordering = false;
 
   @override
   void initState() {
@@ -139,10 +138,6 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         );
       }
     }
-    // Finalement, on remet le flag à false pour réafficher les enveloppes
-    setState(() {
-      _isReordering = false;
-    });
   }
 
   Future<void> _reorderEnveloppes(
@@ -567,11 +562,6 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                             padding: const EdgeInsets.all(16),
                             itemCount: _categories.length,
                             onReorder: _reorderCategories,
-                            onReorderStart: (index) {
-                              setState(() {
-                                _isReordering = true;
-                              });
-                            },
                             buildDefaultDragHandles:
                                 false, // On utilise une poignée personnalisée
                             itemBuilder: (context, index) {
@@ -599,101 +589,89 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     final isDette = categorie.nom.toLowerCase() == 'dette' ||
         categorie.nom.toLowerCase() == 'dettes';
 
-    return Column(
+    // Widget qui affiche la liste des enveloppes (reordonnable ou non)
+    final Widget enveloppesWidget = _editionMode
+        ? ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: enveloppes.length,
+            itemBuilder: (context, idx) => _buildEnveloppeItem(
+              categorie,
+              enveloppes[idx],
+              index: idx,
+              key: ValueKey(enveloppes[idx].id),
+            ),
+            onReorder: (oldIndex, newIndex) =>
+                _reorderEnveloppes(categorie, oldIndex, newIndex),
+          )
+        : Column(
+            children: enveloppes
+                .map((enveloppe) => _buildEnveloppeItem(categorie, enveloppe))
+                .toList(),
+          );
+
+    return Container(
       key: key,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                categorie.nom,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white70,
-                ),
-              ),
-            ),
-            if (_editionMode) ...[
-              IconButton(
-                icon: const Icon(Icons.edit, color: Colors.white70, size: 22),
-                tooltip: 'Renommer la catégorie',
-                onPressed: isDette ? null : () => _renommerCategorie(categorie),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.redAccent,
-                  size: 22,
-                ),
-                tooltip: 'Supprimer la catégorie',
-                onPressed:
-                    isDette ? null : () => _supprimerCategorie(categorie),
-              ),
-              ReorderableDragStartListener(
-                index: index!,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Icon(
-                    isDette ? Icons.lock : Icons.drag_handle,
-                    color: isDette ? Colors.grey : Colors.white54,
-                    size: 24,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Card(
+        color: const Color(0xFF232526),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      categorie.nom,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white70,
+                      ),
+                    ),
                   ),
-                ),
+                  if (_editionMode) ...[
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.white70),
+                      tooltip: 'Renommer la catégorie',
+                      onPressed:
+                          isDette ? null : () => _renommerCategorie(categorie),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline,
+                          color: Colors.redAccent),
+                      tooltip: 'Supprimer la catégorie',
+                      onPressed:
+                          isDette ? null : () => _supprimerCategorie(categorie),
+                    ),
+                    ReorderableDragStartListener(
+                      index: index!,
+                      child: Icon(
+                        isDette ? Icons.lock : Icons.drag_handle,
+                        color: isDette ? Colors.grey : Colors.white54,
+                      ),
+                    ),
+                  ] else ...[
+                    if (!isDette)
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline,
+                            color: Colors.white70),
+                        tooltip: 'Ajouter une enveloppe',
+                        onPressed: () => _ajouterEnveloppe(categorie),
+                      ),
+                  ],
+                ],
               ),
-            ] else ...[
-              if (!isDette)
-                IconButton(
-                  icon: const Icon(
-                    Icons.add_circle_outline,
-                    color: Colors.white70,
-                    size: 22,
-                  ),
-                  tooltip: 'Ajouter une enveloppe',
-                  onPressed: () => _ajouterEnveloppe(categorie),
-                ),
+              const SizedBox(height: 8),
+              enveloppesWidget,
             ],
-          ],
-        ),
-        AnimatedOpacity(
-          duration: const Duration(milliseconds: 200),
-          opacity: _isReordering ? 0.0 : 1.0,
-          child: IgnorePointer(
-            ignoring: _isReordering,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_editionMode)
-                  ReorderableListView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    buildDefaultDragHandles: false,
-                    onReorder: (oldIndex, newIndex) =>
-                        _reorderEnveloppes(categorie, oldIndex, newIndex),
-                    children: enveloppes
-                        .asMap()
-                        .entries
-                        .map(
-                          (entry) => _buildEnveloppeItem(
-                            categorie,
-                            entry.value,
-                            index: entry.key,
-                            key: ValueKey(entry.value.id),
-                          ),
-                        )
-                        .toList(),
-                  )
-                else
-                  ...enveloppes.map(
-                    (enveloppe) => _buildEnveloppeItem(categorie, enveloppe),
-                  ),
-                const SizedBox(height: 24),
-              ],
-            ),
           ),
         ),
-      ],
+      ),
     );
   }
 
