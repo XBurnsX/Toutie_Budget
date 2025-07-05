@@ -16,7 +16,6 @@ import 'page_statistiques.dart';
 import 'page_ajout_transaction.dart';
 import 'page_comptes.dart';
 import 'page_transactions_compte.dart';
-import '../services/cache_service.dart';
 
 /// Page d'affichage du budget et des enveloppes
 class PageBudget extends StatefulWidget {

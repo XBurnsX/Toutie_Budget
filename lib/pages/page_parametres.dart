@@ -10,6 +10,8 @@ import 'package:toutie_budget/services/theme_service.dart';
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
 import 'page_import_csv.dart';
+import 'page_debug_cache.dart';
+import 'page_firebase_monitor.dart';
 
 import '../themes/dropdown_theme_extension.dart';
 
@@ -24,6 +26,8 @@ class _PageParametresState extends State<PageParametres> {
   bool notifications = true;
   String langue = 'fr';
   double budgetNotif = 80;
+  int _aboutClickCount = 0;
+  DateTime? _lastAboutClick;
 
   @override
   Widget build(BuildContext context) {
@@ -217,10 +221,26 @@ class _PageParametresState extends State<PageParametres> {
               },
             ),
             const Divider(),
-            const ListTile(
-              leading: Icon(Icons.info_outline),
-              title: Text('À propos'),
-              subtitle: Text('Toutie Budget'),
+            ListTile(
+              leading: const Icon(Icons.memory),
+              title: const Text('Debug Cache'),
+              subtitle: const Text(
+                'Gérer et surveiller le cache de l\'application',
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const PageDebugCache(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('À propos'),
+              subtitle: const Text('Toutie Budget'),
+              onTap: _handleAboutTap,
             ),
             const Divider(),
             ListTile(
@@ -236,6 +256,29 @@ class _PageParametresState extends State<PageParametres> {
         );
       },
     );
+  }
+
+  void _handleAboutTap() {
+    final now = DateTime.now();
+
+    // Réinitialiser le compteur si plus de 3 secondes se sont écoulées
+    if (_lastAboutClick != null &&
+        now.difference(_lastAboutClick!).inSeconds > 3) {
+      _aboutClickCount = 0;
+    }
+
+    _aboutClickCount++;
+    _lastAboutClick = now;
+
+    // Si 5 clics ont été effectués, ouvrir le monitoring Firebase
+    if (_aboutClickCount >= 5) {
+      _aboutClickCount = 0; // Réinitialiser le compteur
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const PageFirebaseMonitor(),
+        ),
+      );
+    }
   }
 
   Future<void> _deleteAllUserData() async {

@@ -4,6 +4,7 @@ import '../models/categorie.dart';
 import '../services/argent_service.dart';
 import '../services/firebase_service.dart';
 import '../services/color_service.dart';
+import '../services/cache_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -395,11 +396,11 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   }
 
   Widget _buildVirerArgentContent(BuildContext context) {
-    return StreamBuilder<List<Compte>>(
-      stream: FirebaseService().lireComptes(),
+    return FutureBuilder<List<Compte>>(
+      future: CacheService.getComptes(FirebaseService()),
       builder: (context, comptesSnapshot) {
-        return StreamBuilder<List<Categorie>>(
-          stream: FirebaseService().lireCategories(),
+        return FutureBuilder<List<Categorie>>(
+          future: CacheService.getCategories(FirebaseService()),
           builder: (context, catSnapshot) {
             try {
               if (comptesSnapshot.hasError || catSnapshot.hasError) {

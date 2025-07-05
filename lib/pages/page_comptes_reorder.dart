@@ -3,6 +3,7 @@ import 'package:toutie_budget/models/compte.dart';
 import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
+import 'package:toutie_budget/services/cache_service.dart';
 import 'page_creation_compte.dart';
 import 'page_transactions_compte.dart';
 import 'page_modification_compte.dart';
@@ -42,8 +43,8 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
           ),
         ],
       ),
-      body: StreamBuilder<List<Compte>>(
-        stream: FirebaseService().lireComptes(),
+      body: FutureBuilder<List<Compte>>(
+        future: CacheService.getComptes(FirebaseService()),
         builder: (context, snapshot) {
           final comptes = (snapshot.data ?? [])
               .where((c) => c.estArchive == false)

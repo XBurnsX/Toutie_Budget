@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/categorie.dart';
 import '../services/firebase_service.dart';
+import '../services/cache_service.dart';
 import 'page_set_objectif.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -32,7 +33,25 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   }
 
   Future<void> _initCategories() async {
-    // Charger les catégories initiales
+    // Charger les catégories initiales depuis le cache
+    try {
+      final categories = await CacheService.getCategories(FirebaseService());
+      if (mounted) {
+        final sortedCategories = _sortCategoriesWithDetteFirst(categories);
+        setState(() {
+          _categories = sortedCategories;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+
+    // Ensuite, écouter les changements en temps réel
     _categoriesSubscription = FirebaseService().lireCategories().listen((
       categories,
     ) {
@@ -52,6 +71,14 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         }
       }
     });
+  }
+
+  // Méthode pour rafraîchir les données
+  Future<void> _refreshCategories() async {
+    setState(() {
+      _isLoading = true;
+    });
+    await _initCategories();
   }
 
   // Méthode pour trier les catégories avec "Dette" toujours en première position

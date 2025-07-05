@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../services/firebase_service.dart';
+import '../services/cache_service.dart';
 import 'page_virer_argent.dart';
 
 /// Page pour afficher et gérer les enveloppes en situation d'urgence (solde négatif)
@@ -15,11 +16,11 @@ class PageSituationsUrgence extends StatelessWidget {
         title: const Text('Situations d\'urgence'),
         elevation: 0,
       ),
-      body: StreamBuilder<List<Compte>>(
-        stream: FirebaseService().lireComptes(),
+      body: FutureBuilder<List<Compte>>(
+        future: CacheService.getComptes(FirebaseService()),
         builder: (context, comptesSnapshot) {
-          return StreamBuilder<List<Categorie>>(
-            stream: FirebaseService().lireCategories(),
+          return FutureBuilder<List<Categorie>>(
+            future: CacheService.getCategories(FirebaseService()),
             builder: (context, catSnapshot) {
               if (!comptesSnapshot.hasData || !catSnapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());

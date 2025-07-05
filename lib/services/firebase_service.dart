@@ -6,6 +6,7 @@ import '../models/categorie.dart';
 import '../models/transaction_model.dart' as app_model;
 import '../models/dette.dart';
 import 'dette_service.dart';
+import 'firebase_monitor_service.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -51,6 +52,15 @@ class FirebaseService {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
 
+    // Logger l'écriture
+    FirebaseMonitorService.logWrite(
+      collection: 'comptes',
+      document: compte.id,
+      count: 1,
+      userId: user.uid,
+      details: 'Ajout compte: ${compte.nom}',
+    );
+
     final compteAvecUser = Compte(
       id: compte.id,
       userId: user.uid,
@@ -69,6 +79,16 @@ class FirebaseService {
   Future<void> ajouterCategorie(Categorie categorie) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
+
+    // Logger l'écriture
+    FirebaseMonitorService.logWrite(
+      collection: 'categories',
+      document: categorie.id,
+      count: 1,
+      userId: user.uid,
+      details: 'Ajout catégorie: ${categorie.nom}',
+    );
+
     // Assure que la catégorie est bien associée à l'utilisateur actuel
     final categorieAvecUser = Categorie(
       id: categorie.id,
@@ -85,6 +105,16 @@ class FirebaseService {
     if (user == null) {
       return Stream.value([]); // Retourne un stream vide si pas d'utilisateur
     }
+
+    // Logger la requête
+    FirebaseMonitorService.logQuery(
+      collection: 'categories',
+      document: 'user_${user.uid}',
+      count: 1,
+      userId: user.uid,
+      details: 'Lecture des catégories utilisateur',
+    );
+
     return categoriesRef
         .where(
           'userId',
@@ -97,6 +127,15 @@ class FirebaseService {
             (doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>),
           )
           .toList();
+
+      // Logger le nombre de documents lus
+      FirebaseMonitorService.logRead(
+        collection: 'categories',
+        document: 'user_${user.uid}',
+        count: snapshot.docs.length,
+        userId: user.uid,
+        details: '${snapshot.docs.length} catégories lues',
+      );
 
       // Trier les catégories : Dette toujours en premier, puis par ordre
       categories.sort((a, b) {
@@ -134,6 +173,16 @@ class FirebaseService {
       note: transaction.note,
       estFractionnee: transaction.estFractionnee,
       sousItems: transaction.sousItems,
+    );
+
+    // Logger l'écriture de la transaction
+    FirebaseMonitorService.logWrite(
+      collection: 'transactions',
+      document: transaction.id,
+      count: 1,
+      userId: user.uid,
+      details:
+          'Ajout transaction: ${transaction.tiers ?? 'Sans tiers'} - ${transaction.montant}€',
     );
 
     // 1. Sauvegarder la transaction
@@ -910,6 +959,15 @@ class FirebaseService {
       return Stream.value([]);
     }
 
+    // Logger la requête
+    FirebaseMonitorService.logQuery(
+      collection: 'transactions',
+      document: 'compte_$compteId',
+      count: 1,
+      userId: user.uid,
+      details: 'Lecture transactions compte: $compteId',
+    );
+
     // Requête optimisée avec index composite : userId + compteId + date
     return firestore
         .collection('transactions')
@@ -919,10 +977,22 @@ class FirebaseService {
         .limit(100) // Limiter à 100 transactions par compte
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => app_model.Transaction.fromJson(doc.data()))
-              .toList(),
+      (snapshot) {
+        // Logger le nombre de documents lus
+        FirebaseMonitorService.logRead(
+          collection: 'transactions',
+          document: 'compte_$compteId',
+          count: snapshot.docs.length,
+          userId: user.uid,
+          details:
+              '${snapshot.docs.length} transactions lues pour compte $compteId',
         );
+
+        return snapshot.docs
+            .map((doc) => app_model.Transaction.fromJson(doc.data()))
+            .toList();
+      },
+    );
   }
 
   Stream<List<Compte>> lireComptes() {
@@ -930,6 +1000,16 @@ class FirebaseService {
     if (user == null) {
       return Stream.value([]); // Retourne un stream vide si pas d'utilisateur
     }
+
+    // Logger la requête
+    FirebaseMonitorService.logQuery(
+      collection: 'comptes',
+      document: 'user_${user.uid}',
+      count: 1,
+      userId: user.uid,
+      details: 'Lecture des comptes utilisateur',
+    );
+
     return comptesRef
         .where(
           'userId',
@@ -937,12 +1017,23 @@ class FirebaseService {
         ) // Ne lit que les comptes de l'utilisateur
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map(
-                (doc) =>
-                    Compte.fromMap(doc.data() as Map<String, dynamic>, doc.id),
-              )
-              .toList(),
+      (snapshot) {
+        // Logger le nombre de documents lus
+        FirebaseMonitorService.logRead(
+          collection: 'comptes',
+          document: 'user_${user.uid}',
+          count: snapshot.docs.length,
+          userId: user.uid,
+          details: '${snapshot.docs.length} comptes lus',
         );
+
+        return snapshot.docs
+            .map(
+              (doc) =>
+                  Compte.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+            )
+            .toList();
+      },
+    );
   }
 }
