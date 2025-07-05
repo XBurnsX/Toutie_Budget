@@ -9,6 +9,7 @@ import 'page_modification_compte.dart';
 import 'page_reconciliation.dart';
 import 'page_parametres_dettes.dart';
 import 'page_pret_personnel.dart';
+import 'page_investissement.dart';
 
 class PageComptesReorder extends StatefulWidget {
   const PageComptesReorder({super.key});
@@ -194,11 +195,19 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
           onTap: editing
               ? null
               : () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PageTransactionsCompte(compte: compte),
-                    ),
-                  );
+                  if (compte.type == 'Investissement') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PageInvestissement(compte: compte),
+                      ),
+                    );
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PageTransactionsCompte(compte: compte),
+                      ),
+                    );
+                  }
                 },
           onLongPress:
               editing ? null : () => _showCompteMenu(context, compte, isCheque),

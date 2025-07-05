@@ -50,6 +50,9 @@ dependencies:
   path: ^1.9.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  # Graphiques
+  fl_chart: ^0.68.0
+  http: ^1.1.0
 
 dev_dependencies:
   flutter_test:
