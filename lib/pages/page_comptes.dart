@@ -11,7 +11,6 @@ import 'package:toutie_budget/models/dette.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/compte.dart';
-import '../services/cache_service.dart';
 
 /// Page d'affichage des comptes bancaires et d'investissement
 class PageComptes extends StatelessWidget {
@@ -43,8 +42,8 @@ class PageComptes extends StatelessWidget {
   }
 
   Widget _buildComptesContent(BuildContext context) {
-    return FutureBuilder<List<Compte>>(
-      future: CacheService.getComptes(FirebaseService()),
+    return StreamBuilder<List<Compte>>(
+      stream: FirebaseService().lireComptes(),
       builder: (context, snapshot) {
         final comptes =
             (snapshot.data ?? []).where((c) => c.estArchive == false).toList();

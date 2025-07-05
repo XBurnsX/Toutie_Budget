@@ -41,51 +41,6 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
         appBar: AppBar(
           title: Text(_type == 'Dette' ? 'Créer une dette' : 'Créer un compte'),
           elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.check),
-              tooltip: 'Valider',
-              onPressed: () async {
-                if (!_formKey.currentState!.validate()) {
-                  return;
-                }
-                _formKey.currentState!.save();
-
-                if (_type == 'Dette') {
-                  final id =
-                      FirebaseFirestore.instance.collection('dettes').doc().id;
-                  final dette = Dette(
-                    id: id,
-                    nomTiers: _nom,
-                    montantInitial: _solde.abs(),
-                    solde: _solde.abs(),
-                    type: 'dette',
-                    historique: [],
-                    archive: false,
-                    dateCreation: DateTime.now(),
-                    estManuelle: true,
-                    userId: '',
-                  );
-                  await DetteService().ajouterDette(dette);
-                } else {
-                  final id =
-                      FirebaseFirestore.instance.collection('comptes').doc().id;
-                  final compte = Compte(
-                    id: id,
-                    nom: _nom,
-                    type: _type,
-                    solde: _solde,
-                    couleur: _couleur.value,
-                    pretAPlacer: _solde,
-                    dateCreation: DateTime.now(),
-                    estArchive: false,
-                  );
-                  await FirebaseService().ajouterCompte(compte);
-                }
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
         ),
         body: Center(
           child: ConstrainedBox(
@@ -99,51 +54,6 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
       appBar: AppBar(
         title: Text(_type == 'Dette' ? 'Créer une dette' : 'Créer un compte'),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            tooltip: 'Valider',
-            onPressed: () async {
-              if (!_formKey.currentState!.validate()) {
-                return;
-              }
-              _formKey.currentState!.save();
-
-              if (_type == 'Dette') {
-                final id =
-                    FirebaseFirestore.instance.collection('dettes').doc().id;
-                final dette = Dette(
-                  id: id,
-                  nomTiers: _nom,
-                  montantInitial: _solde.abs(),
-                  solde: _solde.abs(),
-                  type: 'dette',
-                  historique: [],
-                  archive: false,
-                  dateCreation: DateTime.now(),
-                  estManuelle: true,
-                  userId: '',
-                );
-                await DetteService().ajouterDette(dette);
-              } else {
-                final id =
-                    FirebaseFirestore.instance.collection('comptes').doc().id;
-                final compte = Compte(
-                  id: id,
-                  nom: _nom,
-                  type: _type,
-                  solde: _solde,
-                  couleur: _couleur.value,
-                  pretAPlacer: _solde,
-                  dateCreation: DateTime.now(),
-                  estArchive: false,
-                );
-                await FirebaseService().ajouterCompte(compte);
-              }
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
       ),
       body: _buildCreationCompteContent(context),
     );
@@ -270,6 +180,63 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
               ),
               const SizedBox(height: 32),
             ],
+            // Bouton Ajouter
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (!_formKey.currentState!.validate()) {
+                    return;
+                  }
+                  _formKey.currentState!.save();
+
+                  if (_type == 'Dette') {
+                    final id = FirebaseFirestore.instance
+                        .collection('dettes')
+                        .doc()
+                        .id;
+                    final dette = Dette(
+                      id: id,
+                      nomTiers: _nom,
+                      montantInitial: _solde.abs(),
+                      solde: _solde.abs(),
+                      type: 'dette',
+                      historique: [],
+                      archive: false,
+                      dateCreation: DateTime.now(),
+                      estManuelle: true,
+                      userId: '',
+                    );
+                    await DetteService().ajouterDette(dette);
+                  } else {
+                    final id = FirebaseFirestore.instance
+                        .collection('comptes')
+                        .doc()
+                        .id;
+                    final compte = Compte(
+                      id: id,
+                      nom: _nom,
+                      type: _type,
+                      solde: _solde,
+                      couleur: _couleur.value,
+                      pretAPlacer: _solde,
+                      dateCreation: DateTime.now(),
+                      estArchive: false,
+                    );
+                    await FirebaseService().ajouterCompte(compte);
+                  }
+                  Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.add),
+                label: Text(
+                    _type == 'Dette' ? 'Créer la dette' : 'Créer le compte'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
+              ),
+            ),
           ],
         ),
       ),
