@@ -412,19 +412,20 @@ class _PageBudgetState extends State<PageBudget> {
                             (c) => {
                               'id': c.id,
                               'nom': c.nom,
-                              'enveloppes': c.enveloppes
-                                  .map((e) => e.toMap())
-                                  .toList(),
+                              'enveloppes':
+                                  c.enveloppes.map((e) => e.toMap()).toList(),
                             },
                           )
                           .toList(),
                       comptes: comptes
-                          .map(
-                            (compte) => {
-                              'id': compte.id,
-                              'couleur': compte.couleur,
-                            },
-                          )
+                          .map((compte) => {
+                                'id': compte.id,
+                                'nom': compte.nom,
+                                'type': compte.type,
+                                'estArchive': compte.estArchive,
+                                'pretAPlacer': compte.pretAPlacer,
+                                'couleur': compte.couleur,
+                              })
                           .toList(),
                       selectedMonthKey: selectedMonthKey,
                     ),
