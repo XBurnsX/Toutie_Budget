@@ -598,68 +598,74 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
             ),
           ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.tiers != null && t.tiers!.isNotEmpty ? t.tiers! : '-',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      height: 1.1,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Colonne gauche : tiers + sous-titre
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: Text(
-                          sousTitre,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                            height: 1.2,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        t.tiers != null && t.tiers!.isNotEmpty ? t.tiers! : '-',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          height: 1.1,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (t.note != null && t.note!.isNotEmpty) ...[
-                        const SizedBox(width: 12),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 135.0),
-                          child: Flexible(
-                            child: Text(
-                              t.note!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade500,
-                                height: 1.2,
-                                fontStyle: FontStyle.italic,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                      Text(
+                        sousTitre,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                // Colonne droite : montant
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${isDepense ? '-' : '+'}${t.montant.toStringAsFixed(2)} \$',
+                      style: TextStyle(
+                        color: montantColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            Text(
-              '${isDepense ? '-' : '+'}${t.montant.toStringAsFixed(2)} \$',
-              style: TextStyle(
-                color: montantColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
+            // Note centrée au milieu de la card
+            if (t.note != null && t.note!.isNotEmpty)
+              Align(
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text(
+                    t.note!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ),
