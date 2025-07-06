@@ -567,7 +567,7 @@ class ArgentService {
 
     // Invalider le cache après un virement réussi
     // Invalider seulement les comptes et catégories, pas les transactions
-    // CacheService.invalidateComptes();
-    // CacheService.invalidateCategories();
+    CacheService.invalidateComptes();
+    CacheService.invalidateCategories();
   }
 }

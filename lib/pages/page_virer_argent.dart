@@ -425,15 +425,13 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   }
 
   Widget _buildVirerArgentContent(BuildContext context) {
-    return FutureBuilder<List<Compte>>(
-      key: ValueKey(
-          'comptes_$_refreshKey'), // Clé pour forcer le rafraîchissement
-      future: CacheService.getComptes(FirebaseService()),
+    return StreamBuilder<List<Compte>>(
+      key: ValueKey('comptes_$_refreshKey'),
+      stream: FirebaseService().lireComptes(),
       builder: (context, comptesSnapshot) {
-        return FutureBuilder<List<Categorie>>(
-          key: ValueKey(
-              'categories_$_refreshKey'), // Clé pour forcer le rafraîchissement
-          future: _getCategoriesWithDebug(),
+        return StreamBuilder<List<Categorie>>(
+          key: ValueKey('categories_$_refreshKey'),
+          stream: FirebaseService().lireCategories(),
           builder: (context, catSnapshot) {
             try {
               if (comptesSnapshot.hasError || catSnapshot.hasError) {
@@ -450,16 +448,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
               final comptes = comptesSnapshot.data!;
               final enveloppes =
                   catSnapshot.data!.expand((cat) => cat.enveloppes).toList();
-
-              // Debug temporaire pour voir le nombre d'enveloppes
-              print('DEBUG: Nombre de catégories: ${catSnapshot.data!.length}');
-              print('DEBUG: Nombre d\'enveloppes: ${enveloppes.length}');
-
-              // Debug détaillé des catégories
-              for (var cat in catSnapshot.data!) {
-                print(
-                    'DEBUG: Catégorie "${cat.nom}" a ${cat.enveloppes.length} enveloppes');
-              }
 
               // Vérification des données
               if (catSnapshot.data!.isEmpty) {
@@ -782,10 +770,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
   // Méthode pour forcer le rafraîchissement des données
   void _refreshData() {
-    // Invalider le cache avant de rafraîchir
-    // CacheService.invalidateComptes();
-    // CacheService.invalidateCategories();
-
+    // Avec les streams, il suffit de changer la clé pour forcer la reconstruction
     setState(() {
       _refreshKey++;
     });
@@ -818,41 +803,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       print('DEBUG: Rechargement forcé terminé');
     } catch (e) {
       print('Erreur lors du rafraîchissement forcé: $e');
-    }
-  }
-
-  Future<List<Categorie>> _getCategoriesWithDebug() async {
-    print('DEBUG: Début du chargement des catégories...');
-
-    try {
-      // Essayer d'abord le cache
-      final categoriesFromCache =
-          await CacheService.getCategories(FirebaseService());
-      print('DEBUG: Catégories depuis le cache: ${categoriesFromCache.length}');
-
-      // Si le cache ne contient qu'une catégorie, essayer directement Firebase
-      if (categoriesFromCache.length <= 1) {
-        print('DEBUG: Cache insuffisant, chargement direct depuis Firebase...');
-
-        // Charger directement depuis Firebase
-        final firebaseService = FirebaseService();
-        final categoriesFromFirebase =
-            await firebaseService.lireCategories().first;
-        print(
-            'DEBUG: Catégories depuis Firebase: ${categoriesFromFirebase.length}');
-
-        for (var cat in categoriesFromFirebase) {
-          print(
-              'DEBUG: Catégorie Firebase: "${cat.nom}" avec ${cat.enveloppes.length} enveloppes');
-        }
-
-        return categoriesFromFirebase;
-      }
-
-      return categoriesFromCache;
-    } catch (e) {
-      print('DEBUG: Erreur lors du chargement des catégories: $e');
-      rethrow;
     }
   }
 }
