@@ -274,6 +274,39 @@ class FirebaseService {
         // Erreur silencieuse
       }
     }
+
+    // 5. Si la transaction est un remboursement (sortie) et le tiers correspond à une carte de crédit, on rembourse la carte
+    final isRemboursement = (transaction.type == 'remboursement' ||
+        transaction.typeMouvement ==
+            app_model.TypeMouvementFinancier.remboursementEffectue);
+    if (isRemboursement &&
+        transaction.tiers != null &&
+        transaction.tiers!.isNotEmpty) {
+      // Recherche insensible à la casse et aux espaces
+      final nomCarteRecherche =
+          transaction.tiers!.replaceAll(' ', '').toLowerCase();
+      final query =
+          await comptesRef.where('type', isEqualTo: 'Carte de crédit').get();
+      final cartes = query.docs.where((doc) {
+        final nomCarte =
+            (doc['nom'] as String?)?.replaceAll(' ', '').toLowerCase() ?? '';
+        return nomCarte == nomCarteRecherche;
+      }).toList();
+      if (cartes.isNotEmpty) {
+        final doc = cartes.first;
+        final data = doc.data() as Map<String, dynamic>;
+        final double soldeActuel =
+            (data['soldeActuel'] as num?)?.toDouble() ?? 0.0;
+        final double nouveauSolde = soldeActuel - transaction.montant.abs();
+        await setCarteCredit(doc.id, {
+          'soldeActuel': nouveauSolde,
+        });
+      } else {
+        // Optionnel : log si la carte n'est pas trouvée
+        print(
+            'Carte de crédit non trouvée pour le prêteur : ${transaction.tiers}');
+      }
+    }
   }
 
   /// Crée une transaction interne pour refléter un ajustement de solde sur une dette manuelle
