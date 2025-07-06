@@ -24,7 +24,6 @@ class PageComptesReorder extends StatefulWidget {
 
 class _PageComptesReorderState extends State<PageComptesReorder> {
   bool _editionMode = false;
-  int _refreshKey = 0; // Clé pour forcer le rafraîchissement des StreamBuilder
 
   @override
   Widget build(BuildContext context) {
@@ -46,17 +45,9 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Rafraîchir',
-            onPressed: () {
-              _refreshData();
-            },
-          ),
         ],
       ),
       body: StreamBuilder<List<Compte>>(
-        key: ValueKey('comptes_$_refreshKey'),
         stream: FirebaseService().lireComptes(),
         builder: (context, snapshot) {
           final comptes = (snapshot.data ?? [])
@@ -769,11 +760,5 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
     );
   }
 
-  void _refreshData() {
-    // Invalider le cache pour forcer le rechargement
-    CacheService.invalidateComptes();
-    setState(() {
-      _refreshKey++;
-    }); // Forcer la reconstruction du widget
-  }
+
 }
