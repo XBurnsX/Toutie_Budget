@@ -538,8 +538,6 @@ class _PageBudgetState extends State<PageBudget> {
 
               return Column(
                 children: [
-                  // Bandeau de bienvenue (une seule fois à l'ouverture)
-                  const BandeauBienvenue(),
                   const SizedBox(height: 20),
                   ...comptesNonArchives
                       .where(

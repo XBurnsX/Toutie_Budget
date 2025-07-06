@@ -66,7 +66,17 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
       // Pour les remboursements effectués, on ne montre que les dettes contractées
       // (pas les prêts accordés car on ne peut pas "rembourser" un prêt qu'on a accordé)
       if (type == 'dette') {
-        options.add(_OptionItem(id: doc.id, label: nomTiers, type: 'dette'));
+        // Récupérer la couleur de la dette (par défaut rouge pour les dettes)
+        final couleur = data['couleur'] != null
+            ? Color(data['couleur'] as int)
+            : Colors.red;
+
+        options.add(_OptionItem(
+          id: doc.id,
+          label: nomTiers,
+          type: 'dette',
+          couleur: couleur,
+        ));
       }
     }
     return options;
@@ -83,18 +93,32 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        // Construire la liste complète (cartes + dettes)
+        // Construire la liste complète (cartes en premier, puis dettes)
         final options = <_OptionItem>[];
-        // Cartes de crédit (à jour)
+
+        // 1. Cartes de crédit (en haut)
         final cartes = widget.ajoutController.listeComptesAffichables
             .where((c) => c.type == 'Carte de crédit')
             .toList();
         for (final carte in cartes) {
-          options
-              .add(_OptionItem(id: carte.id, label: carte.nom, type: 'compte'));
+          options.add(_OptionItem(
+            id: carte.id,
+            label: carte.nom,
+            type: 'compte',
+            couleur: Color(carte.couleur),
+          ));
         }
-        // Dettes depuis Future
-        options.addAll(snapshot.data ?? []);
+
+        // 2. Dettes depuis Future (en bas)
+        final dettes = snapshot.data ?? [];
+        for (final dette in dettes) {
+          options.add(_OptionItem(
+            id: dette.id,
+            label: dette.label,
+            type: dette.type,
+            couleur: dette.couleur,
+          ));
+        }
         if (options.isEmpty) {
           return const Text('Aucune carte ou dette trouvée');
         }
@@ -109,9 +133,15 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
           }
         }
 
-        // Tri final
-        deduped.sort(
-            (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+        // Tri : cartes de crédit d'abord, puis dettes, puis tri alphabétique dans chaque groupe
+        deduped.sort((a, b) {
+          // D'abord par type (compte avant dette)
+          if (a.type != b.type) {
+            return a.type == 'compte' ? -1 : 1;
+          }
+          // Puis alphabétiquement dans le même type
+          return a.label.toLowerCase().compareTo(b.label.toLowerCase());
+        });
 
         // Déterminer la valeur sélectionnée actuelle à partir du controller
         String? selectedId;
@@ -119,7 +149,8 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
         if (currentLabel.isNotEmpty) {
           final match = deduped.firstWhere(
             (o) => o.label.toLowerCase() == currentLabel.toLowerCase(),
-            orElse: () => _OptionItem(id: '', label: '', type: ''),
+            orElse: () =>
+                _OptionItem(id: '', label: '', type: '', couleur: Colors.grey),
           );
           if (match.id.isNotEmpty) selectedId = match.id;
         }
@@ -130,7 +161,26 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
               .map(
                 (o) => DropdownMenuItem<String>(
                   value: o.id,
-                  child: Text(o.label, overflow: TextOverflow.ellipsis),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: o.couleur,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          o.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: o.couleur),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
               .toList(),
@@ -162,6 +212,12 @@ class _OptionItem {
   final String id;
   final String label;
   final String type; // 'compte' ou 'dette'
+  final Color couleur;
 
-  _OptionItem({required this.id, required this.label, required this.type});
+  _OptionItem({
+    required this.id,
+    required this.label,
+    required this.type,
+    required this.couleur,
+  });
 }

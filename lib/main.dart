@@ -6,6 +6,7 @@ import 'package:toutie_budget/pages/page_comptes_reorder.dart';
 import 'package:toutie_budget/pages/page_login.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
+import 'package:toutie_budget/widgets/bandeau_bienvenue.dart';
 
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -230,7 +231,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return Scaffold(
       // Suppression de l'AppBar pour un affichage sans barre supérieure
-      body: pages[_selectedIndex],
+      body: Stack(
+        children: [
+          pages[_selectedIndex],
+          // Bandeau de bienvenue (une seule fois au démarrage de l'appli)
+          const Positioned(
+            top: 30,
+            left: 0,
+            right: 0,
+            child: BandeauBienvenue(),
+          ),
+        ],
+      ),
       bottomNavigationBar: Consumer<ThemeService>(
         builder: (context, themeService, child) {
           return BottomNavigationBar(
