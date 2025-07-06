@@ -7,6 +7,7 @@ import '../services/color_service.dart';
 import '../services/cache_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../services/persistent_cache_service.dart';
 
 class PageVirerArgent extends StatefulWidget {
   const PageVirerArgent({
@@ -29,6 +30,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   dynamic source;
   dynamic destination;
   String? _montantOriginal;
+  int _refreshKey = 0; // Clé pour forcer le rafraîchissement des FutureBuilder
 
   @override
   void initState() {
@@ -219,6 +221,9 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       );
 
       if (mounted) {
+        // Forcer le rafraîchissement des données
+        _refreshData();
+
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -374,6 +379,18 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
           foregroundColor: Colors.white,
           elevation: 0,
           surfaceTintColor: const Color(0xFF18191A),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshData,
+              tooltip: 'Rafraîchir les données',
+            ),
+            IconButton(
+              icon: const Icon(Icons.cloud_download),
+              onPressed: _forceRefreshFromFirebase,
+              tooltip: 'Recharger depuis Firebase',
+            ),
+          ],
         ),
         body: Center(
           child: ConstrainedBox(
@@ -390,6 +407,18 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         foregroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: const Color(0xFF18191A),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Rafraîchir les données',
+          ),
+          IconButton(
+            icon: const Icon(Icons.cloud_download),
+            onPressed: _forceRefreshFromFirebase,
+            tooltip: 'Recharger depuis Firebase',
+          ),
+        ],
       ),
       body: _buildVirerArgentContent(context),
     );
@@ -397,10 +426,14 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
   Widget _buildVirerArgentContent(BuildContext context) {
     return FutureBuilder<List<Compte>>(
+      key: ValueKey(
+          'comptes_$_refreshKey'), // Clé pour forcer le rafraîchissement
       future: CacheService.getComptes(FirebaseService()),
       builder: (context, comptesSnapshot) {
         return FutureBuilder<List<Categorie>>(
-          future: CacheService.getCategories(FirebaseService()),
+          key: ValueKey(
+              'categories_$_refreshKey'), // Clé pour forcer le rafraîchissement
+          future: _getCategoriesWithDebug(),
           builder: (context, catSnapshot) {
             try {
               if (comptesSnapshot.hasError || catSnapshot.hasError) {
@@ -417,6 +450,26 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
               final comptes = comptesSnapshot.data!;
               final enveloppes =
                   catSnapshot.data!.expand((cat) => cat.enveloppes).toList();
+
+              // Debug temporaire pour voir le nombre d'enveloppes
+              print('DEBUG: Nombre de catégories: ${catSnapshot.data!.length}');
+              print('DEBUG: Nombre d\'enveloppes: ${enveloppes.length}');
+
+              // Debug détaillé des catégories
+              for (var cat in catSnapshot.data!) {
+                print(
+                    'DEBUG: Catégorie "${cat.nom}" a ${cat.enveloppes.length} enveloppes');
+              }
+
+              // Vérification des données
+              if (catSnapshot.data!.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Aucune catégorie trouvée. Vérifiez votre connexion.',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                );
+              }
 
               // Filtrer les comptes pour exclure les types 'Dette' et 'Investissement'
               final comptesFilters = comptes
@@ -725,6 +778,82 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         );
       },
     );
+  }
+
+  // Méthode pour forcer le rafraîchissement des données
+  void _refreshData() {
+    // Invalider le cache avant de rafraîchir
+    // CacheService.invalidateComptes();
+    // CacheService.invalidateCategories();
+
+    setState(() {
+      _refreshKey++;
+    });
+  }
+
+  // Méthode alternative pour charger directement depuis Firebase
+  Future<void> _forceRefreshFromFirebase() async {
+    try {
+      print('DEBUG: Forçage du rechargement depuis Firebase...');
+
+      // Invalider complètement le cache
+      CacheService.invalidateAll();
+
+      // Nettoyer le cache persistant si possible
+      try {
+        await PersistentCacheService.clearAllCache();
+        print('DEBUG: Cache persistant nettoyé');
+      } catch (e) {
+        print('DEBUG: Impossible de nettoyer le cache persistant: $e');
+      }
+
+      // Attendre un peu pour s'assurer que l'invalidation est terminée
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Forcer le rafraîchissement
+      setState(() {
+        _refreshKey++;
+      });
+
+      print('DEBUG: Rechargement forcé terminé');
+    } catch (e) {
+      print('Erreur lors du rafraîchissement forcé: $e');
+    }
+  }
+
+  Future<List<Categorie>> _getCategoriesWithDebug() async {
+    print('DEBUG: Début du chargement des catégories...');
+
+    try {
+      // Essayer d'abord le cache
+      final categoriesFromCache =
+          await CacheService.getCategories(FirebaseService());
+      print('DEBUG: Catégories depuis le cache: ${categoriesFromCache.length}');
+
+      // Si le cache ne contient qu'une catégorie, essayer directement Firebase
+      if (categoriesFromCache.length <= 1) {
+        print('DEBUG: Cache insuffisant, chargement direct depuis Firebase...');
+
+        // Charger directement depuis Firebase
+        final firebaseService = FirebaseService();
+        final categoriesFromFirebase =
+            await firebaseService.lireCategories().first;
+        print(
+            'DEBUG: Catégories depuis Firebase: ${categoriesFromFirebase.length}');
+
+        for (var cat in categoriesFromFirebase) {
+          print(
+              'DEBUG: Catégorie Firebase: "${cat.nom}" avec ${cat.enveloppes.length} enveloppes');
+        }
+
+        return categoriesFromFirebase;
+      }
+
+      return categoriesFromCache;
+    } catch (e) {
+      print('DEBUG: Erreur lors du chargement des catégories: $e');
+      rethrow;
+    }
   }
 }
 

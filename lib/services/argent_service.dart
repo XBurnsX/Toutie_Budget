@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/categorie.dart';
 import '../models/compte.dart';
 import 'firebase_service.dart';
+import 'cache_service.dart';
 
 class ArgentService {
   final FirebaseService _firebaseService = FirebaseService();
@@ -39,12 +40,12 @@ class ArgentService {
       if (!snapSource.exists || !snapDest.exists) return;
       final pretAPlacerSource =
           (snapSource.data() as Map<String, dynamic>)['pretAPlacer']
-              ?.toDouble() ??
-          0;
+                  ?.toDouble() ??
+              0;
       final pretAPlacerDest =
           (snapDest.data() as Map<String, dynamic>)['pretAPlacer']
-              ?.toDouble() ??
-          0;
+                  ?.toDouble() ??
+              0;
       if (pretAPlacerSource < montant) throw Exception('Montant insuffisant');
       transaction.update(docSource, {
         'pretAPlacer': pretAPlacerSource - montant,
@@ -105,9 +106,8 @@ class ArgentService {
         final comptesSource = provenancesSource
             .map((prov) => prov['compte_id'].toString())
             .toSet();
-        final comptesDest = provenancesDest
-            .map((prov) => prov['compte_id'].toString())
-            .toSet();
+        final comptesDest =
+            provenancesDest.map((prov) => prov['compte_id'].toString()).toSet();
 
         // Bloquer si les comptes de provenance sont différents
         if (!comptesSource.every(
@@ -154,8 +154,8 @@ class ArgentService {
           if (existingIndex != -1) {
             provenancesDestFinal[existingIndex]['montant'] =
                 ((provenancesDestFinal[existingIndex]['montant'] as num)
-                    .toDouble() +
-                proportionATransferer);
+                        .toDouble() +
+                    proportionATransferer);
           } else {
             provenancesDestFinal.add({
               'compte_id': prov['compte_id'],
@@ -317,9 +317,8 @@ class ArgentService {
       // VÉRIFICATION DE PROVENANCE - L'enveloppe ne peut être vidée que vers son compte d'origine
       final List<dynamic> provenances = srcEnvs[srcIdx]['provenances'] ?? [];
       if (provenances.isNotEmpty) {
-        final comptesProvenance = provenances
-            .map((prov) => prov['compte_id'].toString())
-            .toSet();
+        final comptesProvenance =
+            provenances.map((prov) => prov['compte_id'].toString()).toSet();
 
         if (!comptesProvenance.contains(destination.id)) {
           throw Exception(
@@ -398,9 +397,8 @@ class ArgentService {
         final provenances = envs[idx]['provenances'] as List<dynamic>? ?? [];
         // Blocage uniquement si la liste provenances nettoyée est non vide
         if (provenances.isNotEmpty) {
-          final comptesExistants = provenances
-              .map((prov) => prov['compte_id'].toString())
-              .toSet();
+          final comptesExistants =
+              provenances.map((prov) => prov['compte_id'].toString()).toSet();
           if (!comptesExistants.contains(compteId)) {
             throw Exception(
               "L'argent de cette enveloppe provient déjà d'un autre compte.",
@@ -566,5 +564,10 @@ class ArgentService {
     } else {
       throw Exception('Type de virement non supporté');
     }
+
+    // Invalider le cache après un virement réussi
+    // Invalider seulement les comptes et catégories, pas les transactions
+    // CacheService.invalidateComptes();
+    // CacheService.invalidateCategories();
   }
 }
