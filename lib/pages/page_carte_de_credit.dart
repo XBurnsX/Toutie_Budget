@@ -405,7 +405,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     final double tauxAnnuel =
         double.tryParse(_tauxInteretController.text) ?? 0.0;
     if (tauxAnnuel > 0) {
-      final double soldeActuel = widget.soldeActuel ?? 0.0;
+      final double soldeActuel = _soldeActuel;
       final double interet = soldeActuel * (tauxAnnuel / 100 / 12);
       setState(() {
         _fraisInteretMensuel =
@@ -421,7 +421,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     final double tauxMensuel = tauxAnnuel / 100 / 12;
     double paiementMensuel =
         double.tryParse(_paiementMensuelController.text) ?? 0.0;
-    double soldeCourant = widget.soldeActuel ?? 0.0;
+    double soldeCourant = _soldeActuel;
 
     // Validation
     if (paiementMensuel <= (soldeCourant * tauxMensuel) + _totalDepensesFixes) {
@@ -435,7 +435,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     int mois = 0;
     while (soldeCourant > 0) {
       if (mois > 1200) {
-        // Sécurité pour éviter une boucle infinie
         _resultatCalculTemps = 'Durée > 100 ans.';
         setState(() {});
         return;
@@ -475,15 +474,14 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       return;
     }
 
-    double paiementEstime =
-        (widget.soldeActuel ?? 0.0) / n; // Estimation de base
-    for (int j = 0; j < 10; j++) {
-      // Répéter pour affiner
-      double soldeSimule = widget.soldeActuel ?? 0.0;
-      for (int k = 0; k < n; k++) {
-        soldeSimule += soldeSimule * i + _totalDepensesFixes - paiementEstime;
-      }
-      paiementEstime += soldeSimule / n;
+    final double S = _soldeActuel;
+    final double D = _totalDepensesFixes;
+
+    double paiementEstime;
+    if (i == 0) {
+      paiementEstime = (S / n) + D;
+    } else {
+      paiementEstime = (S * i * pow(1 + i, n)) / (pow(1 + i, n) - 1) + D;
     }
 
     setState(() {
@@ -503,7 +501,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       return;
     }
 
-    final double limiteCredit = widget.limiteCredit ?? 0.0;
+    final double limiteCredit = _limiteCredit;
     if (limiteCredit <= 0) {
       setState(() {
         _resultatCalculPourcentage = 'Veuillez configurer la limite de crédit.';
@@ -511,7 +509,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       return;
     }
 
-    final double soldeActuel = widget.soldeActuel ?? 0.0;
+    final double soldeActuel = _soldeActuel;
     final double soldeCible = limiteCredit * (pourcentageCible / 100);
     final double montantARembourser = soldeActuel - soldeCible;
 
@@ -523,20 +521,22 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       return;
     }
 
+    if (_dateCible == null) {
+      setState(() {
+        _resultatCalculPourcentage = 'Veuillez choisir une date cible.';
+      });
+      return;
+    }
+
     final double tauxAnnuel =
         double.tryParse(_tauxInteretController.text) ?? 0.0;
     final double i = tauxAnnuel / 100 / 12; // Taux d'intérêt mensuel
-
-    // Si pas de date cible, on calcule pour 12 mois par défaut
-    int n = 12;
-    if (_dateCible != null) {
-      n = _dateCible!.difference(DateTime.now()).inDays ~/ 30;
-      if (n <= 0) {
-        setState(() {
-          _resultatCalculPourcentage = 'La date doit être dans le futur.';
-        });
-        return;
-      }
+    int n = _dateCible!.difference(DateTime.now()).inDays ~/ 30;
+    if (n <= 0) {
+      setState(() {
+        _resultatCalculPourcentage = 'La date doit être dans le futur.';
+      });
+      return;
     }
 
     // Calcul itératif pour trouver le paiement mensuel requis
@@ -549,9 +549,8 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       paiementEstime += (soldeSimule - soldeCible) / n;
     }
 
-    final String dateInfo = _dateCible != null
-        ? ' d\'ici ${DateFormat.yMMM('fr_CA').format(_dateCible!)}'
-        : ' en $n mois';
+    final String dateInfo =
+        ' d\'ici ${DateFormat.yMMM('fr_CA').format(_dateCible!)}';
 
     setState(() {
       _resultatCalculPourcentage =
@@ -568,8 +567,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     final nomCarte = widget.nomCarte ?? 'Ma carte de crédit';
     final soldeActuel = widget.soldeActuel ?? _soldeActuel;
     // Utiliser les variables d'état locales si elles sont configurées, sinon les données du widget
-    final limiteCredit =
-        _limiteCredit > 0 ? _limiteCredit : (widget.limiteCredit ?? 0.0);
+    final limiteCredit = _limiteCredit;
     final paiementMinimum = _paiementMinimum > 0
         ? _paiementMinimum
         : (widget.paiementMinimum ?? 0.0);
@@ -955,7 +953,17 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
             : DateTime.now();
         _tauxInteretController.text =
             (data['tauxInteret'] as num?)?.toString() ?? '';
-        // ... autres champs si besoin
+        // Chargement des dépenses fixes
+        final depenses = (data['depensesFixes'] as List<dynamic>?) ?? [];
+        _depensesFixesControllers = depenses.map((d) {
+          return DepenseFixeController(
+            nom: d['nom'] ?? '',
+            montant: d['montant']?.toString() ?? '',
+          );
+        }).toList();
+        if (_depensesFixesControllers.isEmpty) {
+          _depensesFixesControllers = [DepenseFixeController()];
+        }
       });
     } else {
       setState(() {
@@ -965,7 +973,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
         _paiementMinimum = 0.0;
         _dateEcheance = DateTime.now();
         _tauxInteretController.text = '';
-        // ... autres champs à 0 ou vide
+        _depensesFixesControllers = [DepenseFixeController()];
       });
     }
     _checkInitialSetup(); // <-- APPEL ICI, APRÈS le chargement Firestore
