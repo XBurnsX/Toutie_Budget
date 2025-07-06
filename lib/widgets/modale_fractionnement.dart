@@ -3,17 +3,24 @@ import '../models/fractionnement_model.dart';
 import '../services/color_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
+import '../widgets/ajout_transaction/champ_enveloppe.dart';
+import '../models/compte.dart';
+import '../models/transaction_model.dart';
 
 class ModaleFractionnement extends StatefulWidget {
   final double montantTotal;
   final List<Map<String, dynamic>> enveloppes;
   final Function(TransactionFractionnee) onConfirmer;
+  final List<Map<String, dynamic>> categoriesFirebase;
+  final List<Compte> comptesFirebase;
 
   const ModaleFractionnement({
     super.key,
     required this.montantTotal,
     required this.enveloppes,
     required this.onConfirmer,
+    required this.categoriesFirebase,
+    required this.comptesFirebase,
   });
 
   @override
@@ -154,9 +161,8 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
   Widget _buildLigneSousItem(int index, {bool isInMainCard = false}) {
     final sousItem = _sousItems[index];
     final theme = Theme.of(context);
-    final montantInput = _montantInputs.length > index
-        ? _montantInputs[index]
-        : '';
+    final montantInput =
+        _montantInputs.length > index ? _montantInputs[index] : '';
 
     return Padding(
       padding: EdgeInsets.only(bottom: isInMainCard ? 16 : 0),
@@ -216,12 +222,12 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                         montantInput.isEmpty
                             ? '0.00'
                             : double.tryParse(
-                                    montantInput
-                                        .replaceAll('\$', '')
-                                        .replaceAll(' ', '')
-                                        .replaceAll(',', '.'),
-                                  )?.toStringAsFixed(2) ??
-                                  montantInput,
+                                  montantInput
+                                      .replaceAll('\$', '')
+                                      .replaceAll(' ', '')
+                                      .replaceAll(',', '.'),
+                                )?.toStringAsFixed(2) ??
+                                montantInput,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -239,67 +245,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: sousItem.enveloppeId.isEmpty
-                                ? null
-                                : sousItem.enveloppeId,
-                            dropdownColor: Theme.of(context).dropdownColor,
-                            items: widget.enveloppes
-                                .where((env) {
-                                  final nom =
-                                      (env['nom'] as String?)?.toLowerCase() ??
-                                      '';
-                                  final id = env['id']?.toString() ?? '';
-                                  final estPret =
-                                      ((nom.contains('prêt') ||
-                                              nom.contains('pret')) &&
-                                          nom.contains('placer')) ||
-                                      id.startsWith('pret_');
-                                  return !estPret;
-                                })
-                                .map((enveloppe) {
-                                  final solde =
-                                      (enveloppe['solde'] as num?)
-                                          ?.toDouble() ??
-                                      0.0;
-                                  final couleurCompte =
-                                      _getCouleurCompteEnveloppe(enveloppe);
-                                  return DropdownMenuItem<String>(
-                                    value: enveloppe['id'],
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          enveloppe['nom'] ?? 'Enveloppe',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          '${solde.toStringAsFixed(2)} \$',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                            color: couleurCompte,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                })
-                                .toList(),
-                            onChanged: (value) {
-                              final enveloppe = widget.enveloppes.firstWhere(
-                                (env) => env['id'] == value,
-                                orElse: () => {'nom': 'Enveloppe inconnue'},
-                              );
-                              setState(() {
-                                _sousItems[index] = _sousItems[index].copyWith(
-                                  enveloppeId: value ?? '',
-                                  description:
-                                      enveloppe['nom'] ?? 'Enveloppe inconnue',
-                                );
-                              });
-                            },
+                          child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: 'Enveloppe',
                               border: OutlineInputBorder(),
@@ -308,6 +254,33 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                                 horizontal: 12,
                                 vertical: 8,
                               ),
+                            ),
+                            child: ChampEnveloppe(
+                              enveloppeSelectionnee: sousItem.enveloppeId.isEmpty
+                                  ? null
+                                  : sousItem.enveloppeId,
+                              categoriesFirebase: widget.categoriesFirebase,
+                              comptesFirebase: widget.comptesFirebase,
+                              typeSelectionne: TypeTransaction.depense,
+                              typeMouvementSelectionne:
+                                  TypeMouvementFinancier.depenseNormale,
+                              compteSelectionne:
+                                  null, // Pas de compte spécifique pour le fractionnement
+                              onEnveloppeChanged: (value) {
+                                final enveloppe = widget.enveloppes.firstWhere(
+                                  (env) => env['id'] == value,
+                                  orElse: () => {'nom': 'Enveloppe inconnue'},
+                                );
+                                setState(() {
+                                  _sousItems[index] = _sousItems[index].copyWith(
+                                    enveloppeId: value ?? '',
+                                    description:
+                                        enveloppe['nom'] ?? 'Enveloppe inconnue',
+                                  );
+                                });
+                              },
+                              getCouleurCompteEnveloppe:
+                                  _getCouleurCompteEnveloppe,
                             ),
                           ),
                         ),
@@ -323,7 +296,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
     );
   }
 
-  // Fonction utilitaire pour obtenir la couleur du compte d'origine d'une enveloppe
+  // Fonction pour obtenir la couleur du compte d'origine d'une enveloppe
   Color _getCouleurCompteEnveloppe(Map<String, dynamic> enveloppe) {
     // Obtenir le solde de l'enveloppe
     final double solde = (enveloppe['solde'] as num?)?.toDouble() ?? 0.0;
@@ -413,9 +386,8 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.grey.shade600
-                          : Colors.grey.shade300,
+                      color:
+                          isDark ? Colors.grey.shade600 : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -511,8 +483,7 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed:
-                          _estValide &&
+                      onPressed: _estValide &&
                               _sousItems.every(
                                 (item) =>
                                     item.montant > 0 &&
@@ -521,9 +492,8 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                           ? _confirmerFractionnement
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _estValide
-                            ? Colors.green
-                            : Colors.grey,
+                        backgroundColor:
+                            _estValide ? Colors.green : Colors.grey,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),

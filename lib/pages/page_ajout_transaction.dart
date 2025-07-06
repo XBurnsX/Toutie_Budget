@@ -176,6 +176,8 @@ class _EcranAjoutTransactionRefactoredState
             onConfirmer: (TransactionFractionnee transactionFractionnee) {
               _controller.setFractionnement(transactionFractionnee);
             },
+            categoriesFirebase: _controller.categoriesFirebase,
+            comptesFirebase: _controller.listeComptesAffichables,
           ),
         );
       },
