@@ -160,21 +160,24 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                   decoration:
                       const InputDecoration(labelText: 'Limite de crédit (\$)'),
                   readOnly: true,
-                  onTap: () => _openNumericKeyboard(limiteController, isMoney: true),
+                  onTap: () =>
+                      _openNumericKeyboard(limiteController, isMoney: true),
                 ),
                 TextField(
                   controller: paiementMinController,
                   decoration: const InputDecoration(
                       labelText: 'Paiement minimum requis (\$)'),
                   readOnly: true,
-                  onTap: () => _openNumericKeyboard(paiementMinController, isMoney: true),
+                  onTap: () => _openNumericKeyboard(paiementMinController,
+                      isMoney: true),
                 ),
                 TextField(
                   controller: jourPaiementController,
                   decoration: const InputDecoration(
                       labelText: 'Jour du paiement (1-28)'),
                   readOnly: true,
-                  onTap: () => _openNumericKeyboard(jourPaiementController, showDecimal: false),
+                  onTap: () => _openNumericKeyboard(jourPaiementController,
+                      showDecimal: false),
                 ),
               ],
             ),
@@ -186,15 +189,29 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
             ),
             ElevatedButton(
               onPressed: () async {
-                // Sauvegarder les informations
-                final double limite =
-                    double.tryParse(limiteController.text) ?? 0.0;
-                final double paiementMin =
-                    double.tryParse(paiementMinController.text) ?? 0.0;
-                final int jourPaiement =
-                    int.tryParse(jourPaiementController.text) ?? 1;
+                // Nettoyer et parser les valeurs
+                final String limiteText = limiteController.text
+                    .replaceAll('\$', '')
+                    .replaceAll(' ', '')
+                    .replaceAll(',', '.')
+                    .trim();
+                final String paiementMinText = paiementMinController.text
+                    .replaceAll('\$', '')
+                    .replaceAll(' ', '')
+                    .replaceAll(',', '.')
+                    .trim();
+                final String jourPaiementText =
+                    jourPaiementController.text.replaceAll(' ', '').trim();
 
-                if (limite > 0 && paiementMin > 0) {
+                final double limite = double.tryParse(limiteText) ?? 0.0;
+                final double paiementMin =
+                    double.tryParse(paiementMinText) ?? 0.0;
+                final int jourPaiement = int.tryParse(jourPaiementText) ?? 1;
+
+                if (limite > 0 &&
+                    paiementMin > 0 &&
+                    jourPaiement >= 1 &&
+                    jourPaiement <= 28) {
                   // Calcule la prochaine date d'échéance
                   final now = DateTime.now();
                   final dateEcheance =
@@ -250,11 +267,23 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
 
                   Navigator.of(context).pop();
                 } else {
-                  // Afficher une erreur si les champs sont invalides
+                  // Afficher une erreur spécifique selon le problème
+                  String messageErreur =
+                      'Veuillez remplir tous les champs correctement.';
+
+                  if (limite <= 0) {
+                    messageErreur =
+                        'La limite de crédit doit être supérieure à 0.';
+                  } else if (paiementMin <= 0) {
+                    messageErreur =
+                        'Le paiement minimum doit être supérieur à 0.';
+                  } else if (jourPaiement < 1 || jourPaiement > 28) {
+                    messageErreur =
+                        'Le jour de paiement doit être entre 1 et 28.';
+                  }
+
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Veuillez remplir tous les champs correctement.')),
+                    SnackBar(content: Text(messageErreur)),
                   );
                 }
               },
