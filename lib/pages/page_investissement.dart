@@ -1165,87 +1165,91 @@ class _PageInvestissementState extends State<PageInvestissement> {
         final performancePercent = performance['performance'] ?? 0.0;
         final prixDisponible = performance['prixDisponible'] ?? false;
 
-        return Card(
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start, // Aligner tout en haut
-              children: [
-                // Partie gauche (titre + sous-titre)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
+        return GestureDetector(
+          onLongPress: () => _supprimerAction(actionId, symbol, quantite),
+          child: Card(
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start, // Aligner tout en haut
+                children: [
+                  // Partie gauche (titre + sous-titre)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              symbol,
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(width: 8),
+                            if (!prixDisponible)
+                              Icon(Icons.warning,
+                                  color: Colors.orange, size: 16),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text('Quantité: $quantite'),
+                        if (prixDisponible) ...[
                           Text(
-                            symbol,
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(width: 8),
-                          if (!prixDisponible)
-                            Icon(Icons.warning, color: Colors.orange, size: 16),
+                              'Prix actuel: \$${prixActuel?.toStringAsFixed(2) ?? 'N/A'}'),
+                          Text('Prix moyen: \$${prixAchat.toStringAsFixed(2)}'),
+                        ] else ...[
+                          Text('Prix non disponible',
+                              style: TextStyle(color: Colors.orange)),
                         ],
-                      ),
-                      SizedBox(height: 4),
-                      Text('Quantité: $quantite'),
-                      if (prixDisponible) ...[
-                        Text(
-                            'Prix actuel: \$${prixActuel?.toStringAsFixed(2) ?? 'N/A'}'),
-                        Text('Prix moyen: \$${prixAchat.toStringAsFixed(2)}'),
-                      ] else ...[
-                        Text('Prix non disponible',
-                            style: TextStyle(color: Colors.orange)),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                // Partie droite (solde, gain/perte, perf)
-                SizedBox(
-                  width: 120,
-                  child: Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center, // Centrer verticalement
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      SizedBox(height: 8), // Padding en haut du solde
-                      Text(
-                        '\$${valeurActuelle.toStringAsFixed(2)}',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 17),
-                        textAlign: TextAlign.right,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 1),
-                      Text(
-                        '\$${gainPerte.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: gainPerte >= 0 ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                  // Partie droite (solde, gain/perte, perf)
+                  SizedBox(
+                    width: 120,
+                    child: Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.center, // Centrer verticalement
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(height: 8), // Padding en haut du solde
+                        Text(
+                          '\$${valeurActuelle.toStringAsFixed(2)}',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 17),
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.right,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 1),
-                      Text(
-                        'Perf: ${performancePercent.toStringAsFixed(2)}%',
-                        style: TextStyle(
-                          color: performancePercent >= 0
-                              ? Colors.green
-                              : Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                        SizedBox(height: 1),
+                        Text(
+                          '\$${gainPerte.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: gainPerte >= 0 ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.right,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                        SizedBox(height: 1),
+                        Text(
+                          'Perf: ${performancePercent.toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            color: performancePercent >= 0
+                                ? Colors.green
+                                : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -67,20 +67,49 @@ class InvestissementService {
         'pretAPlacer': nouveauPretAPlacer,
       });
 
-      // Sauvegarder les détails de l'action
-      await _firebaseService.firestore.collection('actions').add({
-        'compteId': compteId,
-        'symbol': symbol,
-        'quantite': quantite,
-        'prixAchat': prixAchat,
-        'dateAchat': dateAchat.toIso8601String(),
-        'dateCreation': DateTime.now().toIso8601String(),
-      });
+      // Chercher une action existante avec le même symbole pour ce compte
+      final existingQuery = await _firebaseService.firestore
+          .collection('actions')
+          .where('compteId', isEqualTo: compteId)
+          .where('symbol', isEqualTo: symbol)
+          .limit(1)
+          .get();
+
+      if (existingQuery.docs.isNotEmpty) {
+        // Fusionner avec l'action existante
+        final doc = existingQuery.docs.first;
+        final data = doc.data();
+        final ancienneQuantite = (data['quantite'] as num).toDouble();
+        final ancienPrix = (data['prixAchat'] as num).toDouble();
+        final nouvelleQuantite = ancienneQuantite + quantite;
+        final nouveauPrixMoyen =
+            ((ancienneQuantite * ancienPrix) + (quantite * prixAchat)) /
+                nouvelleQuantite;
+        await _firebaseService.firestore
+            .collection('actions')
+            .doc(doc.id)
+            .update({
+          'quantite': nouvelleQuantite,
+          'prixAchat': nouveauPrixMoyen,
+          'dateAchat':
+              dateAchat.toIso8601String(), // On met à jour la date d'achat
+        });
+        print('✅ Action $symbol fusionnée (quantité + prix moyen mis à jour)');
+      } else {
+        // Créer une nouvelle action
+        await _firebaseService.firestore.collection('actions').add({
+          'compteId': compteId,
+          'symbol': symbol,
+          'quantite': quantite,
+          'prixAchat': prixAchat,
+          'dateAchat': dateAchat.toIso8601String(),
+          'dateCreation': DateTime.now().toIso8601String(),
+        });
+        print('✅ Nouvelle action $symbol ajoutée au compte $compteId');
+      }
 
       // Ajouter le symbole à la queue de mise à jour Alpha Vantage
       _alphaVantage.addSymbolToQueue(symbol);
-
-      print('✅ Action $symbol ajoutée au compte $compteId');
     } catch (e) {
       print('❌ Erreur ajout action: $e');
       rethrow;
