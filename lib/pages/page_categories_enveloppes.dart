@@ -251,12 +251,21 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         enveloppes: [],
         ordre: _categories.length, // Ajouter à la fin
       );
-      await FirebaseService().ajouterCategorie(newCat);
-
-      // Mettre à jour la liste locale
-      setState(() {
-        _categories = _sortCategoriesWithDetteFirst([..._categories, newCat]);
-      });
+      setState(() => _isLoading = true);
+      try {
+        await FirebaseService().ajouterCategorie(newCat);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la création: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
