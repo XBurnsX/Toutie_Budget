@@ -89,14 +89,25 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
         if (options.isEmpty) {
           return const Text('Aucune carte ou dette trouvée');
         }
+        // Supprimer les doublons éventuels (même libellé)
+        final seenLabels = <String>{};
+        final deduped = <_OptionItem>[];
+        for (final o in options) {
+          final key = o.label.toLowerCase().trim();
+          if (!seenLabels.contains(key)) {
+            deduped.add(o);
+            seenLabels.add(key);
+          }
+        }
+
         // Tri final
-        options.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+        deduped.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
 
         // Déterminer la valeur sélectionnée actuelle à partir du controller
         String? selectedId;
         final currentLabel = widget.controller.text.trim();
         if (currentLabel.isNotEmpty) {
-          final match = options.firstWhere(
+          final match = deduped.firstWhere(
             (o) => o.label.toLowerCase() == currentLabel.toLowerCase(),
             orElse: () => _OptionItem(id: '', label: '', type: ''),
           );
@@ -105,7 +116,7 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
 
         return DropdownButtonFormField<String>(
           value: selectedId,
-          items: options
+          items: deduped
               .map(
                 (o) => DropdownMenuItem<String>(
                   value: o.id,
