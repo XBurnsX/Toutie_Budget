@@ -26,7 +26,8 @@ class ChampRemboursement extends StatefulWidget {
 }
 
 class _ChampRemboursementState extends State<ChampRemboursement> {
-  late Future<List<_OptionItem>> _futureDettes; // Les dettes sont récupérées une seule fois
+  late Future<List<_OptionItem>>
+      _futureDettes; // Les dettes sont récupérées une seule fois
 
   @override
   void initState() {
@@ -58,8 +59,15 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final nomTiers = (data['nomTiers'] ?? data['nom'] ?? '').toString();
+      final type = (data['type'] ?? '').toString();
+
       if (nomTiers.isEmpty) continue;
-      options.add(_OptionItem(id: doc.id, label: nomTiers, type: 'dette'));
+
+      // Pour les remboursements effectués, on ne montre que les dettes contractées
+      // (pas les prêts accordés car on ne peut pas "rembourser" un prêt qu'on a accordé)
+      if (type == 'dette') {
+        options.add(_OptionItem(id: doc.id, label: nomTiers, type: 'dette'));
+      }
     }
     return options;
   }
@@ -82,7 +90,8 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
             .where((c) => c.type == 'Carte de crédit')
             .toList();
         for (final carte in cartes) {
-          options.add(_OptionItem(id: carte.id, label: carte.nom, type: 'compte'));
+          options
+              .add(_OptionItem(id: carte.id, label: carte.nom, type: 'compte'));
         }
         // Dettes depuis Future
         options.addAll(snapshot.data ?? []);
@@ -101,7 +110,8 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
         }
 
         // Tri final
-        deduped.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+        deduped.sort(
+            (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
 
         // Déterminer la valeur sélectionnée actuelle à partir du controller
         String? selectedId;
@@ -136,7 +146,8 @@ class _ChampRemboursementState extends State<ChampRemboursement> {
             hintText: 'Sélectionner une carte ou une dette',
             border: InputBorder.none,
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+            contentPadding:
+                EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
           ),
           isExpanded: true,
           dropdownColor: dropdownColor,
