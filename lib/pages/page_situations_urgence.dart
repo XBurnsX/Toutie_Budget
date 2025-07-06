@@ -9,25 +9,64 @@ import 'page_virer_argent.dart';
 class PageSituationsUrgence extends StatelessWidget {
   const PageSituationsUrgence({super.key});
 
+  void _forceRefresh() {
+    // Invalider le cache pour forcer le rechargement
+    CacheService.invalidateComptes();
+    CacheService.invalidateCategories();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Situations d\'urgence'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _forceRefresh,
+            tooltip: 'Rafraîchir les données',
+          ),
+        ],
       ),
-      body: FutureBuilder<List<Compte>>(
-        future: CacheService.getComptes(FirebaseService()),
+      body: StreamBuilder<List<Compte>>(
+        stream: FirebaseService().lireComptes(),
         builder: (context, comptesSnapshot) {
-          return FutureBuilder<List<Categorie>>(
-            future: CacheService.getCategories(FirebaseService()),
+          return StreamBuilder<List<Categorie>>(
+            stream: FirebaseService().lireCategories(),
             builder: (context, catSnapshot) {
+              if (comptesSnapshot.hasError || catSnapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Erreur : ${comptesSnapshot.error?.toString() ?? ''}\n${catSnapshot.error?.toString() ?? ''}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              }
+
               if (!comptesSnapshot.hasData || !catSnapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
 
               final comptes = comptesSnapshot.data!;
               final categories = catSnapshot.data!;
+
+              // Debug: afficher les données récupérées
+              print('DEBUG: Comptes récupérés: ${comptes.length}');
+              for (var compte in comptes) {
+                print(
+                    'DEBUG: Compte ${compte.nom} - Prêt à placer: ${compte.pretAPlacer}');
+              }
+
+              print('DEBUG: Catégories récupérées: ${categories.length}');
+              for (var categorie in categories) {
+                print(
+                    'DEBUG: Catégorie ${categorie.nom} - Enveloppes: ${categorie.enveloppes.length}');
+                for (var enveloppe in categorie.enveloppes) {
+                  print(
+                      'DEBUG:   Enveloppe ${enveloppe.nom} - Solde: ${enveloppe.solde}');
+                }
+              }
 
               // Filtrer les comptes avec prêt à placer négatif
               final comptesNegatifs = comptes
@@ -39,6 +78,9 @@ class PageSituationsUrgence extends StatelessWidget {
                   )
                   .toList();
 
+              print(
+                  'DEBUG: Comptes négatifs trouvés: ${comptesNegatifs.length}');
+
               // Filtrer les catégories qui ont des enveloppes négatives
               final categoriesAvecEnveloppesNegatives =
                   <Map<String, dynamic>>[];
@@ -47,6 +89,8 @@ class PageSituationsUrgence extends StatelessWidget {
                 final enveloppesNegatives =
                     categorie.enveloppes.where((env) => env.solde < 0).toList();
                 if (enveloppesNegatives.isNotEmpty) {
+                  print(
+                      'DEBUG: Catégorie ${categorie.nom} a ${enveloppesNegatives.length} enveloppes négatives');
                   categoriesAvecEnveloppesNegatives.add({
                     'id': categorie.id,
                     'nom': categorie.nom,
@@ -55,6 +99,9 @@ class PageSituationsUrgence extends StatelessWidget {
                   });
                 }
               }
+
+              print(
+                  'DEBUG: Catégories avec enveloppes négatives: ${categoriesAvecEnveloppesNegatives.length}');
 
               if (comptesNegatifs.isEmpty &&
                   categoriesAvecEnveloppesNegatives.isEmpty) {
