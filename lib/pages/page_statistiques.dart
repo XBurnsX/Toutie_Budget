@@ -16,6 +16,13 @@ class PageStatistiques extends StatefulWidget {
 class _PageStatistiquesState extends State<PageStatistiques> {
   DateTime _selectedMonth = DateTime.now();
 
+  // Cache local pour éviter les relectures
+  List<Compte>? _cachedComptes;
+  List<Categorie>? _cachedCategories;
+  Map<String, List<app_model.Transaction>> _cachedTransactions = {};
+  Map<String, dynamic>? _cachedStats;
+  DateTime? _lastStatsCalculation;
+
   @override
   Widget build(BuildContext context) {
     return _buildStatistiquesContent(context);
@@ -43,105 +50,119 @@ class _PageStatistiquesState extends State<PageStatistiques> {
           ),
         ],
       ),
-      body: StreamBuilder<List<Compte>>(
-        stream: FirebaseService().lireComptes(),
-        builder: (context, comptesSnapshot) {
-          return StreamBuilder<List<Categorie>>(
-            stream: FirebaseService().lireCategories(),
-            builder: (context, categoriesSnapshot) {
-              if (comptesSnapshot.hasError || categoriesSnapshot.hasError) {
-                return Center(
-                  child: Text(
-                    'Erreur : ${comptesSnapshot.error?.toString() ?? ''}\n${categoriesSnapshot.error?.toString() ?? ''}',
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                );
-              }
+      body: FutureBuilder<void>(
+        future: _chargerDonneesSiNecessaire(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-              if (!comptesSnapshot.hasData || !categoriesSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Erreur : ${snapshot.error}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
+          }
 
-              final comptes = comptesSnapshot.data!;
-              final categories = categoriesSnapshot.data!;
+          if (_cachedComptes == null || _cachedCategories == null) {
+            return const Center(child: Text('Aucune donnée disponible'));
+          }
 
-              return RefreshIndicator(
-                onRefresh: _forceRefresh,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Sélecteur de mois stylé
-                      _buildSelecteurMois(),
-                      const SizedBox(height: 24),
-
-                      // Statistiques avec les données en temps réel
-                      _buildStatistiquesReelles(comptes, categories),
-                    ],
-                  ),
-                ),
-              );
-            },
+          return RefreshIndicator(
+            onRefresh: _forceRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSelecteurMois(),
+                  const SizedBox(height: 24),
+                  _buildStatistiquesReelles(),
+                ],
+              ),
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildStatistiquesReelles(
-      List<Compte> comptes, List<Categorie> categories) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _calculerStatistiques(comptes, categories),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+  Future<void> _chargerDonneesSiNecessaire() async {
+    // Charger les comptes seulement si pas en cache
+    if (_cachedComptes == null) {
+      print('DEBUG: Chargement des comptes depuis Firebase...');
+      _cachedComptes = await FirebaseService().lireComptes().first;
+    }
+
+    // Charger les catégories seulement si pas en cache
+    if (_cachedCategories == null) {
+      print('DEBUG: Chargement des catégories depuis Firebase...');
+      _cachedCategories = await FirebaseService().lireCategories().first;
+    }
+
+    // Charger les transactions seulement si pas en cache ou si le mois a changé
+    if (_cachedComptes != null) {
+      for (var compte in _cachedComptes!) {
+        if (!_cachedTransactions.containsKey(compte.id)) {
+          print('DEBUG: Chargement des transactions pour ${compte.nom}...');
+          _cachedTransactions[compte.id] =
+              await FirebaseService().lireTransactions(compte.id).first;
         }
+      }
+    }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Erreur lors du calcul des statistiques: ${snapshot.error}',
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        }
+    // Recalculer les stats si nécessaire
+    await _recalculerStatsSiNecessaire();
+  }
 
-        final data = snapshot.data!;
-        final topEnveloppes =
-            data['topEnveloppes'] as List<MapEntry<String, double>>;
-        final topTiers = data['topTiers'] as List<MapEntry<String, double>>;
-        final totalRevenus = data['totalRevenus'] as double;
-        final totalDepenses = data['totalDepenses'] as double;
+  Future<void> _recalculerStatsSiNecessaire() async {
+    if (_cachedComptes == null || _cachedCategories == null) return;
 
-        return Column(
+    // Vérifier si on doit recalculer (mois différent ou pas de cache)
+    final currentMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    if (_lastStatsCalculation == null ||
+        _lastStatsCalculation != currentMonth) {
+      print(
+          'DEBUG: Recalcul des statistiques pour ${DateFormat('MMMM yyyy', 'fr_FR').format(_selectedMonth)}...');
+      _cachedStats =
+          await _calculerStatistiques(_cachedComptes!, _cachedCategories!);
+      _lastStatsCalculation = currentMonth;
+    }
+  }
+
+  Widget _buildStatistiquesReelles() {
+    if (_cachedStats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final topEnveloppes =
+        _cachedStats!['topEnveloppes'] as List<MapEntry<String, double>>;
+    final topTiers =
+        _cachedStats!['topTiers'] as List<MapEntry<String, double>>;
+    final totalRevenus = _cachedStats!['totalRevenus'] as double;
+    final totalDepenses = _cachedStats!['totalDepenses'] as double;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top 5 des enveloppes et tiers
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _buildTopEnveloppes(topEnveloppes)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildTopTiers(topTiers)),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // Revenus et Dépenses
-            _buildRevenusDepenses(totalRevenus, totalDepenses),
-            const SizedBox(height: 32),
-
-            // Solde net et évolution
-            _buildSoldeNet(totalRevenus, totalDepenses),
-            const SizedBox(height: 32),
-
-            // Graphique simple
-            _buildGraphiqueSimple(totalRevenus, totalDepenses),
+            Expanded(child: _buildTopEnveloppes(topEnveloppes)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTopTiers(topTiers)),
           ],
-        );
-      },
+        ),
+        const SizedBox(height: 32),
+        _buildRevenusDepenses(totalRevenus, totalDepenses),
+        const SizedBox(height: 32),
+        _buildSoldeNet(totalRevenus, totalDepenses),
+        const SizedBox(height: 32),
+        _buildGraphiqueSimple(totalRevenus, totalDepenses),
+      ],
     );
   }
 
@@ -155,48 +176,42 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     double revenus = 0.0;
     double depenses = 0.0;
 
-    // Parcourir toutes les transactions du mois
+    // Utiliser le cache local des transactions
     for (var compte in comptes) {
-      try {
-        final transactions =
-            await FirebaseService().lireTransactions(compte.id).first;
+      final transactions = _cachedTransactions[compte.id] ?? [];
 
-        for (var transaction in transactions) {
-          if (transaction.date
-                  .isAfter(debutMois.subtract(const Duration(days: 1))) &&
-              transaction.date.isBefore(finMois.add(const Duration(days: 1)))) {
-            if (transaction.type == app_model.TypeTransaction.depense) {
-              depenses += transaction.montant;
+      for (var transaction in transactions) {
+        if (transaction.date
+                .isAfter(debutMois.subtract(const Duration(days: 1))) &&
+            transaction.date.isBefore(finMois.add(const Duration(days: 1)))) {
+          if (transaction.type == app_model.TypeTransaction.depense) {
+            depenses += transaction.montant;
 
-              // Trouver le nom de l'enveloppe pour les statistiques
-              String enveloppeNom = 'Enveloppe inconnue';
-              for (var categorie in categories) {
-                for (var enveloppe in categorie.enveloppes) {
-                  if (enveloppe.id == transaction.enveloppeId) {
-                    enveloppeNom = enveloppe.nom;
-                    break;
-                  }
+            // Trouver le nom de l'enveloppe pour les statistiques
+            String enveloppeNom = 'Enveloppe inconnue';
+            for (var categorie in categories) {
+              for (var enveloppe in categorie.enveloppes) {
+                if (enveloppe.id == transaction.enveloppeId) {
+                  enveloppeNom = enveloppe.nom;
+                  break;
                 }
               }
-
-              enveloppesUtilisation[enveloppeNom] =
-                  (enveloppesUtilisation[enveloppeNom] ?? 0) +
-                      transaction.montant;
-
-              // Statistiques des tiers
-              if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
-                tiersUtilisation[transaction.tiers!] =
-                    (tiersUtilisation[transaction.tiers!] ?? 0) +
-                        transaction.montant;
-              }
-            } else {
-              revenus += transaction.montant;
             }
+
+            enveloppesUtilisation[enveloppeNom] =
+                (enveloppesUtilisation[enveloppeNom] ?? 0) +
+                    transaction.montant;
+
+            // Statistiques des tiers
+            if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
+              tiersUtilisation[transaction.tiers!] =
+                  (tiersUtilisation[transaction.tiers!] ?? 0) +
+                      transaction.montant;
+            }
+          } else {
+            revenus += transaction.montant;
           }
         }
-      } catch (e) {
-        print(
-            'DEBUG: Erreur lors du chargement des transactions pour le compte ${compte.nom}: $e');
       }
     }
 
@@ -217,12 +232,18 @@ class _PageStatistiquesState extends State<PageStatistiques> {
   }
 
   Future<void> _forceRefresh() async {
+    print('DEBUG: Forçage du rafraîchissement des statistiques...');
+
+    // Vider le cache local
+    _cachedComptes = null;
+    _cachedCategories = null;
+    _cachedTransactions.clear();
+    _cachedStats = null;
+    _lastStatsCalculation = null;
+
     // Invalider tous les caches
     CacheService.invalidateComptes();
     CacheService.invalidateCategories();
-    for (var compte in await FirebaseService().lireComptes().first) {
-      CacheService.invalidateTransactions(compte.id);
-    }
 
     // Forcer la reconstruction
     setState(() {});
@@ -240,6 +261,9 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     if (picked != null && picked != _selectedMonth) {
       setState(() {
         _selectedMonth = DateTime(picked.year, picked.month, 1);
+        // Vider le cache des stats pour forcer le recalcul
+        _cachedStats = null;
+        _lastStatsCalculation = null;
       });
     }
   }
