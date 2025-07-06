@@ -47,6 +47,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     );
     _objectifJour = widget.enveloppe.objectifJour;
     _bihebdoStartDate = widget.enveloppe.dateDernierAjout;
+    
     // Définir le type d'objectif basé sur l'enveloppe existante
     if (_currentObjectif > 0) {
       switch (widget.enveloppe.frequenceObjectif) {
@@ -59,13 +60,17 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
           break;
         case 'annuel':
           _objectifType = 'annee';
+          // Pour les objectifs annuels, charger la date de l'objectif
+          if (widget.enveloppe.objectifDate != null) {
+            _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
+          }
           break;
         default:
           _objectifType = 'date';
-      }
-
-      if (widget.enveloppe.objectifDate != null) {
-        _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
+          // Pour les objectifs avec date fixe, charger la date de l'objectif
+          if (widget.enveloppe.objectifDate != null) {
+            _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
+          }
       }
     }
   }
@@ -127,7 +132,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       nom: widget.enveloppe.nom,
       solde: widget.enveloppe.solde,
       objectif: value,
-      objectifDate: _objectifType == 'date' && _selectedDate != null
+      objectifDate: (_objectifType == 'date' || _objectifType == 'annee') && _selectedDate != null
           ? _selectedDate!.toIso8601String()
           : null,
       depense: widget.enveloppe.depense,

@@ -925,8 +925,10 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                               }
                                             }
 
+                                            DateTime dateCible = DateTime.parse(
+                                                enveloppe['objectif_date']);
                                             return Text(
-                                              '${montantNecessaire > 0 ? '${montantNecessaire.toStringAsFixed(2)}\$' : '—'} pour le ${DateTime.parse(enveloppe['objectif_date']).day.toString().padLeft(2, '0')}/${DateTime.parse(enveloppe['objectif_date']).month.toString().padLeft(2, '0')}',
+                                              '${montantNecessaire > 0 ? '${montantNecessaire.toStringAsFixed(2)}\$' : '—'} pour le ${dateCible.day.toString().padLeft(2, '0')}/${dateCible.month.toString().padLeft(2, '0')}/${dateCible.year}',
                                               style: const TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 13,
@@ -986,7 +988,7 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                 montantObjectif / moisRestants;
 
                                             return Text(
-                                              '${montantMensuelNecessaire.toStringAsFixed(2)}\$ pour le ${cible.day.toString().padLeft(2, '0')}/${cible.month.toString().padLeft(2, '0')}',
+                                              '${montantMensuelNecessaire.toStringAsFixed(2)}\$ pour le ${cible.day.toString().padLeft(2, '0')}/${cible.month.toString().padLeft(2, '0')}/${cible.year}',
                                               style: const TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 13,
