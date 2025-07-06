@@ -186,16 +186,16 @@ class ChampEnveloppe extends StatelessWidget {
         return (env['provenances'] as List).any(
               (prov) => prov['compte_id'] == compteSelectionne,
             ) ||
-            solde == 0;
+            solde <= 0;
       }
 
       // Gestion ancienne provenance unique
       if (env['provenance_compte_id'] != null) {
-        return env['provenance_compte_id'] == compteSelectionne || solde == 0;
+        return env['provenance_compte_id'] == compteSelectionne || solde <= 0;
       }
 
       // Sinon, ne pas afficher sauf si solde == 0
-      return solde == 0;
+      return solde <= 0;
     }
 
     // Sinon (revenu ou pas de compte sélectionné), tout afficher

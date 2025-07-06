@@ -188,6 +188,20 @@ class _EcranAjoutTransactionRefactoredState
     try {
       final result = await _controller.sauvegarderTransaction();
 
+      // Gestion des erreurs retournées par le contrôleur (ex: compte source non sélectionné)
+      if (result != null && result['erreur'] != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['erreur']),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
       // Si result n'est pas null, la transaction a réussi
       // Si result est null mais qu'aucune exception n'a été levée, la transaction a aussi réussi
       if (mounted) {
@@ -301,6 +315,11 @@ class _EcranAjoutTransactionRefactoredState
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
 
+        // Arrêter le spinner AVANT de quitter l'écran.
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+
         // Afficher le message de finalisation si applicable
         if (result != null && result['finalisee'] == true) {
           await Future.delayed(
@@ -335,18 +354,27 @@ class _EcranAjoutTransactionRefactoredState
 
         // Retourner à la page précédente après la sauvegarde
         if (mounted) {
-          Navigator.of(context).pop();
+          if (Navigator.of(context).canPop()) {
+            print('[DEBUG] Pop de la page d\'ajout transaction (canPop = true)');
+            Navigator.of(context).pop();
+          } else {
+            // Dans le cadre de l'onglet « Ajout » (bottom-nav), on ne fait pas de navigation :
+            // le callback onTransactionSaved() se charge déjà de remettre l'index précédent.
+            print('[DEBUG] Pas de pop possible ; on laisse MyHomePage gérer le retour via onTransactionSaved]');
+          }
         }
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print('[ERREUR _sauvegarderTransaction] Exception: ' + e.toString());
+      print('[ERREUR _sauvegarderTransaction] StackTrace: ' + stack.toString());
       if (mounted) {
         // Afficher le message d'erreur spécifique pour la validation du remboursement
         final errorMessage = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('Erreur: ' + errorMessage),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 6),
           ),
         );
       }

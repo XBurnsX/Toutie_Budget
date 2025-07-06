@@ -329,6 +329,9 @@ class AjoutTransactionController extends ChangeNotifier {
       if (_typeMouvementSelectionne ==
           app_model.TypeMouvementFinancier.remboursementEffectue) {
         // Le remboursement effectué peut être une dette ou un paiement de carte de crédit.
+        if (_compteSelectionne == null) {
+          return {'erreur': 'Veuillez sélectionner un compte source pour le remboursement.'};
+        }
         if (_remboursementType == 'compte') {
           // C'est un paiement de carte de crédit.
           await _traiterRemboursementCarteCredit(
