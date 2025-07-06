@@ -653,16 +653,19 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                 alignment: Alignment.center,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text(
-                    t.note!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade500,
-                      fontStyle: FontStyle.italic,
+                  child: Container(
+                    padding: const EdgeInsets.only(top: 20.0),
+                    child: Text(
+                      t.note!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
                   ),
                 ),
               ),
