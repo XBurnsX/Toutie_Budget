@@ -244,15 +244,17 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                   ),
                 ),
                 const SizedBox(width: 35),
-                _buildOvalButton(
-                  '',
-                  onTap: _onBackspace,
-                  color: Colors.white,
-                  textColor: Colors.black,
-                  icon: Icons.backspace_outlined,
-                  filled: true,
-                  zeroPadding: true,
-                ),
+                widget.showDone
+                    ? _buildOvalButton(
+                        '',
+                        onTap: _onBackspace,
+                        color: Colors.white,
+                        textColor: Colors.black,
+                        icon: Icons.backspace_outlined,
+                        filled: true,
+                        zeroPadding: true,
+                      )
+                    : const SizedBox(width: 85),
               ],
             ),
             const SizedBox(height: 8),
