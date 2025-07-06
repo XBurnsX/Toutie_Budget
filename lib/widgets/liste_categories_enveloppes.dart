@@ -750,9 +750,13 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                           ?.toString() ??
                                                       '')
                                                   .toLowerCase();
+                                          print(
+                                              'DEBUG: Enveloppe ${enveloppe['nom']} - Type: $freq');
+
+                                          // ===== BLOC 1: OBJECTIF MENSUEL =====
                                           if (freq.contains('mensuel')) {
                                             return Text(
-                                              '${objectif.toStringAsFixed(2)}\u00A0\$${(enveloppe['objectifJour'] ?? enveloppe['objectif_jour']) != null ? " d'ici le ${enveloppe['objectifJour'] ?? enveloppe['objectif_jour']}" : ''}',
+                                              '${objectif.toStringAsFixed(2)}\$${(enveloppe['objectifJour'] ?? enveloppe['objectif_jour']) != null ? " pour le ${enveloppe['objectifJour'] ?? enveloppe['objectif_jour']}" : ''}',
                                               style: const TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 13,
@@ -760,13 +764,16 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             );
-                                          } else if (freq.contains('bihebdo')) {
-                                            // Affichage pour la fréquence toutes les 2 semaines
+                                          }
+
+                                          // ===== BLOC 2: OBJECTIF BIHEBDOMADAIRE (2 SEMAINES) =====
+                                          else if (freq.contains('bihebdo')) {
                                             double montantObjectif =
                                                 (enveloppe['objectif'] as num?)
                                                         ?.toDouble() ??
                                                     0.0;
 
+                                            // Calculer la prochaine date d'échéance
                                             DateTime lastDate;
                                             if (enveloppe[
                                                     'date_dernier_ajout'] !=
@@ -786,11 +793,10 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                             DateTime prochaineDate = lastDate
                                                 .add(const Duration(days: 14));
 
-                                            // S'assurer qu'on tombe bien sur le bon jour de la semaine si objectifJour est défini
+                                            // Ajuster au bon jour de la semaine si spécifié
                                             int? objectifJour = enveloppe[
                                                 'objectif_jour']; // 1=lundi … 7=dim
                                             if (objectifJour != null) {
-                                              // Avancer jusqu'au prochain jour de la semaine correspondant
                                               while (prochaineDate.weekday !=
                                                   objectifJour) {
                                                 prochaineDate = prochaineDate
@@ -803,7 +809,7 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                 '${prochaineDate.day.toString().padLeft(2, '0')}/${prochaineDate.month.toString().padLeft(2, '0')}';
 
                                             return Text(
-                                              '${montantObjectif.toStringAsFixed(2)}\u00A0\$ d\'ici le $dateStr',
+                                              '${montantObjectif.toStringAsFixed(2)}\$ pour le $dateStr',
                                               style: const TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 13,
@@ -811,45 +817,44 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             );
-                                          } else if (freq.contains('date')) {
+                                          }
+
+                                          // ===== BLOC 3: OBJECTIF DATE FIXE =====
+                                          else if (freq.contains('date')) {
                                             double montantNecessaire = 0;
+
                                             if (enveloppe['objectif'] != null &&
                                                 enveloppe['objectif_date'] !=
                                                     null) {
                                               try {
                                                 DateTime dateCible =
-                                                    DateTime.parse(
-                                                  enveloppe['objectif_date'],
-                                                );
+                                                    DateTime.parse(enveloppe[
+                                                        'objectif_date']);
 
-                                                // Utiliser le mois sélectionné pour le calcul du statut
-                                                DateTime dateReference =
-                                                    widget.selectedMonthKey !=
-                                                            null
-                                                        ? DateFormat(
-                                                            'yyyy-MM',
-                                                          ).parse(widget
+                                                // Date de référence pour les calculs
+                                                DateTime dateReference = widget
+                                                            .selectedMonthKey !=
+                                                        null
+                                                    ? DateFormat('yyyy-MM')
+                                                        .parse(widget
                                                             .selectedMonthKey!)
-                                                        : DateTime.now();
+                                                    : DateTime.now();
 
-                                                // CORRECTION : Utiliser une date de création fixe au lieu du mois consulté
+                                                // Date de création de l'objectif
                                                 DateTime dateCreationObjectif;
                                                 if (enveloppe[
                                                         'date_creation_objectif'] !=
                                                     null) {
-                                                  // Si on a la vraie date de création de l'objectif
                                                   dateCreationObjectif =
-                                                      DateTime.parse(
-                                                    enveloppe[
-                                                        'date_creation_objectif'],
-                                                  );
+                                                      DateTime.parse(enveloppe[
+                                                          'date_creation_objectif']);
                                                 } else {
-                                                  // Fallback : utiliser juin 2025 comme exemple (à ajuster selon vos données)
                                                   dateCreationObjectif =
-                                                      DateTime(2025, 6, 1);
+                                                      DateTime(2025, 6,
+                                                          1); // Fallback
                                                 }
 
-                                                // Calculer le nombre total de mois depuis la VRAIE création jusqu'à la date cible
+                                                // Calculs des mois
                                                 int moisTotal = (dateCible
                                                                 .year -
                                                             dateCreationObjectif
@@ -859,8 +864,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                         dateCreationObjectif
                                                             .month) +
                                                     1;
-
-                                                // Calculer le nombre de mois restants depuis le mois de référence
                                                 int moisRestants = (dateCible
                                                                 .year -
                                                             dateReference
@@ -869,12 +872,10 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                     (dateCible.month -
                                                         dateReference.month) +
                                                     1;
-
-                                                if (moisRestants < 1) {
+                                                if (moisRestants < 1)
                                                   moisRestants = 1;
-                                                }
 
-                                                // Le montant nécessaire chaque mois est fixe : objectif total / nombre total de mois
+                                                // Montant nécessaire
                                                 double objectifTotal =
                                                     (enveloppe['objectif']
                                                                 as num?)
@@ -885,22 +886,18 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                     ? objectifTotal / moisTotal
                                                     : 0;
 
-                                                // Si on est en retard, calculer le rattrapage
+                                                // Gestion du rattrapage
                                                 double soldeActuel =
-                                                    solde; // Utiliser le solde du mois sélectionné
-
-                                                // Pour les mois futurs, utiliser le solde actuel réel au lieu du solde projeté
-                                                if (isFutureMonth) {
-                                                  soldeActuel =
-                                                      (enveloppe['solde'] ??
-                                                              0.0)
-                                                          .toDouble();
-                                                }
+                                                    isFutureMonth
+                                                        ? (enveloppe['solde'] ??
+                                                                0.0)
+                                                            .toDouble()
+                                                        : solde;
 
                                                 if (soldeActuel <
                                                     objectifTotal) {
                                                   if (moisRestants == 1) {
-                                                    // Dernier mois : afficher simplement ce qui manque pour atteindre l'objectif
+                                                    // Dernier mois : montant manquant
                                                     double manquant =
                                                         objectifTotal -
                                                             soldeActuel;
@@ -909,7 +906,7 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                             ? manquant
                                                             : 0;
                                                   } else {
-                                                    // Autres mois : calculer ce qui manque réparti sur les mois restants
+                                                    // Autres mois : répartition
                                                     double manquant =
                                                         objectifTotal -
                                                             soldeActuel;
@@ -920,15 +917,16 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                             : 0;
                                                   }
                                                 } else {
-                                                  // Objectif déjà atteint
-                                                  montantNecessaire = 0;
+                                                  montantNecessaire =
+                                                      0; // Objectif atteint
                                                 }
                                               } catch (_) {
                                                 montantNecessaire = 0;
                                               }
                                             }
+
                                             return Text(
-                                              'Nécessaire ce mois-ci : ${montantNecessaire > 0 ? '${montantNecessaire.toStringAsFixed(2)}\$' : '—'}',
+                                              '${montantNecessaire > 0 ? '${montantNecessaire.toStringAsFixed(2)}\$' : '—'} pour le ${DateTime.parse(enveloppe['objectif_date']).day.toString().padLeft(2, '0')}/${DateTime.parse(enveloppe['objectif_date']).month.toString().padLeft(2, '0')}',
                                               style: const TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 13,
@@ -936,16 +934,18 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             );
-                                          } else if (freq.contains('annuel')) {
+                                          }
+
+                                          // ===== BLOC 4: OBJECTIF ANNUEL =====
+                                          else if (freq.contains('annuel')) {
                                             double montantObjectif =
                                                 (enveloppe['objectif'] as num?)
                                                         ?.toDouble() ??
                                                     0.0;
-
                                             DateTime maintenant =
                                                 DateTime.now();
 
-                                            // Date cible stockée dans objectif_date (on ignore l'année)
+                                            // Date cible (ignore l'année)
                                             DateTime? cible;
                                             if (enveloppe['objectif_date'] !=
                                                 null) {
@@ -972,22 +972,21 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                                   cible.day);
                                             }
 
-                                            // Calcul du nombre de mois restants (inclusif)
+                                            // Calcul du montant mensuel nécessaire
                                             int moisRestants =
                                                 (cible.year - maintenant.year) *
                                                         12 +
                                                     (cible.month -
                                                         maintenant.month) +
                                                     1;
-                                            if (moisRestants < 1) {
+                                            if (moisRestants < 1)
                                               moisRestants = 1;
-                                            }
 
                                             double montantMensuelNecessaire =
                                                 montantObjectif / moisRestants;
 
                                             return Text(
-                                              'Nécessaire par mois : ${montantMensuelNecessaire.toStringAsFixed(2)}\u00A0\$',
+                                              '${montantMensuelNecessaire.toStringAsFixed(2)}\$ pour le ${cible.day.toString().padLeft(2, '0')}/${cible.month.toString().padLeft(2, '0')}',
                                               style: const TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 13,
@@ -996,6 +995,8 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                                               overflow: TextOverflow.ellipsis,
                                             );
                                           }
+
+                                          // Aucun objectif reconnu
                                           return const SizedBox.shrink();
                                         },
                                       ),
