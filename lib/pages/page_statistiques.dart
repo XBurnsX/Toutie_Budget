@@ -39,11 +39,6 @@ class _PageStatistiquesState extends State<PageStatistiques> {
         surfaceTintColor: const Color(0xFF18191A),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: _selectionnerMois,
-            tooltip: 'Choisir le mois',
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _forceRefresh,
             tooltip: 'Rafraîchir les données',

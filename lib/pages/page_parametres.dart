@@ -225,21 +225,6 @@ class _PageParametresState extends State<PageParametres> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.memory),
-              title: const Text('Debug Cache'),
-              subtitle: const Text(
-                'Gérer et surveiller le cache de l\'application',
-              ),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const PageDebugCache(),
-                  ),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('À propos'),
               subtitle: const Text('Toutie Budget'),

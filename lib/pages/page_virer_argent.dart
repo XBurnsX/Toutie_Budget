@@ -407,18 +407,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         foregroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: const Color(0xFF18191A),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshData,
-            tooltip: 'Rafraîchir les données',
-          ),
-          IconButton(
-            icon: const Icon(Icons.cloud_download),
-            onPressed: _forceRefreshFromFirebase,
-            tooltip: 'Recharger depuis Firebase',
-          ),
-        ],
       ),
       body: _buildVirerArgentContent(context),
     );
