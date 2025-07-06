@@ -687,9 +687,63 @@ class AjoutTransactionController extends ChangeNotifier {
         'soldeActuel': nouveauSolde,
       });
 
-      // La logique de répartition sur les dettes associées a été retirée pour éviter
-      // le double comptage des remboursements. Cette opération doit être gérée
-      // manuellement ou par un autre mécanisme si nécessaire.
+      // Vérifier si on doit rembourser les dettes associées
+      final bool rembourserDettesAssociees =
+          data['rembourserDettesAssociees'] ?? false;
+      print(
+          '[RemboursementCarteCredit] rembourserDettesAssociees: $rembourserDettesAssociees');
+
+      if (rembourserDettesAssociees) {
+        final List<dynamic> depensesFixes = data['depensesFixes'] ?? [];
+        print(
+            '[RemboursementCarteCredit] Nombre de dépenses fixes: ${depensesFixes.length}');
+
+        if (depensesFixes.isNotEmpty) {
+          print(
+              '[RemboursementCarteCredit] Traitement des frais fixes pour $nomCarte');
+
+          try {
+            // Pour chaque frais fixe, rembourser automatiquement la dette correspondante
+            for (final depenseFixe in depensesFixes) {
+              final String nomDette = depenseFixe['nom'] ?? '';
+              final double montantDette =
+                  (depenseFixe['montant'] as num?)?.toDouble() ?? 0.0;
+
+              if (nomDette.isNotEmpty && montantDette > 0) {
+                print(
+                    '[RemboursementCarteCredit] Remboursement automatique: $nomDette - $montantDette\$');
+
+                try {
+                  // Rembourser la dette correspondante
+                  final List<String> messagesArchivage =
+                      await detteService.remboursementEnCascade(
+                    nomTiers: nomDette,
+                    montantTotal: montantDette,
+                    typeRemboursement: 'remboursement_effectue',
+                    transactionId: '${transactionId}_auto_${nomDette}',
+                  );
+
+                  if (messagesArchivage.isNotEmpty) {
+                    print(
+                        '[RemboursementCarteCredit] Messages pour $nomDette: ${messagesArchivage.join(', ')}');
+                  }
+                } catch (e) {
+                  print(
+                      '[RemboursementCarteCredit] Erreur lors du remboursement de $nomDette: $e');
+                }
+              }
+            }
+          } catch (e) {
+            print(
+                '[RemboursementCarteCredit] Erreur lors du traitement des frais fixes: $e');
+          }
+        } else {
+          print('[RemboursementCarteCredit] Aucune dépense fixe trouvée');
+        }
+      } else {
+        print(
+            '[RemboursementCarteCredit] rembourserDettesAssociees est désactivé');
+      }
     } catch (e) {
       // Laisser silencieux; ne doit pas interrompre la sauvegarde principale
     }
