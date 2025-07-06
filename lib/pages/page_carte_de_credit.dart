@@ -103,6 +103,8 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
 
   Future<void> _openNumericKeyboard(TextEditingController controller,
       {bool isMoney = false, bool showDecimal = true}) async {
+    print(
+        'DEBUG: Ouverture clavier numérique - Valeur actuelle: ${controller.text}');
     await showModalBottomSheet(
       context: context,
       builder: (_) => NumericKeyboard(
@@ -111,6 +113,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
         showDecimal: showDecimal,
         showDone: true,
         onDone: () {
+          print('DEBUG: Clavier fermé - Valeur finale: ${controller.text}');
           Navigator.of(context).pop();
         },
       ),
@@ -233,14 +236,21 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                         'type': 'Carte de crédit',
                         'tauxInteret':
                             double.tryParse(_tauxInteretController.text) ?? 0.0,
-                        'depensesFixes': _depensesFixesControllers
-                            .map((controller) => {
-                                  'nom': controller.nom.text,
-                                  'montant': double.tryParse(
-                                          controller.montant.text) ??
-                                      0.0,
-                                })
-                            .toList(),
+                        'depensesFixes':
+                            _depensesFixesControllers.map((controller) {
+                          // Nettoyer la valeur en supprimant le $ et les espaces
+                          final montantText = controller.montant.text
+                              .replaceAll('\$', '')
+                              .replaceAll(' ', '')
+                              .trim();
+                          final montant = double.tryParse(montantText) ?? 0.0;
+                          print(
+                              'DEBUG: Sauvegarde dépense fixe - Nom: ${controller.nom.text}, Texte original: "${controller.montant.text}", Texte nettoyé: "$montantText", Montant parsé: $montant');
+                          return {
+                            'nom': controller.nom.text,
+                            'montant': montant,
+                          };
+                        }).toList(),
                         'rembourserDettesAssociees': _rembourserDettesAssociees,
                       },
                     );
@@ -327,12 +337,20 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
           'dateEcheance': _dateEcheance.toIso8601String(),
           'type': 'Carte de crédit',
           'tauxInteret': double.tryParse(_tauxInteretController.text) ?? 0.0,
-          'depensesFixes': _depensesFixesControllers
-              .map((controller) => {
-                    'nom': controller.nom.text,
-                    'montant': double.tryParse(controller.montant.text) ?? 0.0,
-                  })
-              .toList(),
+          'depensesFixes': _depensesFixesControllers.map((controller) {
+            // Nettoyer la valeur en supprimant le $ et les espaces
+            final montantText = controller.montant.text
+                .replaceAll('\$', '')
+                .replaceAll(' ', '')
+                .trim();
+            final montant = double.tryParse(montantText) ?? 0.0;
+            print(
+                'DEBUG: Sauvegarde modifs dépense fixe - Nom: ${controller.nom.text}, Texte original: "${controller.montant.text}", Texte nettoyé: "$montantText", Montant parsé: $montant');
+            return {
+              'nom': controller.nom.text,
+              'montant': montant,
+            };
+          }).toList(),
           'rembourserDettesAssociees': _rembourserDettesAssociees,
         },
       );
@@ -864,7 +882,9 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                           labelText: 'Je paie ce montant par mois (\$)',
                           border: OutlineInputBorder()),
                       readOnly: true,
-                      onTap: () => _openNumericKeyboard(_paiementMensuelController, isMoney: true),
+                      onTap: () => _openNumericKeyboard(
+                          _paiementMensuelController,
+                          isMoney: true),
                       onChanged: (_) => _markAsModified(),
                     ),
                     const SizedBox(height: 12),
@@ -946,7 +966,10 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                           labelText: 'Pourcentage cible (ex: 20 pour 20%)',
                           border: OutlineInputBorder()),
                       readOnly: true,
-                      onTap: () => _openNumericKeyboard(_pourcentageCibleController, isMoney: false, showDecimal: true),
+                      onTap: () => _openNumericKeyboard(
+                          _pourcentageCibleController,
+                          isMoney: false,
+                          showDecimal: true),
                       onChanged: (_) => _markAsModified(),
                     ),
                     const SizedBox(height: 12),
@@ -1003,8 +1026,15 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                 decoration: const InputDecoration(
                     hintText: 'Montant', border: OutlineInputBorder()),
                 readOnly: true,
-                onTap: () => _openNumericKeyboard(controllerPair.montant, isMoney: true),
-                onChanged: (_) => _markAsModified(),
+                onTap: () {
+                  print(
+                      'DEBUG: Ouverture clavier pour montant: ${controllerPair.montant.text}');
+                  _openNumericKeyboard(controllerPair.montant, isMoney: true);
+                },
+                onChanged: (value) {
+                  print('DEBUG: Montant changé: $value');
+                  _markAsModified();
+                },
               ),
             ),
             IconButton(
@@ -1072,10 +1102,23 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
             (data['tauxInteret'] as num?)?.toString() ?? '';
         // Chargement des dépenses fixes
         final depenses = (data['depensesFixes'] as List<dynamic>?) ?? [];
+        print(
+            'DEBUG: Chargement dépenses fixes - ${depenses.length} dépenses trouvées');
         _depensesFixesControllers = depenses.map((d) {
+          final montant = d['montant'];
+          String montantStr = '';
+          if (montant != null) {
+            if (montant is num) {
+              montantStr = montant.toStringAsFixed(2);
+            } else if (montant is String) {
+              montantStr = montant;
+            }
+          }
+          print(
+              'DEBUG: Chargement dépense - Nom: ${d['nom']}, Montant original: $montant, Montant parsé: $montantStr');
           return DepenseFixeController(
             nom: d['nom'] ?? '',
-            montant: d['montant']?.toString() ?? '',
+            montant: montantStr,
           );
         }).toList();
         if (_depensesFixesControllers.isEmpty) {
