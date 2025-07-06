@@ -5,6 +5,7 @@ import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/firebase_service.dart';
+import '../services/cache_service.dart';
 
 /// Page de modification d'un compte existant
 class PageModificationCompte extends StatefulWidget {
@@ -310,43 +311,79 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState?.validate() ?? false) {
-                  if (_type == 'Investissement') {
-                    FocusScope.of(context).unfocus();
+                  try {
+                    print('DEBUG: Sauvegarde du compte ${widget.compte.id}');
                     print(
-                        'Valeur brute du champ pretAPlacer : \'${_pretAPlacerController.text}\'');
-                    final pretAPlacerValue = double.tryParse(
-                            _pretAPlacerController.text
-                                .replaceAll(RegExp(r'[^0-9.,-]'), '')
-                                .replaceAll(',', '.')) ??
-                        0.0;
-                    print('Mise à jour pretAPlacer : $pretAPlacerValue');
-                    await FirebaseService()
-                        .firestore
-                        .collection('comptes')
-                        .doc(widget.compte.id)
-                        .update({
-                      'pretAPlacer': pretAPlacerValue,
-                      'nom': _nom,
-                      'couleur': _couleur.value,
-                    });
-                  } else {
-                    await FirebaseService()
-                        .firestore
-                        .collection('comptes')
-                        .doc(widget.compte.id)
-                        .update({
-                      'solde': double.tryParse(
-                              _soldeController.text.replaceAll(',', '.')) ??
-                          0.0,
-                      'pretAPlacer': double.tryParse(_pretAPlacerController.text
-                              .replaceAll(',', '.')) ??
-                          0.0,
-                      'nom': _nom,
-                      'type': _type,
-                      'couleur': _couleur.value,
-                    });
+                        'DEBUG: Solde controller: "${_soldeController.text}"');
+                    print(
+                        'DEBUG: Prêt à placer controller: "${_pretAPlacerController.text}"');
+
+                    if (_type == 'Investissement') {
+                      FocusScope.of(context).unfocus();
+                      final pretAPlacerValue = double.tryParse(
+                              _pretAPlacerController.text
+                                  .replaceAll(RegExp(r'[^0-9.,-]'), '')
+                                  .replaceAll(',', '.')) ??
+                          0.0;
+                      print(
+                          'DEBUG: Mise à jour pretAPlacer : $pretAPlacerValue');
+
+                      await FirebaseService().updateCompte(widget.compte.id, {
+                        'pretAPlacer': pretAPlacerValue,
+                        'nom': _nom,
+                        'couleur': _couleur.value,
+                      });
+                    } else {
+                      // Nettoyer les valeurs avant parsing
+                      final soldeText = _soldeController.text
+                          .replaceAll(RegExp(r'[^0-9.,-]'), '')
+                          .replaceAll(',', '.');
+                      final pretAPlacerText = _pretAPlacerController.text
+                          .replaceAll(RegExp(r'[^0-9.,-]'), '')
+                          .replaceAll(',', '.');
+
+                      final soldeValue = double.tryParse(soldeText) ?? 0.0;
+                      final pretAPlacerValue =
+                          double.tryParse(pretAPlacerText) ?? 0.0;
+
+                      print(
+                          'DEBUG: Solde nettoyé: "$soldeText" -> $soldeValue');
+                      print(
+                          'DEBUG: Prêt à placer nettoyé: "$pretAPlacerText" -> $pretAPlacerValue');
+
+                      await FirebaseService().updateCompte(widget.compte.id, {
+                        'solde': soldeValue,
+                        'pretAPlacer': pretAPlacerValue,
+                        'nom': _nom,
+                        'type': _type,
+                        'couleur': _couleur.value,
+                      });
+                    }
+
+                    print('DEBUG: Sauvegarde terminée avec succès');
+
+                    if (mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Compte modifié avec succès'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    print('DEBUG: Erreur lors de la sauvegarde: $e');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Erreur lors de la modification: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
-                  Navigator.pop(context);
+                } else {
+                  print('DEBUG: Validation du formulaire échouée');
                 }
               },
               child: const Text('Valider'),

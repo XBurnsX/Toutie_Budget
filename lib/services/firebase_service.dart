@@ -7,6 +7,7 @@ import '../models/transaction_model.dart' as app_model;
 import '../models/dette.dart';
 import 'dette_service.dart';
 import 'firebase_monitor_service.dart';
+import 'cache_service.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -665,7 +666,33 @@ class FirebaseService {
   Future<void> updateCompte(String compteId, Map<String, dynamic> data) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
-    await comptesRef.doc(compteId).update(data);
+
+    print('DEBUG: updateCompte appelée pour le compte $compteId');
+    print('DEBUG: Données à mettre à jour: $data');
+
+    // Logger l'écriture
+    FirebaseMonitorService.logWrite(
+      collection: 'comptes',
+      document: compteId,
+      count: 1,
+      userId: user.uid,
+      details: 'Mise à jour compte: ${data.toString()}',
+    );
+
+    try {
+      await comptesRef.doc(compteId).update(data);
+      print('DEBUG: Mise à jour Firestore réussie');
+
+      // Attendre un peu pour s'assurer que la mise à jour est propagée
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Invalider le cache pour forcer le rafraîchissement
+      CacheService.invalidateComptes();
+      print('DEBUG: Cache invalidé');
+    } catch (e) {
+      print('DEBUG: Erreur lors de la mise à jour Firestore: $e');
+      rethrow;
+    }
   }
 
   // Méthode pour annuler l'effet d'une transaction (rollback)
