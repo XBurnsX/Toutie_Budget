@@ -395,8 +395,9 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     controller: soldeController,
                     decoration: const InputDecoration(
                         labelText: 'Nouveau solde actuel (\$)'),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    readOnly: true,
+                    onTap: () =>
+                        _openNumericKeyboard(soldeController, isMoney: true),
                     autofocus: true,
                   ),
                   const SizedBox(height: 12),
@@ -404,8 +405,9 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     controller: paiementMinController,
                     decoration: const InputDecoration(
                         labelText: 'Paiement mensuel minimum (\$)'),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    readOnly: true,
+                    onTap: () => _openNumericKeyboard(paiementMinController,
+                        isMoney: true),
                   ),
                 ],
               ),
@@ -792,8 +794,9 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
               decoration: const InputDecoration(
                   labelText: 'Taux d\'intérêt annuel (%)',
                   border: OutlineInputBorder()),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              readOnly: true,
+              onTap: () => _openNumericKeyboard(_tauxInteretController,
+                  isMoney: false, showDecimal: true),
               onChanged: (_) {
                 _calculerFraisInteretMensuel();
                 _markAsModified();
@@ -860,8 +863,8 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                       decoration: const InputDecoration(
                           labelText: 'Je paie ce montant par mois (\$)',
                           border: OutlineInputBorder()),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      readOnly: true,
+                      onTap: () => _openNumericKeyboard(_paiementMensuelController, isMoney: true),
                       onChanged: (_) => _markAsModified(),
                     ),
                     const SizedBox(height: 12),
@@ -942,8 +945,8 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                       decoration: const InputDecoration(
                           labelText: 'Pourcentage cible (ex: 20 pour 20%)',
                           border: OutlineInputBorder()),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      readOnly: true,
+                      onTap: () => _openNumericKeyboard(_pourcentageCibleController, isMoney: false, showDecimal: true),
                       onChanged: (_) => _markAsModified(),
                     ),
                     const SizedBox(height: 12),
@@ -999,8 +1002,8 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                 controller: controllerPair.montant,
                 decoration: const InputDecoration(
                     hintText: 'Montant', border: OutlineInputBorder()),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                readOnly: true,
+                onTap: () => _openNumericKeyboard(controllerPair.montant, isMoney: true),
                 onChanged: (_) => _markAsModified(),
               ),
             ),
