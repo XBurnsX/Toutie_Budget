@@ -497,7 +497,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         final montant = (item['montant'] as num?)?.toDouble() ?? 0.0;
         return '$nomEnv - ${montant.toStringAsFixed(0)}\$';
       }).toList();
-      sousTitre = enveloppesFormatees.join(' , ');
+      sousTitre = enveloppesFormatees.join('\n');
     } else if (t.typeMouvement ==
         app_model.TypeMouvementFinancier.pretAccorde) {
       sousTitre = 'Prêt accordé';
