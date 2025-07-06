@@ -164,7 +164,7 @@ class PageSituationsUrgence extends StatelessWidget {
                         const SizedBox(height: 8),
                         const Text(
                           'Tapez sur une enveloppe pour la renflouer directement.',
-                          style: TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14, color: Colors.black),
                         ),
                       ],
                     ),
