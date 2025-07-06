@@ -11,6 +11,7 @@ import '../widgets/ajout_transaction/section_fractionnement.dart';
 import '../widgets/ajout_transaction/bouton_sauvegarder.dart';
 import '../widgets/modale_fractionnement.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 
 class EcranAjoutTransactionRefactored extends StatefulWidget {
   final List<String> comptesExistants;
@@ -192,6 +193,70 @@ class _EcranAjoutTransactionRefactoredState
       if (mounted) {
         final tiersTexte = _controller.payeController.text.trim();
         String message = '';
+
+        // --- Ajout logique remboursement dettes associées ---
+        // On ne fait ça que pour une nouvelle transaction de remboursement
+        if (_controller.typeMouvementSelectionne ==
+                TypeMouvementFinancier.remboursementEffectue &&
+            tiersTexte.isNotEmpty) {
+          // Chercher la carte de crédit correspondante (nom insensible à la casse/espaces)
+          final nomCarteRecherche =
+              tiersTexte.replaceAll(' ', '').toLowerCase();
+          final queryCartes = await cf.FirebaseFirestore.instance
+              .collection('comptes')
+              .where('type', isEqualTo: 'Carte de crédit')
+              .get();
+          final cartes = queryCartes.docs.where((doc) {
+            final nomCarte =
+                (doc['nom'] as String?)?.replaceAll(' ', '').toLowerCase() ??
+                    '';
+            return nomCarte == nomCarteRecherche;
+          }).toList();
+          if (cartes.isNotEmpty) {
+            final carteDoc = cartes.first;
+            final dataCarte = carteDoc.data() as Map<String, dynamic>;
+            final bool rembourserDettes =
+                dataCarte['rembourserDettesAssociees'] ?? false;
+            if (rembourserDettes) {
+              final depenses =
+                  (dataCarte['depensesFixes'] as List<dynamic>?) ?? [];
+              int dettesRemboursees = 0;
+              for (final depense in depenses) {
+                final nomDette = (depense['nom'] ?? '').toString().trim();
+                final montant = (depense['montant'] as num?)?.toDouble() ?? 0.0;
+                if (nomDette.isNotEmpty && montant > 0) {
+                  // Chercher la dette correspondante
+                  final queryDette = await cf.FirebaseFirestore.instance
+                      .collection('dettes')
+                      .where('nomTiers', isEqualTo: nomDette)
+                      .get();
+                  if (queryDette.docs.isNotEmpty) {
+                    final detteDoc = queryDette.docs.first;
+                    final dataDette = detteDoc.data();
+                    final double solde =
+                        (dataDette['solde'] as num?)?.toDouble() ?? 0.0;
+                    final double nouveauSoldeDette = solde - montant;
+                    await cf.FirebaseFirestore.instance
+                        .collection('dettes')
+                        .doc(detteDoc.id)
+                        .update({'solde': nouveauSoldeDette});
+                    dettesRemboursees++;
+                  }
+                }
+              }
+              if (dettesRemboursees > 0 && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content:
+                        Text('Dettes associées remboursées automatiquement.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            }
+          }
+        }
+        // --- Fin logique remboursement dettes associées ---
 
         // Différencier les messages selon le mode (ajout ou modification)
         final estModification = widget.transactionExistante != null;

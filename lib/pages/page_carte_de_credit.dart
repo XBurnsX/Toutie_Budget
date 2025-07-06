@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:toutie_budget/services/firebase_service.dart'; // Assurez-vous d'avoir le package intl dans pubspec.yaml
 import 'dart:math'; // Pour les calculs financiers
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'page_ajout_transaction.dart';
 
 // --- Classe helper pour gérer les contrôleurs de dépenses fixes ---
 class DepenseFixeController {
@@ -77,6 +78,9 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
 
   // Ajout de la variable d'état pour le nom de la carte
   String _nomCarte = '';
+
+  // Ajoute la variable d'état globale
+  bool _rembourserDettesAssociees = false;
 
   @override
   void initState() {
@@ -201,6 +205,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                                       0.0,
                                 })
                             .toList(),
+                        'rembourserDettesAssociees': _rembourserDettesAssociees,
                       },
                     );
                   } catch (e) {
@@ -280,6 +285,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     'montant': double.tryParse(controller.montant.text) ?? 0.0,
                   })
               .toList(),
+          'rembourserDettesAssociees': _rembourserDettesAssociees,
         },
       );
 
@@ -324,53 +330,78 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   void _showUpdateSoldeDialog() {
     final soldeController =
         TextEditingController(text: _soldeActuel.toStringAsFixed(2));
+    final paiementMinController =
+        TextEditingController(text: _paiementMinimum.toStringAsFixed(2));
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Mettre à jour le solde'),
-          content: TextField(
-            controller: soldeController,
-            decoration:
-                const InputDecoration(labelText: 'Nouveau solde actuel (\$)'),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final nouveauSolde = double.tryParse(soldeController.text);
-                if (nouveauSolde != null) {
-                  setState(() {
-                    _soldeActuel = nouveauSolde;
-                    // Recalculer les frais d'intérêt basés sur le nouveau solde
-                    _calculerFraisInteretMensuel();
-                  });
-                  _markAsModified();
-                  // Sauvegarder le nouveau solde dans Firebase
-                  try {
-                    await FirebaseService().setCarteCredit(
-                      widget.compteId,
-                      {
-                        'nom': _nomCarte,
-                        'soldeActuel': nouveauSolde,
-                        'type': 'Carte de crédit',
-                      },
-                    );
-                  } catch (e) {
-                    print('Erreur lors de la sauvegarde du solde: $e');
-                  }
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Mettre à jour'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Mettre à jour le solde'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: soldeController,
+                    decoration: const InputDecoration(
+                        labelText: 'Nouveau solde actuel (\$)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: paiementMinController,
+                    decoration: const InputDecoration(
+                        labelText: 'Paiement mensuel minimum (\$)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final nouveauSolde = double.tryParse(soldeController.text);
+                    final nouveauPaiementMin =
+                        double.tryParse(paiementMinController.text);
+                    if (nouveauSolde != null) {
+                      setStateDialog(() {
+                        _soldeActuel = nouveauSolde;
+                        if (nouveauPaiementMin != null) {
+                          _paiementMinimum = nouveauPaiementMin;
+                        }
+                      });
+                      _markAsModified();
+                      // Sauvegarder le nouveau solde dans Firebase
+                      try {
+                        await FirebaseService().setCarteCredit(
+                          widget.compteId,
+                          {
+                            'nom': _nomCarte,
+                            'soldeActuel': nouveauSolde,
+                            'type': 'Carte de crédit',
+                            if (nouveauPaiementMin != null)
+                              'paiementMinimum': nouveauPaiementMin,
+                          },
+                        );
+                      } catch (e) {
+                        print('Erreur lors de la sauvegarde du solde: $e');
+                      }
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: const Text('Mettre à jour'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -737,6 +768,38 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                 onPressed: _ajouterDepenseFixe,
               ),
             ),
+            // Case à cocher juste en dessous des dépenses fixes
+            CheckboxListTile(
+              value: _rembourserDettesAssociees,
+              onChanged: (val) {
+                setState(() => _rembourserDettesAssociees = val ?? false);
+              },
+              title: const Text(
+                  'Voulez-vous aussi rembourser vos autres dettes associées (Accord D, etc.) ?'),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.payment),
+              label: const Text('Payez maintenant !'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => EcranAjoutTransactionRefactored(
+                      comptesExistants: [_nomCarte],
+                      nomTiers: _nomCarte,
+                      typeRemboursement: 'remboursement_effectue',
+                      montantSuggere: _paiementMinimum,
+                    ),
+                  ),
+                );
+              },
+            ),
             const Divider(height: 24),
 
             // Scénario 1: "Si je paie X par mois"
@@ -964,6 +1027,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
         if (_depensesFixesControllers.isEmpty) {
           _depensesFixesControllers = [DepenseFixeController()];
         }
+        _rembourserDettesAssociees = data['rembourserDettesAssociees'] ?? false;
       });
     } else {
       setState(() {
