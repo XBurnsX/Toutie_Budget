@@ -21,7 +21,7 @@ class ArgentService {
     });
   }
 
-  /// Virement entre deux comptes (ajuste le Prêt à placer des deux comptes)
+  /// Virement entre deux comptes (ajuste le Prêt à placer et le solde des deux comptes)
   Future<void> virementEntreComptes({
     required Compte source,
     required Compte destination,
@@ -38,19 +38,28 @@ class ArgentService {
       final snapSource = await transaction.get(docSource);
       final snapDest = await transaction.get(docDest);
       if (!snapSource.exists || !snapDest.exists) return;
-      final pretAPlacerSource =
-          (snapSource.data() as Map<String, dynamic>)['pretAPlacer']
-                  ?.toDouble() ??
-              0;
-      final pretAPlacerDest =
-          (snapDest.data() as Map<String, dynamic>)['pretAPlacer']
-                  ?.toDouble() ??
-              0;
+
+      final sourceData = snapSource.data() as Map<String, dynamic>;
+      final destData = snapDest.data() as Map<String, dynamic>;
+
+      final pretAPlacerSource = sourceData['pretAPlacer']?.toDouble() ?? 0;
+      final pretAPlacerDest = destData['pretAPlacer']?.toDouble() ?? 0;
+      final soldeSource = sourceData['solde']?.toDouble() ?? 0;
+      final soldeDest = destData['solde']?.toDouble() ?? 0;
+
       if (pretAPlacerSource < montant) throw Exception('Montant insuffisant');
+
+      // Mettre à jour le compte source (débiter)
       transaction.update(docSource, {
         'pretAPlacer': pretAPlacerSource - montant,
+        'solde': soldeSource - montant,
       });
-      transaction.update(docDest, {'pretAPlacer': pretAPlacerDest + montant});
+
+      // Mettre à jour le compte destination (créditer)
+      transaction.update(docDest, {
+        'pretAPlacer': pretAPlacerDest + montant,
+        'solde': soldeDest + montant,
+      });
     });
   }
 
