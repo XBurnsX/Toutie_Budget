@@ -244,37 +244,15 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                   ),
                 ),
                 const SizedBox(width: 35),
-                widget.showDone
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 6.0,
-                          horizontal: 2.0,
-                        ),
-                        child: SizedBox(
-                          width: 85,
-                          height: 44,
-                          child: ElevatedButton(
-                            onPressed: widget.onDone ??
-                                () => Navigator.of(context).maybePop(),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .secondaryContainer,
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.primary,
-                              elevation: 2,
-                              shape: const StadiumBorder(),
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              size: 22,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                      )
-                    : const SizedBox(width: 85),
+                _buildOvalButton(
+                  '',
+                  onTap: _onBackspace,
+                  color: Colors.white,
+                  textColor: Colors.black,
+                  icon: Icons.backspace_outlined,
+                  filled: true,
+                  zeroPadding: true,
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -317,15 +295,26 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                 const SizedBox(width: 35),
                 _buildOvalButton('0'),
                 const SizedBox(width: 35),
-                _buildOvalButton(
-                  '',
-                  onTap: _onBackspace,
-                  color: Colors.grey.shade200,
-                  textColor: Colors.black,
-                  icon: Icons.backspace_outlined,
-                  filled: true,
-                  zeroPadding: true,
-                ),
+                widget.showDone
+                    ? _buildOvalButton(
+                        '',
+                        onTap: widget.onDone ??
+                            () => Navigator.of(context).maybePop(),
+                        color: Colors.white,
+                        textColor: Theme.of(context).colorScheme.primary,
+                        icon: Icons.done,
+                        filled: true,
+                        zeroPadding: true,
+                      )
+                    : _buildOvalButton(
+                        '',
+                        onTap: _onBackspace,
+                        color: Colors.grey.shade200,
+                        textColor: Colors.black,
+                        icon: Icons.backspace_outlined,
+                        filled: true,
+                        zeroPadding: true,
+                      ),
               ],
             ),
             const SizedBox(height: 8),
