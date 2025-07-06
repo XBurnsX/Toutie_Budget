@@ -84,4 +84,5 @@ flutter:
   assets:
     - assets/images/login.png
     - assets/images/app_icon.png
+    - assets/images/toutie.png
     - assets/icons/

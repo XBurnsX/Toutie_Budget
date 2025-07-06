@@ -4,6 +4,7 @@ import 'package:toutie_budget/services/rollover_service.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../widgets/liste_categories_enveloppes.dart';
+import '../widgets/bandeau_bienvenue.dart';
 import 'page_categories_enveloppes.dart';
 import '../widgets/month_picker.dart';
 import 'page_virer_argent.dart';
@@ -376,7 +377,9 @@ class _PageBudgetState extends State<PageBudget> {
                       SizedBox(
                         width: 400,
                         child: Container(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                           height: double.infinity,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,7 +538,8 @@ class _PageBudgetState extends State<PageBudget> {
 
               return Column(
                 children: [
-
+                  // Bandeau de bienvenue (une seule fois à l'ouverture)
+                  const BandeauBienvenue(),
                   const SizedBox(height: 20),
                   ...comptesNonArchives
                       .where(
