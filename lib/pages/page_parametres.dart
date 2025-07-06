@@ -210,12 +210,15 @@ class _PageParametresState extends State<PageParametres> {
                 );
                 if (confirm == true) {
                   await _deleteAllUserData();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Toutes vos données ont été supprimées.'),
-                    ),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Toutes vos données ont été supprimées.'),
+                      ),
+                    );
+                  }
                   await FirebaseService().signOut();
+                  if (!mounted) return;
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 }
               },
