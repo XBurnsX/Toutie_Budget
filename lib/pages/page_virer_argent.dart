@@ -511,75 +511,45 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                     ),
                     child: Column(
                       children: [
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: sourceId,
-                          decoration: const InputDecoration(
-                            labelText: 'Source',
-                            border: OutlineInputBorder(),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          items: _buildDropdownItems(
-                              tout, destinationId, catSnapshot.data!, comptes),
-                          selectedItemBuilder: (BuildContext context) {
-                            return tout
-                                .where((obj) => getId(obj) != destinationId)
-                                .map<Widget>(
-                                  (obj) => Row(
-                                    children: [
-                                      Expanded(
-                                          child: _getNomAvecCouleur(
-                                              obj, catSnapshot.data!, comptes)),
-                                      Text(
-                                        _getSolde(obj),
-                                        style: TextStyle(
-                                          color: _getSoldeColor(obj, comptes),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                .toList();
-                          },
-                          onChanged: (val) => setState(() {
-                            sourceId = val;
-                            source = getSelectedById(val, tout);
-                          }),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: sourceId,
+                              hint: const Text('Sélectionner une source'),
+                              items: _buildDropdownItems(tout, destinationId,
+                                  catSnapshot.data!, comptes),
+                              onChanged: (val) => setState(() {
+                                sourceId = val;
+                                source = getSelectedById(val, tout);
+                              }),
+                            ),
+                          ),
                         ),
                         if (sourceId != null) const SizedBox.shrink(),
                         const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: destinationId,
-                          decoration: const InputDecoration(
-                            labelText: 'Destination',
-                            border: OutlineInputBorder(),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          items: _buildDropdownItems(
-                              tout, sourceId, catSnapshot.data!, comptes),
-                          selectedItemBuilder: (BuildContext context) {
-                            return tout
-                                .where((obj) => getId(obj) != sourceId)
-                                .map<Widget>(
-                                  (obj) => Row(
-                                    children: [
-                                      Expanded(
-                                          child: _getNomAvecCouleur(
-                                              obj, catSnapshot.data!, comptes)),
-                                      Text(
-                                        _getSolde(obj),
-                                        style: TextStyle(
-                                          color: _getSoldeColor(obj, comptes),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                .toList();
-                          },
-                          onChanged: (val) => setState(() {
-                            destinationId = val;
-                            destination = getSelectedById(val, tout);
-                          }),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: destinationId,
+                              hint: const Text('Sélectionner une destination'),
+                              items: _buildDropdownItems(
+                                  tout, sourceId, catSnapshot.data!, comptes),
+                              onChanged: (val) => setState(() {
+                                destinationId = val;
+                                destination = getSelectedById(val, tout);
+                              }),
+                            ),
+                          ),
                         ),
                       ],
                     ),

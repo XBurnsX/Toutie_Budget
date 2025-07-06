@@ -47,7 +47,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     );
     _objectifJour = widget.enveloppe.objectifJour;
     _bihebdoStartDate = widget.enveloppe.dateDernierAjout;
-    
+
     // Définir le type d'objectif basé sur l'enveloppe existante
     if (_currentObjectif > 0) {
       switch (widget.enveloppe.frequenceObjectif) {
@@ -132,7 +132,8 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       nom: widget.enveloppe.nom,
       solde: widget.enveloppe.solde,
       objectif: value,
-      objectifDate: (_objectifType == 'date' || _objectifType == 'annee') && _selectedDate != null
+      objectifDate: (_objectifType == 'date' || _objectifType == 'annee') &&
+              _selectedDate != null
           ? _selectedDate!.toIso8601String()
           : null,
       depense: widget.enveloppe.depense,
@@ -165,6 +166,70 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     });
 
     Navigator.pop(context, value);
+  }
+
+  void _supprimerObjectif() async {
+    // Demander confirmation avant de supprimer
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer l\'objectif'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir supprimer cet objectif ? Cette action ne peut pas être annulée.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true) return;
+
+    // Créer une enveloppe sans objectif
+    final updatedEnv = Enveloppe(
+      id: widget.enveloppe.id,
+      nom: widget.enveloppe.nom,
+      solde: widget.enveloppe.solde,
+      objectif: 0.0, // Objectif remis à 0
+      objectifDate: null, // Pas de date d'objectif
+      depense: widget.enveloppe.depense,
+      archivee: widget.enveloppe.archivee,
+      provenanceCompteId: widget.enveloppe.provenanceCompteId,
+      frequenceObjectif: 'mensuel', // Retour à la valeur par défaut
+      dateDernierAjout: widget.enveloppe.dateDernierAjout,
+      objectifJour: null, // Pas de jour d'objectif
+    );
+
+    // Mise à jour de la liste d'enveloppes dans la catégorie
+    final updatedEnvs = widget.categorie.enveloppes
+        .map((e) => e.id == updatedEnv.id ? updatedEnv : e)
+        .toList();
+
+    await FirebaseService()
+        .categoriesRef
+        .doc(widget.categorie.id)
+        .update({'enveloppes': updatedEnvs.map((e) => e.toMap()).toList()});
+
+    // Mettre à jour l'état local
+    setState(() {
+      _currentObjectif = 0.0;
+      _controller.text = '';
+      _objectifType = 'mois';
+      _selectedDate = null;
+      _objectifJour = null;
+      _bihebdoStartDate = null;
+    });
+
+    // Fermer la page
+    Navigator.pop(context, 0.0);
   }
 
   @override
@@ -478,6 +543,26 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                 ),
               ),
             ),
+            // Bouton pour supprimer l'objectif existant
+            if (_currentObjectif > 0) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _supprimerObjectif,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  child: const Text('Supprimer l\'objectif'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
