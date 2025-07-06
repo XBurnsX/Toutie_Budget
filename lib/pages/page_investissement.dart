@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:toutie_budget/models/transaction_model.dart' as app_model;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 
 class CompteAReboursProchaineMAJ extends StatefulWidget {
   final InvestissementService investissementService;
@@ -186,20 +187,31 @@ class _PageInvestissementState extends State<PageInvestissement> {
                   TextField(
                     controller: quantiteController,
                     decoration: InputDecoration(labelText: 'Quantité'),
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    onTap: () =>
+                        _openNumericKeyboard(quantiteController, isMoney: true),
                   ),
                   TextField(
                     controller: prixController,
                     decoration: InputDecoration(labelText: 'Prix moyen (\$)'),
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    onTap: () =>
+                        _openNumericKeyboard(prixController, isMoney: true),
                   ),
                   SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
                       final symbol = symbolController.text.trim().toUpperCase();
-                      final quantite =
-                          double.tryParse(quantiteController.text) ?? 0;
-                      final prix = double.tryParse(prixController.text) ?? 0;
+                      final quantite = double.tryParse(quantiteController.text
+                              .replaceAll('\$', '')
+                              .replaceAll(' ', '')
+                              .replaceAll(',', '.')) ??
+                          0;
+                      final prix = double.tryParse(prixController.text
+                              .replaceAll('\$', '')
+                              .replaceAll(' ', '')
+                              .replaceAll(',', '.')) ??
+                          0;
                       if (symbol.isNotEmpty && quantite > 0 && prix > 0) {
                         setState(() {
                           actionsInit.add({
@@ -220,7 +232,9 @@ class _PageInvestissementState extends State<PageInvestissement> {
                     controller: cashController,
                     decoration: InputDecoration(
                         labelText: 'Cash disponible initial (\$)'),
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    onTap: () =>
+                        _openNumericKeyboard(cashController, isMoney: true),
                   ),
                 ],
               ),
@@ -233,7 +247,11 @@ class _PageInvestissementState extends State<PageInvestissement> {
               ElevatedButton(
                 onPressed: () async {
                   // Créditer le cash saisi uniquement
-                  final cashSaisi = double.tryParse(cashController.text) ?? 0;
+                  final cashSaisi = double.tryParse(cashController.text
+                          .replaceAll('\$', '')
+                          .replaceAll(' ', '')
+                          .replaceAll(',', '.')) ??
+                      0;
                   if (cashSaisi > 0) {
                     await _firebaseService.firestore
                         .collection('comptes')
@@ -296,7 +314,9 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 labelText: 'Quantité',
                 hintText: '10',
               ),
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () =>
+                  _openNumericKeyboard(quantiteController, isMoney: true),
             ),
             SizedBox(height: 16),
             TextField(
@@ -305,7 +325,8 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 labelText: 'Prix d\'achat (\$)',
                 hintText: '150.00',
               ),
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () => _openNumericKeyboard(prixController, isMoney: true),
             ),
           ],
         ),
@@ -318,8 +339,16 @@ class _PageInvestissementState extends State<PageInvestissement> {
             onPressed: () async {
               try {
                 final symbol = symbolController.text.trim().toUpperCase();
-                final quantite = double.tryParse(quantiteController.text) ?? 0;
-                final prix = double.tryParse(prixController.text) ?? 0;
+                final quantite = double.tryParse(quantiteController.text
+                        .replaceAll('\$', '')
+                        .replaceAll(' ', '')
+                        .replaceAll(',', '.')) ??
+                    0;
+                final prix = double.tryParse(prixController.text
+                        .replaceAll('\$', '')
+                        .replaceAll(' ', '')
+                        .replaceAll(',', '.')) ??
+                    0;
 
                 if (symbol.isEmpty || quantite <= 0 || prix <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -378,7 +407,9 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 labelText: 'Quantité à vendre',
                 hintText: quantitePossedee.toString(),
               ),
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () =>
+                  _openNumericKeyboard(quantiteController, isMoney: true),
             ),
             SizedBox(height: 16),
             TextField(
@@ -387,7 +418,8 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 labelText: 'Prix de vente (\$)',
                 hintText: '150.00',
               ),
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () => _openNumericKeyboard(prixController, isMoney: true),
             ),
           ],
         ),
@@ -399,9 +431,16 @@ class _PageInvestissementState extends State<PageInvestissement> {
           ElevatedButton(
             onPressed: () async {
               try {
-                final prix = double.tryParse(prixController.text) ?? 0;
-                final quantiteAVendre =
-                    double.tryParse(quantiteController.text) ?? 0;
+                final prix = double.tryParse(prixController.text
+                        .replaceAll('\$', '')
+                        .replaceAll(' ', '')
+                        .replaceAll(',', '.')) ??
+                    0;
+                final quantiteAVendre = double.tryParse(quantiteController.text
+                        .replaceAll('\$', '')
+                        .replaceAll(' ', '')
+                        .replaceAll(',', '.')) ??
+                    0;
 
                 if (prix <= 0 || quantiteAVendre <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -492,7 +531,9 @@ class _PageInvestissementState extends State<PageInvestissement> {
             TextField(
               controller: montantController,
               decoration: InputDecoration(labelText: 'Montant reçu (\$)'),
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () =>
+                  _openNumericKeyboard(montantController, isMoney: true),
             ),
             SizedBox(height: 12),
             Row(
@@ -526,8 +567,10 @@ class _PageInvestissementState extends State<PageInvestissement> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final montant = double.tryParse(
-                      montantController.text.replaceAll(',', '.')) ??
+              final montant = double.tryParse(montantController.text
+                      .replaceAll('\$', '')
+                      .replaceAll(' ', '')
+                      .replaceAll(',', '.')) ??
                   0.0;
               if (selectedSymbol == null || montant <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -889,52 +932,57 @@ class _PageInvestissementState extends State<PageInvestissement> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Quantité: $quantite'),
-                Text('Prix d\'achat: \$${prixAchat.toStringAsFixed(2)}'),
                 if (prixDisponible) ...[
                   Text(
                       'Prix actuel: \$${prixActuel?.toStringAsFixed(2) ?? 'N/A'}'),
-                  Text(
-                    'Prix moyen: \$${prixAchat.toStringAsFixed(2)}',
-                  ),
+                  Text('Prix moyen: \$${prixAchat.toStringAsFixed(2)}'),
                 ] else ...[
                   Text('Prix non disponible',
                       style: TextStyle(color: Colors.orange)),
                 ],
               ],
             ),
-            trailing: SizedBox(
-              width: 90,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '\$${valeurActuelle.toStringAsFixed(2)}',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            trailing: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: 100,
+                maxWidth: 120,
+                maxHeight: 70,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  Text(
+                    '\$${valeurActuelle.toStringAsFixed(2)}',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '\$${gainPerte.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: gainPerte >= 0 ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
-                    Text(
-                      '\$${gainPerte.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: gainPerte >= 0 ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Perf: ${performancePercent.toStringAsFixed(2)}%',
+                    style: TextStyle(
+                      color:
+                          performancePercent >= 0 ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
                     ),
-                    Text(
-                      'Performance: ${performancePercent.toStringAsFixed(2)}%',
-                      style: TextStyle(
-                        color:
-                            performancePercent >= 0 ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
             onLongPress: () => _supprimerAction(actionId, symbol, quantite),
@@ -942,6 +990,24 @@ class _PageInvestissementState extends State<PageInvestissement> {
         );
       },
     );
+  }
+
+  // Ajout de la fonction utilitaire pour ouvrir le clavier numérique personnalisé
+  Future<void> _openNumericKeyboard(TextEditingController controller,
+      {bool isMoney = false, bool showDecimal = true}) async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (_) => NumericKeyboard(
+        controller: controller,
+        isMoney: isMoney,
+        showDecimal: showDecimal,
+        showDone: true,
+        onDone: () {
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+    setState(() {});
   }
 
   @override
