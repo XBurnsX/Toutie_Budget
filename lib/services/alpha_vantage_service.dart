@@ -62,6 +62,9 @@ class AlphaVantageService {
 
     print(
         '🔄 Batch update Alpha Vantage démarré (5 actions toutes les 10 min)');
+
+    // Sauvegarder les métadonnées initiales
+    _saveMetadataToFirestore();
   }
 
   // Arrêter le batch update
@@ -126,6 +129,9 @@ class AlphaVantageService {
     print('📊 Batch terminé. Actions restantes: ${_pendingSymbols.length}');
     _lastBatchTime = DateTime.now();
     await _savePersistentStats();
+
+    // Sauvegarder les métadonnées dans Firestore pour tous les comptes d'investissement
+    await _saveMetadataToFirestore();
   }
 
   // Reset le compteur quotidien
@@ -221,6 +227,9 @@ class AlphaVantageService {
   Future<void> forceUpdate() async {
     print('🔄 Mise à jour forcée Alpha Vantage...');
     await _processNextBatch();
+
+    // Sauvegarder les métadonnées après la mise à jour forcée
+    await _saveMetadataToFirestore();
   }
 
   // Obtenir les statistiques
@@ -254,5 +263,34 @@ class AlphaVantageService {
   void clearQueue() {
     _pendingSymbols.clear();
     print('🧹 Queue de mise à jour vidée');
+  }
+
+  // Sauvegarder les métadonnées dans Firestore pour tous les comptes d'investissement
+  Future<void> _saveMetadataToFirestore() async {
+    try {
+      // Récupérer tous les comptes d'investissement
+      final comptesSnapshot = await _firestore
+          .collection('comptes')
+          .where('type', isEqualTo: 'Investissement')
+          .get();
+
+      final now = DateTime.now();
+      final prochaineMaj = now.add(Duration(minutes: 10));
+
+      // Mettre à jour les métadonnées pour chaque compte d'investissement
+      for (final doc in comptesSnapshot.docs) {
+        await _firestore.collection('meta_investissement').doc(doc.id).set({
+          'requestsToday': _requestsToday,
+          'lastUpdate': now.toIso8601String(),
+          'prochaineMaj': prochaineMaj.toIso8601String(),
+          'pendingSymbols': _pendingSymbols.length,
+        }, SetOptions(merge: true));
+      }
+
+      print(
+          '💾 Métadonnées sauvegardées pour ${comptesSnapshot.docs.length} comptes d\'investissement');
+    } catch (e) {
+      print('❌ Erreur sauvegarde métadonnées Firestore: $e');
+    }
   }
 }

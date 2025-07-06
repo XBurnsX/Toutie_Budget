@@ -432,4 +432,9 @@ class InvestissementService {
       }
     }
   }
+
+  // Ajouter des symboles à la queue de mise à jour Alpha Vantage
+  void addSymbolsToUpdateQueue(List<String> symbols) {
+    _alphaVantage.addSymbolsToQueue(symbols);
+  }
 }

@@ -78,11 +78,15 @@ class _PageInvestissementState extends State<PageInvestissement> {
   @override
   void initState() {
     super.initState();
+    // Démarrer le service d'investissement pour les mises à jour automatiques
+    _investissementService.startService();
     _chargerDonnees().then((_) => _checkPremiereOuverture());
   }
 
   @override
   void dispose() {
+    // Arrêter le service d'investissement
+    _investissementService.stopService();
     super.dispose();
   }
 
@@ -109,6 +113,11 @@ class _PageInvestissementState extends State<PageInvestissement> {
       // Charger les actions
       final actions = await _investissementService.getActions(widget.compteId);
 
+      // Ajouter les symboles des actions existantes à la queue de mise à jour
+      final symbols =
+          actions.map((action) => action['symbol'] as String).toList();
+      _investissementService.addSymbolsToUpdateQueue(symbols);
+
       // Charger la performance globale
       final performance = await _investissementService
           .calculerPerformanceCompte(widget.compteId);
@@ -122,8 +131,26 @@ class _PageInvestissementState extends State<PageInvestissement> {
       // On sauvegarde le snapshot du jour si nécessaire
       await _investissementService
           .sauvegarderSnapshotJournalier(widget.compteId);
-      print(
-          '🔍 DEBUG - Sauvegarde snapshot appelée pour le compte ${widget.compteId}');
+
+      // Initialiser les métadonnées si elles n'existent pas
+      final metaDoc = await _firebaseService.firestore
+          .collection('meta_investissement')
+          .doc(widget.compteId)
+          .get();
+
+      if (!metaDoc.exists) {
+        final stats = _investissementService.getStats();
+        await _firebaseService.firestore
+            .collection('meta_investissement')
+            .doc(widget.compteId)
+            .set({
+          'requestsToday': stats['requestsToday'] ?? 0,
+          'lastUpdate': DateTime.now().toIso8601String(),
+          'prochaineMaj':
+              DateTime.now().add(Duration(minutes: 10)).toIso8601String(),
+          'pendingSymbols': stats['pendingSymbols'] ?? 0,
+        });
+      }
 
       setState(() {
         _compte = compte;
@@ -492,6 +519,19 @@ class _PageInvestissementState extends State<PageInvestissement> {
   Future<void> _forcerMiseAJour() async {
     try {
       await _investissementService.forcerMiseAJour();
+
+      // Mettre à jour les métadonnées dans Firestore
+      final stats = _investissementService.getStats();
+      await _firebaseService.firestore
+          .collection('meta_investissement')
+          .doc(widget.compteId)
+          .set({
+        'requestsToday': stats['requestsToday'] ?? 0,
+        'lastUpdate': DateTime.now().toIso8601String(),
+        'prochaineMaj':
+            DateTime.now().add(Duration(minutes: 10)).toIso8601String(),
+      }, SetOptions(merge: true));
+
       _chargerDonnees();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -747,21 +787,12 @@ class _PageInvestissementState extends State<PageInvestissement> {
     final cashDisponible = _compte?.pretAPlacer ?? 0.0;
     final valeurTotalePortefeuille = valeurActionsActuelle + cashDisponible;
 
-    print('🔍 DEBUG Graphique Plat - Valeur actions: $valeurActionsActuelle');
-    print('🔍 DEBUG Graphique Plat - Cash disponible: $cashDisponible');
-    print('🔍 DEBUG Graphique Plat - Valeur totale: $valeurTotalePortefeuille');
-
     if (valeurTotalePortefeuille == 0.0) {
-      print(
-          '🔍 DEBUG Graphique Plat - Valeur totale = 0, retour SizedBox.shrink');
       return const SizedBox.shrink();
     }
 
     final List<FlSpot> spots = List.generate(
         30, (i) => FlSpot(i.toDouble(), valeurTotalePortefeuille));
-
-    print(
-        '🔍 DEBUG Graphique Plat - Création de ${spots.length} points avec valeur $valeurTotalePortefeuille');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -774,12 +805,60 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             SizedBox(
-              height: 160,
+              height: 200, // Augmenter la hauteur pour les axes
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(show: false),
-                  borderData: FlBorderData(show: false),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    horizontalInterval: 500,
+                    verticalInterval: 1,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey.withOpacity(0.3),
+                        strokeWidth: 1,
+                      );
+                    },
+                    getDrawingVerticalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey.withOpacity(0.3),
+                        strokeWidth: 1,
+                      );
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: _getInterval(spots),
+                        reservedSize: 60,
+                        getTitlesWidget: (double value, TitleMeta meta) {
+                          return Text(
+                            '\$${value.toInt()}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  ),
                   lineBarsData: [
                     LineChartBarData(
                       spots: spots,
@@ -794,11 +873,12 @@ class _PageInvestissementState extends State<PageInvestissement> {
                     ),
                   ],
                   lineTouchData: LineTouchData(
+                    enabled: true,
                     touchTooltipData: LineTouchTooltipData(
                       getTooltipItems: (touchedSpots) {
                         return touchedSpots.map((spot) {
                           return LineTooltipItem(
-                            '${spot.y.toStringAsFixed(2)} \$',
+                            'Valeur actuelle\n${spot.y.toStringAsFixed(2)} \$',
                             const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold),
@@ -816,30 +896,37 @@ class _PageInvestissementState extends State<PageInvestissement> {
     );
   }
 
+  // Fonction helper pour calculer l'intervalle des axes Y
+  double _getInterval(List<FlSpot> spots) {
+    if (spots.isEmpty) return 1000;
+
+    final minY = spots.map((spot) => spot.y).reduce((a, b) => a < b ? a : b);
+    final maxY = spots.map((spot) => spot.y).reduce((a, b) => a > b ? a : b);
+    final range = maxY - minY;
+
+    if (range <= 0) return 1000;
+
+    // Calculer un intervalle approprié
+    if (range <= 100) return 50;
+    if (range <= 500) return 100;
+    if (range <= 1000) return 200;
+    if (range <= 5000) return 500;
+    if (range <= 10000) return 1000;
+    return 2000;
+  }
+
   Widget _buildSoldeGraphique() {
     // On utilise un FutureBuilder pour lire l'historique sauvegardé dans Firestore
     return FutureBuilder<QuerySnapshot>(
       future: _firebaseService.firestore
           .collection('historique_portefeuille')
           .where('compteId', isEqualTo: widget.compteId)
-          .orderBy('date', descending: true)
+          .orderBy('date',
+              descending:
+                  false) // Ordre chronologique croissant (plus ancien en premier)
           .limit(30)
           .get(),
       builder: (context, snapshot) {
-        // DEBUG: Ajouter des logs pour comprendre le problème
-        print(
-            '🔍 DEBUG Graphique - ConnectionState: ${snapshot.connectionState}');
-        print('🔍 DEBUG Graphique - HasData: ${snapshot.hasData}');
-        if (snapshot.hasData) {
-          print(
-              '🔍 DEBUG Graphique - Nombre de docs: ${snapshot.data!.docs.length}');
-          if (snapshot.data!.docs.isNotEmpty) {
-            print(
-                '🔍 DEBUG Graphique - Premier doc: ${snapshot.data!.docs.first.data()}');
-          }
-        }
-        print('🔍 DEBUG Graphique - Error: ${snapshot.error}');
-
         // Pendant le chargement de l'historique...
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Card(
@@ -853,23 +940,19 @@ class _PageInvestissementState extends State<PageInvestissement> {
 
         // S'il n'y a pas d'historique du tout (ex: premier jour d'utilisation)
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          print(
-              '🔍 DEBUG Graphique - Pas d\'historique, affichage graphique plat');
           // On affiche le graphique "plat" avec la valeur actuelle
           return _buildGraphiqueAvecValeurActuelle();
         }
 
         // On a un historique ! On prépare les points pour le graphique.
-        final docs = snapshot.data!.docs.reversed
-            .toList(); // Remettre en ordre chronologique
+        final docs = snapshot.data!.docs
+            .toList(); // Ordre chronologique (plus ancien à gauche, plus récent à droite)
+
         final List<FlSpot> spots = [];
         for (int i = 0; i < docs.length; i++) {
           final data = docs[i].data() as Map<String, dynamic>;
           spots.add(FlSpot(i.toDouble(), (data['valeur'] as num).toDouble()));
         }
-
-        print('🔍 DEBUG Graphique - Nombre de points: ${spots.length}');
-        print('🔍 DEBUG Graphique - Points: $spots');
 
         // Le dernier point du graphique doit TOUJOURS être la valeur "live"
         final valeurActuelle = _performanceCompte['totalValeurActuelle'] ?? 0.0;
@@ -887,8 +970,6 @@ class _PageInvestissementState extends State<PageInvestissement> {
 
         // CORRECTION : Si on n'a qu'un seul point, on en ajoute un deuxième pour créer une ligne visible
         if (spots.length == 1) {
-          print(
-              '🔍 DEBUG Graphique - Un seul point détecté, ajout d\'un point supplémentaire');
           spots.add(FlSpot(1.0, spots[0].y)); // Même valeur, point suivant
         }
 
@@ -904,12 +985,86 @@ class _PageInvestissementState extends State<PageInvestissement> {
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 12),
                 SizedBox(
-                  height: 160,
+                  height: 200, // Augmenter la hauteur pour les axes
                   child: LineChart(
                     LineChartData(
-                      gridData: FlGridData(show: false),
-                      titlesData: FlTitlesData(show: false),
-                      borderData: FlBorderData(show: false),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: true,
+                        horizontalInterval:
+                            500, // Intervalle pour les lignes horizontales
+                        verticalInterval: 1,
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey.withOpacity(0.3),
+                            strokeWidth: 1,
+                          );
+                        },
+                        getDrawingVerticalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey.withOpacity(0.3),
+                            strokeWidth: 1,
+                          );
+                        },
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            interval: 1, // Afficher toutes les dates
+                            getTitlesWidget: (double value, TitleMeta meta) {
+                              if (value.toInt() < docs.length) {
+                                final data = docs[value.toInt()].data()
+                                    as Map<String, dynamic>;
+                                final dateStr = data['date'] as String;
+                                // Afficher seulement le jour et le mois
+                                final date = DateTime.parse(dateStr);
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    '${date.day}/${date.month}',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: _getInterval(spots),
+                            reservedSize: 60,
+                            getTitlesWidget: (double value, TitleMeta meta) {
+                              return Text(
+                                '\$${value.toInt()}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                      ),
                       lineBarsData: [
                         LineChartBarData(
                           spots: spots,
@@ -918,8 +1073,17 @@ class _PageInvestissementState extends State<PageInvestissement> {
                           color: Colors.greenAccent,
                           barWidth: 3,
                           dotData: FlDotData(
-                              show: spots.length <=
-                                  2), // Afficher les points si peu de données
+                            show: spots.length <=
+                                2, // Afficher les points si peu de données
+                            getDotPainter: (spot, percent, barData, index) {
+                              return FlDotCirclePainter(
+                                radius: 4,
+                                color: Colors.greenAccent,
+                                strokeWidth: 2,
+                                strokeColor: Colors.white,
+                              );
+                            },
+                          ),
                           belowBarData: BarAreaData(
                             show: true,
                             color: Colors.greenAccent.withOpacity(0.2),
@@ -927,11 +1091,19 @@ class _PageInvestissementState extends State<PageInvestissement> {
                         ),
                       ],
                       lineTouchData: LineTouchData(
+                        enabled: true,
                         touchTooltipData: LineTouchTooltipData(
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
+                              final index = spot.x.toInt();
+                              String dateStr = '';
+                              if (index < docs.length) {
+                                final data =
+                                    docs[index].data() as Map<String, dynamic>;
+                                dateStr = data['date'] as String;
+                              }
                               return LineTooltipItem(
-                                '${spot.y.toStringAsFixed(2)} \$',
+                                '${dateStr}\n${spot.y.toStringAsFixed(2)} \$',
                                 const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold),
