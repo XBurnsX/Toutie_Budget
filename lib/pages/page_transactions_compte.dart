@@ -91,8 +91,8 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
     final user = firebaseService.auth.currentUser;
     if (user == null) return;
 
-    // Utilisation du cache pour la première page
-    if (_transactions.isEmpty && _lastDoc == null) {
+    // Utilisation du cache pour la première page seulement si on a déjà des données
+    if (_transactions.isEmpty && _lastDoc == null && _firstLoadDone) {
       try {
         final cached = await CacheService.getTransactions(
             firebaseService, widget.compte.id);
@@ -107,6 +107,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         }
       } catch (e) {
         // Si le cache échoue, continuer avec la requête directe
+        print('DEBUG: Cache des transactions échoué: $e');
       }
     }
 
@@ -127,6 +128,8 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         .map((doc) =>
             app_model.Transaction.fromJson(doc.data() as Map<String, dynamic>))
         .toList();
+
+    print('DEBUG: ${newTransactions.length} nouvelles transactions chargées');
 
     setState(() {
       _transactions.addAll(newTransactions);
@@ -276,23 +279,58 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         foregroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: const Color(0xFF18191A),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _forceRefresh,
+            tooltip: 'Rafraîchir les données',
+          ),
+        ],
       ),
       body: _buildTransactionsCompteContent(context),
     );
   }
 
+  void _forceRefresh() {
+    // Invalider les caches et recharger
+    CacheService.invalidateTransactions(widget.compte.id);
+    CacheService.invalidateCategories();
+
+    // Vider les listes et recharger
+    setState(() {
+      _transactions.clear();
+      _searchResults.clear();
+      _lastDoc = null;
+      _lastSearchDoc = null;
+      _hasMore = true;
+      _hasMoreSearch = true;
+      _firstLoadDone = false;
+    });
+
+    // Recharger les données
+    _fetchNextPage();
+  }
+
   Widget _buildTransactionsCompteContent(BuildContext context) {
-    // On charge les enveloppes une seule fois
-    return FutureBuilder<List<Categorie>>(
-      future: CacheService.getCategories(FirebaseService()),
+    // On charge les enveloppes avec StreamBuilder pour avoir des données à jour
+    return StreamBuilder<List<Categorie>>(
+      stream: FirebaseService().lireCategories(),
       builder: (context, catSnapshot) {
         final enveloppeIdToNom = <String, String>{};
         if (catSnapshot.hasData) {
+          print('DEBUG: ${catSnapshot.data!.length} catégories chargées');
           for (final cat in catSnapshot.data!) {
+            print(
+                'DEBUG: Catégorie "${cat.nom}" avec ${cat.enveloppes.length} enveloppes');
             for (final env in cat.enveloppes) {
               enveloppeIdToNom[env.id] = env.nom;
+              print('DEBUG: Ajouté au mapping: "${env.id}" -> "${env.nom}"');
             }
           }
+          print(
+              'DEBUG: Mapping final contient ${enveloppeIdToNom.length} enveloppes');
+        } else {
+          print('DEBUG: Aucune catégorie chargée');
         }
         if (_searchQuery.isNotEmpty) {
           // Recherche pro : résultats filtrés Firestore (max 10 à la fois)
@@ -436,6 +474,16 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
     final isDepense = t.type.estDepense;
     final montantColor = isDepense ? Colors.red : Colors.green;
     String sousTitre = '';
+
+    // Debug: afficher les informations de la transaction
+    print('DEBUG: Transaction ${t.id} - enveloppeId: "${t.enveloppeId}"');
+    print(
+        'DEBUG: Mapping enveloppeIdToNom contient ${enveloppeIdToNom.length} enveloppes');
+    if (t.enveloppeId != null && t.enveloppeId!.isNotEmpty) {
+      print('DEBUG: Recherche enveloppe "${t.enveloppeId}" dans le mapping');
+      print('DEBUG: Résultat: "${enveloppeIdToNom[t.enveloppeId!]}"');
+    }
+
     // --- Ajout pour transaction fractionnée ---
     if (t.estFractionnee == true &&
         t.sousItems != null &&
@@ -466,6 +514,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
       sousTitre = '${widget.compte.nom} - prêt à placer';
     } else if (t.enveloppeId != null && t.enveloppeId!.isNotEmpty) {
       sousTitre = enveloppeIdToNom[t.enveloppeId!] ?? '-';
+      print('DEBUG: Sous-titre final: "$sousTitre"');
     } else {
       sousTitre = '-';
     }

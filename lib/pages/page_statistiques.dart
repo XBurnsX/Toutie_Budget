@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../models/transaction_model.dart' as app_model;
 import '../services/cache_service.dart';
+import '../models/compte.dart';
+import '../models/categorie.dart';
 
 class PageStatistiques extends StatefulWidget {
   const PageStatistiques({super.key});
@@ -13,31 +15,138 @@ class PageStatistiques extends StatefulWidget {
 
 class _PageStatistiquesState extends State<PageStatistiques> {
   DateTime _selectedMonth = DateTime.now();
-  bool _isLoading = true;
-
-  // Données statistiques
-  List<MapEntry<String, double>> _topEnveloppes = [];
-  List<MapEntry<String, double>> _topTiers = [];
-  double _totalRevenus = 0.0;
-  double _totalDepenses = 0.0;
 
   @override
-  void initState() {
-    super.initState();
-    _chargerStatistiques();
+  Widget build(BuildContext context) {
+    return _buildStatistiquesContent(context);
   }
 
-  Future<void> _chargerStatistiques() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Widget _buildStatistiquesContent(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+            'Statistiques - ${DateFormat('MMMM yyyy', 'fr_FR').format(_selectedMonth)}'),
+        backgroundColor: const Color(0xFF18191A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: const Color(0xFF18191A),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _selectionnerMois,
+            tooltip: 'Choisir le mois',
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _forceRefresh,
+            tooltip: 'Rafraîchir les données',
+          ),
+        ],
+      ),
+      body: StreamBuilder<List<Compte>>(
+        stream: FirebaseService().lireComptes(),
+        builder: (context, comptesSnapshot) {
+          return StreamBuilder<List<Categorie>>(
+            stream: FirebaseService().lireCategories(),
+            builder: (context, categoriesSnapshot) {
+              if (comptesSnapshot.hasError || categoriesSnapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Erreur : ${comptesSnapshot.error?.toString() ?? ''}\n${categoriesSnapshot.error?.toString() ?? ''}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              }
 
-    final firebaseService = FirebaseService();
+              if (!comptesSnapshot.hasData || !categoriesSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-    // Utiliser le cache pour les comptes et catégories
-    final comptes = await CacheService.getComptes(firebaseService);
-    final categories = await CacheService.getCategories(firebaseService);
+              final comptes = comptesSnapshot.data!;
+              final categories = categoriesSnapshot.data!;
 
+              return RefreshIndicator(
+                onRefresh: _forceRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Sélecteur de mois stylé
+                      _buildSelecteurMois(),
+                      const SizedBox(height: 24),
+
+                      // Statistiques avec les données en temps réel
+                      _buildStatistiquesReelles(comptes, categories),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatistiquesReelles(
+      List<Compte> comptes, List<Categorie> categories) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _calculerStatistiques(comptes, categories),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Erreur lors du calcul des statistiques: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final data = snapshot.data!;
+        final topEnveloppes =
+            data['topEnveloppes'] as List<MapEntry<String, double>>;
+        final topTiers = data['topTiers'] as List<MapEntry<String, double>>;
+        final totalRevenus = data['totalRevenus'] as double;
+        final totalDepenses = data['totalDepenses'] as double;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top 5 des enveloppes et tiers
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildTopEnveloppes(topEnveloppes)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildTopTiers(topTiers)),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            // Revenus et Dépenses
+            _buildRevenusDepenses(totalRevenus, totalDepenses),
+            const SizedBox(height: 32),
+
+            // Solde net et évolution
+            _buildSoldeNet(totalRevenus, totalDepenses),
+            const SizedBox(height: 32),
+
+            // Graphique simple
+            _buildGraphiqueSimple(totalRevenus, totalDepenses),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _calculerStatistiques(
+      List<Compte> comptes, List<Categorie> categories) async {
     final debutMois = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final finMois = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
 
@@ -48,43 +157,46 @@ class _PageStatistiquesState extends State<PageStatistiques> {
 
     // Parcourir toutes les transactions du mois
     for (var compte in comptes) {
-      // Utiliser le cache pour les transactions
-      final transactions =
-          await CacheService.getTransactions(firebaseService, compte.id);
+      try {
+        final transactions =
+            await FirebaseService().lireTransactions(compte.id).first;
 
-      for (var transaction in transactions) {
-        if (transaction.date.isAfter(
-              debutMois.subtract(const Duration(days: 1)),
-            ) &&
-            transaction.date.isBefore(finMois.add(const Duration(days: 1)))) {
-          if (transaction.type == app_model.TypeTransaction.depense) {
-            depenses += transaction.montant;
+        for (var transaction in transactions) {
+          if (transaction.date
+                  .isAfter(debutMois.subtract(const Duration(days: 1))) &&
+              transaction.date.isBefore(finMois.add(const Duration(days: 1)))) {
+            if (transaction.type == app_model.TypeTransaction.depense) {
+              depenses += transaction.montant;
 
-            // Trouver le nom de l'enveloppe pour les statistiques
-            String enveloppeNom = 'Enveloppe inconnue';
-            for (var categorie in categories) {
-              for (var enveloppe in categorie.enveloppes) {
-                if (enveloppe.id == transaction.enveloppeId) {
-                  enveloppeNom = enveloppe.nom;
-                  break;
+              // Trouver le nom de l'enveloppe pour les statistiques
+              String enveloppeNom = 'Enveloppe inconnue';
+              for (var categorie in categories) {
+                for (var enveloppe in categorie.enveloppes) {
+                  if (enveloppe.id == transaction.enveloppeId) {
+                    enveloppeNom = enveloppe.nom;
+                    break;
+                  }
                 }
               }
-            }
 
-            enveloppesUtilisation[enveloppeNom] =
-                (enveloppesUtilisation[enveloppeNom] ?? 0) +
-                    transaction.montant;
-
-            // Statistiques des tiers
-            if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
-              tiersUtilisation[transaction.tiers!] =
-                  (tiersUtilisation[transaction.tiers!] ?? 0) +
+              enveloppesUtilisation[enveloppeNom] =
+                  (enveloppesUtilisation[enveloppeNom] ?? 0) +
                       transaction.montant;
+
+              // Statistiques des tiers
+              if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
+                tiersUtilisation[transaction.tiers!] =
+                    (tiersUtilisation[transaction.tiers!] ?? 0) +
+                        transaction.montant;
+              }
+            } else {
+              revenus += transaction.montant;
             }
-          } else {
-            revenus += transaction.montant;
           }
         }
+      } catch (e) {
+        print(
+            'DEBUG: Erreur lors du chargement des transactions pour le compte ${compte.nom}: $e');
       }
     }
 
@@ -96,13 +208,24 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     final sortedTiers = tiersUtilisation.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    setState(() {
-      _topEnveloppes = sortedEnveloppes.take(10).toList();
-      _topTiers = sortedTiers.take(10).toList();
-      _totalRevenus = revenus;
-      _totalDepenses = depenses;
-      _isLoading = false;
-    });
+    return {
+      'topEnveloppes': sortedEnveloppes.take(10).toList(),
+      'topTiers': sortedTiers.take(10).toList(),
+      'totalRevenus': revenus,
+      'totalDepenses': depenses,
+    };
+  }
+
+  Future<void> _forceRefresh() async {
+    // Invalider tous les caches
+    CacheService.invalidateComptes();
+    CacheService.invalidateCategories();
+    for (var compte in await FirebaseService().lireComptes().first) {
+      CacheService.invalidateTransactions(compte.id);
+    }
+
+    // Forcer la reconstruction
+    setState(() {});
   }
 
   Future<void> _selectionnerMois() async {
@@ -116,75 +239,9 @@ class _PageStatistiquesState extends State<PageStatistiques> {
 
     if (picked != null && picked != _selectedMonth) {
       setState(() {
-        _selectedMonth = picked;
+        _selectedMonth = DateTime(picked.year, picked.month, 1);
       });
-      _chargerStatistiques();
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _buildStatistiquesContent(context);
-  }
-
-  Widget _buildStatistiquesContent(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-            'Statistiques - ${DateFormat('MMMM yyyy', 'fr_FR').format(_selectedMonth)}'),
-        backgroundColor: const Color(0xFF18191A), // Couleur fixe
-        foregroundColor: Colors.white, // Forcer la couleur du texte
-        elevation: 0,
-        surfaceTintColor:
-            const Color(0xFF18191A), // Forcer la couleur de surface
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: _selectionnerMois,
-            tooltip: 'Choisir le mois',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _chargerStatistiques,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Sélecteur de mois stylé
-                    _buildSelecteurMois(),
-                    const SizedBox(height: 24),
-
-                    // Top 5 des enveloppes et tiers
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildTopEnveloppes()),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildTopTiers()),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Revenus et Dépenses
-                    _buildRevenusDepenses(),
-                    const SizedBox(height: 32),
-
-                    // Solde net et évolution
-                    _buildSoldeNet(),
-                    const SizedBox(height: 32),
-
-                    // Graphique simple
-                    _buildGraphiqueSimple(),
-                  ],
-                ),
-              ),
-            ),
-    );
   }
 
   Widget _buildSelecteurMois() {
@@ -218,7 +275,7 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     );
   }
 
-  Widget _buildTopEnveloppes() {
+  Widget _buildTopEnveloppes(List<MapEntry<String, double>> topEnveloppes) {
     return Card(
       elevation: Theme.of(context).cardTheme.elevation ?? 2,
       margin: EdgeInsets.zero,
@@ -243,11 +300,11 @@ class _PageStatistiquesState extends State<PageStatistiques> {
               ],
             ),
             const SizedBox(height: 16),
-            ..._topEnveloppes.map(
+            ...topEnveloppes.map(
               (entry) =>
                   _buildTopItem(entry.key, entry.value, Icons.folder_special),
             ),
-            if (_topEnveloppes.isEmpty)
+            if (topEnveloppes.isEmpty)
               const Text(
                 'Aucune dépense ce mois-ci',
                 style: TextStyle(fontStyle: FontStyle.italic),
@@ -258,7 +315,7 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     );
   }
 
-  Widget _buildTopTiers() {
+  Widget _buildTopTiers(List<MapEntry<String, double>> topTiers) {
     return Card(
       elevation: Theme.of(context).cardTheme.elevation ?? 2,
       margin: EdgeInsets.zero,
@@ -283,10 +340,10 @@ class _PageStatistiquesState extends State<PageStatistiques> {
               ],
             ),
             const SizedBox(height: 16),
-            ..._topTiers.map(
+            ...topTiers.map(
               (entry) => _buildTopItem(entry.key, entry.value, Icons.store),
             ),
-            if (_topTiers.isEmpty)
+            if (topTiers.isEmpty)
               const Text(
                 'Aucun tiers ce mois-ci',
                 style: TextStyle(fontStyle: FontStyle.italic),
@@ -323,7 +380,7 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     );
   }
 
-  Widget _buildRevenusDepenses() {
+  Widget _buildRevenusDepenses(double totalRevenus, double totalDepenses) {
     return Row(
       children: [
         Expanded(
@@ -344,7 +401,7 @@ class _PageStatistiquesState extends State<PageStatistiques> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${_totalRevenus.toStringAsFixed(2)} \$',
+                    '${totalRevenus.toStringAsFixed(2)} \$',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
@@ -374,7 +431,7 @@ class _PageStatistiquesState extends State<PageStatistiques> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${_totalDepenses.toStringAsFixed(2)} \$',
+                    '${totalDepenses.toStringAsFixed(2)} \$',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.red,
@@ -389,8 +446,8 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     );
   }
 
-  Widget _buildSoldeNet() {
-    final soldeNet = _totalRevenus - _totalDepenses;
+  Widget _buildSoldeNet(double totalRevenus, double totalDepenses) {
+    final soldeNet = totalRevenus - totalDepenses;
     final isPositif = soldeNet >= 0;
 
     return SizedBox(
@@ -440,13 +497,12 @@ class _PageStatistiquesState extends State<PageStatistiques> {
     );
   }
 
-  Widget _buildGraphiqueSimple() {
-    if (_totalRevenus == 0 && _totalDepenses == 0) {
+  Widget _buildGraphiqueSimple(double totalRevenus, double totalDepenses) {
+    if (totalRevenus == 0 && totalDepenses == 0) {
       return const SizedBox.shrink();
     }
 
-    final total = _totalRevenus + _totalDepenses;
-    final pourcentageRevenus = _totalRevenus / total;
+    final pourcentageRevenus = totalRevenus / (totalRevenus + totalDepenses);
 
     return Card(
       elevation: Theme.of(context).cardTheme.elevation ?? 2,
@@ -475,7 +531,7 @@ class _PageStatistiquesState extends State<PageStatistiques> {
                 children: [
                   if (pourcentageRevenus > 0)
                     Expanded(
-                      flex: (_totalRevenus * 100).toInt(),
+                      flex: (totalRevenus * 100).toInt(),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.green,
@@ -488,9 +544,9 @@ class _PageStatistiquesState extends State<PageStatistiques> {
                         ),
                       ),
                     ),
-                  if (_totalDepenses > 0)
+                  if (totalDepenses > 0)
                     Expanded(
-                      flex: (_totalDepenses * 100).toInt(),
+                      flex: (totalDepenses * 100).toInt(),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.red,
