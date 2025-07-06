@@ -689,10 +689,47 @@ class _PageInvestissementState extends State<PageInvestissement> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                    'Requêtes aujourd\'hui: ${stats['requestsToday'] ?? 0}/500'),
-                CompteAReboursProchaineMAJ(
-                    investissementService: _investissementService),
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('meta_investissement')
+                      .doc(widget.compteId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    final requestsToday =
+                        snapshot.hasData && snapshot.data!.exists
+                            ? (snapshot.data!.data()?['requestsToday'] ?? 0)
+                            : (stats['requestsToday'] ?? 0);
+                    return Text('Requêtes aujourd\'hui: $requestsToday/500');
+                  },
+                ),
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('meta_investissement')
+                      .doc(widget.compteId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData || !snapshot.data!.exists) {
+                      return CompteAReboursProchaineMAJ(
+                          investissementService: _investissementService);
+                    }
+                    final data = snapshot.data!.data()!;
+                    final prochaineMaj = data['prochaineMaj'] != null
+                        ? DateTime.tryParse(data['prochaineMaj'])
+                        : null;
+                    if (prochaineMaj == null) {
+                      return CompteAReboursProchaineMAJ(
+                          investissementService: _investissementService);
+                    }
+                    final now = DateTime.now();
+                    final difference = prochaineMaj.difference(now);
+                    if (difference.isNegative) {
+                      return Text('Prochaine MAJ: Imminente');
+                    }
+                    final minutes = difference.inMinutes;
+                    final seconds = difference.inSeconds % 60;
+                    return Text('Prochaine MAJ: ${minutes}m ${seconds}s');
+                  },
+                ),
               ],
             ),
           ],
