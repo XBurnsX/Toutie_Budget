@@ -11,8 +11,8 @@ class DepenseFixeController {
   final TextEditingController montant;
 
   DepenseFixeController({String nom = '', String montant = ''})
-      : this.nom = TextEditingController(text: nom),
-        this.montant = TextEditingController(text: montant);
+      : nom = TextEditingController(text: nom),
+        montant = TextEditingController(text: montant);
 
   void dispose() {
     nom.dispose();
@@ -585,7 +585,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
 
     setState(() {
       _resultatCalculPourcentage =
-          'Pour atteindre ${pourcentageCible}% (\$${soldeCible.toStringAsFixed(0)})$dateInfo, '
+          'Pour atteindre $pourcentageCible% (\$${soldeCible.toStringAsFixed(0)})$dateInfo, '
           'paiement mensuel requis: \$${paiementEstime.toStringAsFixed(2)}';
     });
   }
@@ -984,7 +984,10 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   Widget _buildScenarioCard({required String titre, required Widget contenu}) {
     return Card(
       elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+      color: Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest
+          .withOpacity(0.5),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(

@@ -214,7 +214,7 @@ class _EcranAjoutTransactionRefactoredState
           }).toList();
           if (cartes.isNotEmpty) {
             final carteDoc = cartes.first;
-            final dataCarte = carteDoc.data() as Map<String, dynamic>;
+            final dataCarte = carteDoc.data();
             final bool rembourserDettes =
                 dataCarte['rembourserDettesAssociees'] ?? false;
             if (rembourserDettes) {

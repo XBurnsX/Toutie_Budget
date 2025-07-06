@@ -24,6 +24,10 @@ class AjoutTransactionController extends ChangeNotifier {
   DateTime _dateSelectionnee = DateTime.now();
   String? _marqueurSelectionne;
 
+  // Sélection dans ChampRemboursement
+  String? _remboursementId; // id Firestore de la carte ou de la dette sélectionnée
+  String? _remboursementType; // 'compte' ou 'dette'
+
   List<Compte> _listeComptesAffichables = [];
   List<Compte> _comptesFirebase = [];
   List<String> _listeTiersConnus = [];
@@ -95,6 +99,12 @@ class AjoutTransactionController extends ChangeNotifier {
     }
 
     return true;
+  }
+
+  // Setter appelé par ChampRemboursement
+  void setRemboursementSelection(String? id, String? type) {
+    _remboursementId = id;
+    _remboursementType = type;
   }
 
   // Méthodes de mise à jour
@@ -252,6 +262,19 @@ class AjoutTransactionController extends ChangeNotifier {
 
       final tiersTexte = payeController.text.trim();
 
+      // Si l'utilisateur a sélectionné dans la liste mais que onChanged n'a pas déclenché (valeur identique)
+      if (_remboursementId == null && tiersTexte.isNotEmpty) {
+        // Déduire l'ID d'une carte de crédit portant ce nom
+        for (final c in _comptesFirebase) {
+          if (c.type == 'Carte de crédit' && c.nom.toLowerCase() == tiersTexte.toLowerCase()) {
+            _remboursementId = c.id;
+            _remboursementType = 'compte';
+            print('[SauvegardeTx] Id compte déduit: $_remboursementId');
+            break;
+          }
+        }
+      }
+
       final compte = _comptesFirebase.firstWhere(
         (c) => c.id == _compteSelectionne,
       );
@@ -304,9 +327,32 @@ class AjoutTransactionController extends ChangeNotifier {
 
       // Gérer les remboursements
       if (_typeMouvementSelectionne ==
-              app_model.TypeMouvementFinancier.remboursementRecu ||
-          _typeMouvementSelectionne ==
-              app_model.TypeMouvementFinancier.remboursementEffectue) {
+          app_model.TypeMouvementFinancier.remboursementEffectue) {
+        // Le remboursement effectué peut être une dette ou un paiement de carte de crédit.
+        if (_remboursementType == 'compte') {
+          // C'est un paiement de carte de crédit.
+          await _traiterRemboursementCarteCredit(
+            tiersTexte, // Le nom de la carte
+            montant,
+            transactionId,
+            firebaseService,
+            detteService,
+            compteId: _remboursementId, // L'ID de la carte
+          );
+        } else {
+          // C'est un remboursement de dette standard.
+          infoFinalisation = await _traiterRemboursementViaDettesService(
+            tiersTexte,
+            montant,
+            _typeMouvementSelectionne,
+            transactionId,
+            detteService,
+            estModification: _transactionExistante != null,
+          );
+        }
+      } else if (_typeMouvementSelectionne ==
+          app_model.TypeMouvementFinancier.remboursementRecu) {
+        // Un remboursement reçu est toujours traité comme une dette.
         infoFinalisation = await _traiterRemboursementViaDettesService(
           tiersTexte,
           montant,
@@ -576,6 +622,71 @@ class AjoutTransactionController extends ChangeNotifier {
       return null;
     } catch (e) {
       rethrow; // Relancer l'exception pour qu'elle soit capturée par la fonction appelante
+    }
+  }
+
+  // Traiter le remboursement d’une carte de crédit sélectionnée dans le champ "Tiers".
+  // 1. Met à jour le solde (ou soldeActuel) de la carte.
+  // 2. Si rembourserDettesAssociees == true, répartit le montant sur les dettes
+  //    listées dans depensesFixes du document compte.
+  Future<void> _traiterRemboursementCarteCredit(
+    String nomCarte,
+    double montant,
+    String transactionId,
+    FirebaseService firebaseService,
+    DetteService detteService, {
+    String? compteId,
+  }) async {
+    try {
+      final user = FirebaseService().auth.currentUser;
+      if (user == null) return;
+
+      print('[RemboursementCarteCredit] Début. compteId=$compteId nomCarte=$nomCarte montant=$montant');
+      // Rechercher la carte de crédit par id s'il est fourni, sinon par nom
+      DocumentSnapshot<Map<String, dynamic>>? compteDoc;
+      if (compteId != null) {
+        compteDoc = await FirebaseFirestore.instance
+            .collection('comptes')
+            .doc(compteId)
+            .get();
+        if (!compteDoc.exists) return;
+      } else {
+        final snap = await FirebaseFirestore.instance
+            .collection('comptes')
+            .where('userId', isEqualTo: user.uid)
+            .where('type', isEqualTo: 'Carte de crédit')
+            .where('nom', isEqualTo: nomCarte)
+            .limit(1)
+            .get();
+        if (snap.docs.isEmpty) return;
+        compteDoc = snap.docs.first;
+      }
+
+       final doc = compteDoc;
+       final data = doc.data();
+       if (data == null) {
+        print('[RemboursementCarteCredit] Doc sans data. Abandon');
+        return;
+      } // sécurité null
+
+      // Vérifier que le compte appartient bien à l'utilisateur connecté
+      if (data['userId'] != user.uid) {
+        print('[RemboursementCarteCredit] Compte appartient à ${data['userId']} ≠ ${user.uid}. Ignoré');
+        // Sécurité : on ne touche pas aux comptes d'un autre utilisateur
+        return;
+      }
+      // Mettre à jour le solde / soldeActuel
+      final double soldeActuel = (data['soldeActuel'] ?? data['solde'] ?? 0).toDouble();
+      final double nouveauSolde = (soldeActuel - montant).clamp(0, double.infinity);
+      await firebaseService.updateCompte(doc.id, {
+        'soldeActuel': nouveauSolde,
+      });
+
+      // La logique de répartition sur les dettes associées a été retirée pour éviter
+      // le double comptage des remboursements. Cette opération doit être gérée
+      // manuellement ou par un autre mécanisme si nécessaire.
+    } catch (e) {
+      // Laisser silencieux; ne doit pas interrompre la sauvegarde principale
     }
   }
 

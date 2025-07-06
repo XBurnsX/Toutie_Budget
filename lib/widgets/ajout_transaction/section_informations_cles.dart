@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/transaction_model.dart';
 import '../../controllers/ajout_transaction_controller.dart';
 import 'champ_tiers.dart';
+import 'champ_remboursement.dart';
 import 'champ_compte.dart';
 import 'champ_enveloppe.dart';
 import '../../themes/dropdown_theme_extension.dart';
@@ -61,6 +62,19 @@ class SectionInformationsCles extends StatelessWidget {
     final cardShape = Theme.of(context).cardTheme.shape ??
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0));
 
+    // Filtrer les comptes affichables pour le champ "Compte"
+    // On ne veut pas pouvoir sélectionner une carte de crédit comme source
+    // de paiement pour un remboursement.
+    final List<dynamic> comptesSourcesFiltres;
+    if (typeMouvementSelectionne ==
+        TypeMouvementFinancier.remboursementEffectue) {
+      comptesSourcesFiltres = listeComptesAffichables
+          .where((c) => c.type != 'Carte de crédit')
+          .toList();
+    } else {
+      comptesSourcesFiltres = listeComptesAffichables;
+    }
+
     return Card(
       color: cardColor,
       shape: cardShape,
@@ -87,13 +101,19 @@ class SectionInformationsCles extends StatelessWidget {
                           TypeMouvementFinancier.remboursementEffectue
                   ? 'Prêteur'
                   : 'Tiers',
-              widgetContenu: ChampTiers(
-                controller: payeController,
-                typeMouvementSelectionne: typeMouvementSelectionne,
-                listeTiersConnus: listeTiersConnus,
-                onTiersAjoute: onTiersAjoute,
-                ajoutController: ajoutController,
-              ),
+              widgetContenu: typeMouvementSelectionne ==
+                      TypeMouvementFinancier.remboursementEffectue
+                  ? ChampRemboursement(
+                      controller: payeController,
+                      ajoutController: ajoutController,
+                    )
+                  : ChampTiers(
+                      controller: payeController,
+                      typeMouvementSelectionne: typeMouvementSelectionne,
+                      listeTiersConnus: listeTiersConnus,
+                      onTiersAjoute: onTiersAjoute,
+                      ajoutController: ajoutController,
+                    ),
             ),
             _buildSeparateurDansCarte(),
 
@@ -107,7 +127,7 @@ class SectionInformationsCles extends StatelessWidget {
                   : 'Compte',
               widgetContenu: ChampCompte(
                 compteSelectionne: compteSelectionne,
-                listeComptesAffichables: listeComptesAffichables.cast(),
+                listeComptesAffichables: comptesSourcesFiltres.cast(),
                 typeMouvementSelectionne: typeMouvementSelectionne,
                 onCompteChanged: onCompteChanged,
               ),
