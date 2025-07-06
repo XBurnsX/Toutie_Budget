@@ -642,8 +642,6 @@ class AjoutTransactionController extends ChangeNotifier {
       final user = FirebaseService().auth.currentUser;
       if (user == null) return;
 
-      print(
-          '[RemboursementCarteCredit] Début. compteId=$compteId nomCarte=$nomCarte montant=$montant');
       // Rechercher la carte de crédit par id s'il est fourni, sinon par nom
       DocumentSnapshot<Map<String, dynamic>>? compteDoc;
       if (compteId != null) {
@@ -667,14 +665,11 @@ class AjoutTransactionController extends ChangeNotifier {
       final doc = compteDoc;
       final data = doc.data();
       if (data == null) {
-        print('[RemboursementCarteCredit] Doc sans data. Abandon');
         return;
       } // sécurité null
 
       // Vérifier que le compte appartient bien à l'utilisateur connecté
       if (data['userId'] != user.uid) {
-        print(
-            '[RemboursementCarteCredit] Compte appartient à ${data['userId']} ≠ ${user.uid}. Ignoré');
         // Sécurité : on ne touche pas aux comptes d'un autre utilisateur
         return;
       }
@@ -690,18 +685,11 @@ class AjoutTransactionController extends ChangeNotifier {
       // Vérifier si on doit rembourser les dettes associées
       final bool rembourserDettesAssociees =
           data['rembourserDettesAssociees'] ?? false;
-      print(
-          '[RemboursementCarteCredit] rembourserDettesAssociees: $rembourserDettesAssociees');
 
       if (rembourserDettesAssociees) {
         final List<dynamic> depensesFixes = data['depensesFixes'] ?? [];
-        print(
-            '[RemboursementCarteCredit] Nombre de dépenses fixes: ${depensesFixes.length}');
 
         if (depensesFixes.isNotEmpty) {
-          print(
-              '[RemboursementCarteCredit] Traitement des frais fixes pour $nomCarte');
-
           try {
             // Pour chaque frais fixe, rembourser automatiquement la dette correspondante
             for (final depenseFixe in depensesFixes) {
@@ -710,39 +698,23 @@ class AjoutTransactionController extends ChangeNotifier {
                   (depenseFixe['montant'] as num?)?.toDouble() ?? 0.0;
 
               if (nomDette.isNotEmpty && montantDette > 0) {
-                print(
-                    '[RemboursementCarteCredit] Remboursement automatique: $nomDette - $montantDette\$');
-
                 try {
                   // Rembourser la dette correspondante
-                  final List<String> messagesArchivage =
-                      await detteService.remboursementEnCascade(
+                  await detteService.remboursementEnCascade(
                     nomTiers: nomDette,
                     montantTotal: montantDette,
                     typeRemboursement: 'remboursement_effectue',
                     transactionId: '${transactionId}_auto_${nomDette}',
                   );
-
-                  if (messagesArchivage.isNotEmpty) {
-                    print(
-                        '[RemboursementCarteCredit] Messages pour $nomDette: ${messagesArchivage.join(', ')}');
-                  }
                 } catch (e) {
-                  print(
-                      '[RemboursementCarteCredit] Erreur lors du remboursement de $nomDette: $e');
+                  // Erreur silencieuse pour ne pas interrompre le processus principal
                 }
               }
             }
           } catch (e) {
-            print(
-                '[RemboursementCarteCredit] Erreur lors du traitement des frais fixes: $e');
+            // Erreur silencieuse pour ne pas interrompre le processus principal
           }
-        } else {
-          print('[RemboursementCarteCredit] Aucune dépense fixe trouvée');
         }
-      } else {
-        print(
-            '[RemboursementCarteCredit] rembourserDettesAssociees est désactivé');
       }
     } catch (e) {
       // Laisser silencieux; ne doit pas interrompre la sauvegarde principale

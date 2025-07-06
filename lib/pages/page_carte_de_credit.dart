@@ -103,8 +103,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
 
   Future<void> _openNumericKeyboard(TextEditingController controller,
       {bool isMoney = false, bool showDecimal = true}) async {
-    print(
-        'DEBUG: Ouverture clavier numérique - Valeur actuelle: ${controller.text}');
     await showModalBottomSheet(
       context: context,
       builder: (_) => NumericKeyboard(
@@ -113,7 +111,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
         showDecimal: showDecimal,
         showDone: true,
         onDone: () {
-          print('DEBUG: Clavier fermé - Valeur finale: ${controller.text}');
           Navigator.of(context).pop();
         },
       ),
@@ -244,8 +241,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                               .replaceAll(' ', '')
                               .trim();
                           final montant = double.tryParse(montantText) ?? 0.0;
-                          print(
-                              'DEBUG: Sauvegarde dépense fixe - Nom: ${controller.nom.text}, Texte original: "${controller.montant.text}", Texte nettoyé: "$montantText", Montant parsé: $montant');
                           return {
                             'nom': controller.nom.text,
                             'montant': montant,
@@ -344,8 +339,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                 .replaceAll(' ', '')
                 .trim();
             final montant = double.tryParse(montantText) ?? 0.0;
-            print(
-                'DEBUG: Sauvegarde modifs dépense fixe - Nom: ${controller.nom.text}, Texte original: "${controller.montant.text}", Texte nettoyé: "$montantText", Montant parsé: $montant');
             return {
               'nom': controller.nom.text,
               'montant': montant,
@@ -1027,14 +1020,9 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     hintText: 'Montant', border: OutlineInputBorder()),
                 readOnly: true,
                 onTap: () {
-                  print(
-                      'DEBUG: Ouverture clavier pour montant: ${controllerPair.montant.text}');
                   _openNumericKeyboard(controllerPair.montant, isMoney: true);
                 },
-                onChanged: (value) {
-                  print('DEBUG: Montant changé: $value');
-                  _markAsModified();
-                },
+                onChanged: (_) => _markAsModified(),
               ),
             ),
             IconButton(
@@ -1102,8 +1090,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
             (data['tauxInteret'] as num?)?.toString() ?? '';
         // Chargement des dépenses fixes
         final depenses = (data['depensesFixes'] as List<dynamic>?) ?? [];
-        print(
-            'DEBUG: Chargement dépenses fixes - ${depenses.length} dépenses trouvées');
         _depensesFixesControllers = depenses.map((d) {
           final montant = d['montant'];
           String montantStr = '';
@@ -1114,8 +1100,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
               montantStr = montant;
             }
           }
-          print(
-              'DEBUG: Chargement dépense - Nom: ${d['nom']}, Montant original: $montant, Montant parsé: $montantStr');
           return DepenseFixeController(
             nom: d['nom'] ?? '',
             montant: montantStr,
