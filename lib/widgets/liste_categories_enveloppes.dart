@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'pie_chart_with_legend.dart';
 import 'package:toutie_budget/widgets/assignation_bottom_sheet.dart';
+import 'package:toutie_budget/services/argent_service.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes
 class ListeCategoriesEnveloppes extends StatefulWidget {
@@ -110,6 +111,151 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         !_isLoading &&
         _hasMore) {
       _loadNextPage();
+    }
+  }
+
+  void _showViderEnveloppeMenu(
+      BuildContext context, Map<String, dynamic> enveloppe) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[600],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Vider l\'enveloppe "${enveloppe['nom']}" ?',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Cette action va vider l\'enveloppe et retourner ${(enveloppe['solde'] ?? 0.0).toStringAsFixed(2)} \$ dans le prêt à placer du compte d\'origine.',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[700],
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Annuler',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      await _viderEnveloppe(enveloppe);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Vider',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _viderEnveloppe(Map<String, dynamic> enveloppe) async {
+    try {
+      await ArgentService().viderEnveloppe(enveloppeId: enveloppe['id']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Enveloppe "${enveloppe['nom']}" vidée avec succès',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('DEBUG: Erreur lors du vidage de l\'enveloppe: $e');
+      if (mounted) {
+        String messageErreur = 'Erreur lors du vidage';
+
+        if (e.toString().contains('Enveloppe non trouvée')) {
+          messageErreur = 'Enveloppe non trouvée dans la base de données';
+        } else if (e.toString().contains('déjà vide')) {
+          messageErreur = 'L\'enveloppe est déjà vide';
+        } else if (e.toString().contains('Aucune provenance trouvée')) {
+          messageErreur = 'Aucune provenance trouvée pour cette enveloppe';
+        } else if (e.toString().contains('Catégorie non trouvée')) {
+          messageErreur = 'Catégorie non trouvée dans la base de données';
+        } else if (e.toString().contains('Index d\'enveloppe invalide')) {
+          messageErreur = 'Erreur interne : index d\'enveloppe invalide';
+        } else {
+          messageErreur = 'Erreur lors du vidage : ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              messageErreur,
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -474,6 +620,11 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                               comptes: widget.comptes,
                             ),
                           );
+                        },
+                        onLongPress: () {
+                          if (solde > 0) {
+                            _showViderEnveloppeMenu(context, enveloppe);
+                          }
                         },
                         child: cardWidget,
                       );
@@ -994,6 +1145,11 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                             comptes: widget.comptes,
                           ),
                         );
+                      },
+                      onLongPress: () {
+                        if (solde > 0) {
+                          _showViderEnveloppeMenu(context, enveloppe);
+                        }
                       },
                       child: cardWidget,
                     );

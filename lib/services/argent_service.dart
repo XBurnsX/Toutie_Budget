@@ -570,4 +570,129 @@ class ArgentService {
     CacheService.invalidateComptes();
     CacheService.invalidateCategories();
   }
+
+  /// Vide une enveloppe et retourne l'argent dans le prêt à placer du compte d'origine
+  Future<void> viderEnveloppe({
+    required String enveloppeId,
+  }) async {
+    final categoriesRef = _firebaseService.categoriesRef;
+    final comptesRef = _firebaseService.comptesRef;
+
+    // Récupérer les données avant la transaction
+    QuerySnapshot catSnap = await categoriesRef.get();
+    DocumentSnapshot? catDoc;
+    int envIndex = -1;
+    Map<String, dynamic>? enveloppeData;
+
+    // Trouver la catégorie contenant l'enveloppe
+    for (var doc in catSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final enveloppes = (data['enveloppes'] as List<dynamic>? ?? []);
+      final index = enveloppes.indexWhere((e) => e['id'] == enveloppeId);
+      if (index != -1) {
+        catDoc = doc;
+        envIndex = index;
+        enveloppeData = Map<String, dynamic>.from(enveloppes[index]);
+        break;
+      }
+    }
+
+    if (catDoc == null || envIndex == -1 || enveloppeData == null) {
+      throw Exception('Enveloppe non trouvée');
+    }
+
+    final solde = (enveloppeData['solde'] as num?)?.toDouble() ?? 0.0;
+    if (solde <= 0) {
+      throw Exception('L\'enveloppe est déjà vide');
+    }
+
+    // Récupérer les provenances de l'enveloppe
+    final List<dynamic> provenances = enveloppeData['provenances'] ?? [];
+    if (provenances.isEmpty) {
+      throw Exception('Aucune provenance trouvée pour cette enveloppe');
+    }
+
+    // Maintenant faire la transaction
+    await categoriesRef.firestore.runTransaction((transaction) async {
+      // Récupérer les données fraîches dans la transaction
+      final catSnapFresh = await transaction.get(catDoc!.reference);
+      if (!catSnapFresh.exists) {
+        throw Exception('Catégorie non trouvée');
+      }
+
+      final catData = catSnapFresh.data() as Map<String, dynamic>;
+      final envs = (catData['enveloppes'] as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      // Vérifier que l'enveloppe existe toujours
+      if (envIndex >= envs.length) {
+        throw Exception('Index d\'enveloppe invalide');
+      }
+
+      // Vider l'enveloppe
+      envs[envIndex]['solde'] = 0.0;
+      envs[envIndex]['provenances'] = [];
+      envs[envIndex].remove('provenance_compte_id');
+
+      // Mettre à jour l'historique
+      final now = DateTime.now();
+      final moisCourant =
+          "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+      Map<String, dynamic> historique =
+          (envs[envIndex]['historique'] as Map<String, dynamic>?) ?? {};
+      historique[moisCourant] = {
+        'depense': envs[envIndex]['depense'] ?? 0.0,
+        'solde': 0.0,
+        'objectif': envs[envIndex]['objectif'] ?? 0.0,
+      };
+      envs[envIndex]['historique'] = historique;
+
+      // Mettre à jour la catégorie
+      transaction.update(catDoc.reference, {'enveloppes': envs});
+
+      // Retourner l'argent dans les comptes d'origine
+      for (var provenance in provenances) {
+        try {
+          final compteId = provenance['compte_id']?.toString();
+          final montantRaw = provenance['montant'];
+
+          if (compteId == null || compteId.isEmpty) {
+            print('DEBUG: compte_id manquant dans la provenance: $provenance');
+            continue;
+          }
+
+          double montant = 0.0;
+          if (montantRaw is num) {
+            montant = montantRaw.toDouble();
+          } else if (montantRaw is String) {
+            montant = double.tryParse(montantRaw) ?? 0.0;
+          }
+
+          if (montant > 0) {
+            final compteDoc = comptesRef.doc(compteId);
+            final compteSnap = await transaction.get(compteDoc);
+
+            if (compteSnap.exists) {
+              final compteData = compteSnap.data() as Map<String, dynamic>;
+              final pretAPlacerActuel =
+                  (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
+
+              transaction.update(compteDoc, {
+                'pretAPlacer': pretAPlacerActuel + montant,
+              });
+            }
+          }
+        } catch (e) {
+          print(
+              'DEBUG: Erreur lors du traitement de la provenance $provenance: $e');
+          // Continuer avec les autres provenances
+        }
+      }
+    });
+
+    // Invalider le cache
+    CacheService.invalidateComptes();
+    CacheService.invalidateCategories();
+  }
 }

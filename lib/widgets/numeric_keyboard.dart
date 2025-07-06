@@ -303,7 +303,7 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
                         onTap: widget.onDone ??
                             () => Navigator.of(context).maybePop(),
                         color: Colors.white,
-                        textColor: Theme.of(context).colorScheme.primary,
+                        textColor: Colors.black,
                         icon: Icons.done,
                         filled: true,
                         zeroPadding: true,
