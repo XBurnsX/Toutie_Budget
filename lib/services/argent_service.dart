@@ -575,6 +575,7 @@ class ArgentService {
   Future<void> viderEnveloppe({
     required String enveloppeId,
   }) async {
+    print('DEBUG: Début du vidage de l\'enveloppe $enveloppeId');
     final categoriesRef = _firebaseService.categoriesRef;
     final comptesRef = _firebaseService.comptesRef;
 
@@ -602,13 +603,20 @@ class ArgentService {
     }
 
     final solde = (enveloppeData['solde'] as num?)?.toDouble() ?? 0.0;
+    print('DEBUG: Solde de l\'enveloppe: $solde');
     if (solde <= 0) {
       throw Exception('L\'enveloppe est déjà vide');
     }
 
     // Récupérer les provenances de l'enveloppe
     final List<dynamic> provenances = enveloppeData['provenances'] ?? [];
+    print('DEBUG: Provenances trouvées: $provenances');
+    print('DEBUG: Type des provenances: ${provenances.runtimeType}');
+    print('DEBUG: Nombre de provenances: ${provenances.length}');
+
     if (provenances.isEmpty) {
+      print('DEBUG: ERREUR - Aucune provenance trouvée pour cette enveloppe');
+      print('DEBUG: Données complètes de l\'enveloppe: $enveloppeData');
       throw Exception('Aucune provenance trouvée pour cette enveloppe');
     }
 
@@ -630,7 +638,31 @@ class ArgentService {
         throw Exception('Index d\'enveloppe invalide');
       }
 
-      // Vider l'enveloppe
+      // RÉCUPÉRER D'ABORD TOUTES LES LECTURES
+      print('DEBUG: Récupération des prêts à placer actuels');
+      final Map<String, double> pretAPlacerActuels = {};
+
+      for (var provenance in provenances) {
+        final compteId = provenance['compte_id']?.toString();
+        if (compteId != null && compteId.isNotEmpty) {
+          final compteDoc = comptesRef.doc(compteId);
+          final compteSnap = await transaction.get(compteDoc);
+
+          if (compteSnap.exists) {
+            final compteData = compteSnap.data() as Map<String, dynamic>;
+            final pretAPlacer =
+                (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
+            pretAPlacerActuels[compteId] = pretAPlacer;
+            print(
+                'DEBUG: Prêt à placer actuel du compte $compteId: $pretAPlacer');
+          }
+        }
+      }
+
+      // MAINTENANT FAIRE TOUTES LES ÉCRITURES
+      print('DEBUG: Début des écritures');
+
+      // 1. Vider l'enveloppe
       envs[envIndex]['solde'] = 0.0;
       envs[envIndex]['provenances'] = [];
       envs[envIndex].remove('provenance_compte_id');
@@ -648,20 +680,17 @@ class ArgentService {
       };
       envs[envIndex]['historique'] = historique;
 
-      // Mettre à jour la catégorie
+      // 2. Mettre à jour la catégorie
       transaction.update(catDoc.reference, {'enveloppes': envs});
 
-      // Retourner l'argent dans les comptes d'origine
+      // 3. Mettre à jour les comptes avec les données déjà lues
       for (var provenance in provenances) {
-        try {
-          final compteId = provenance['compte_id']?.toString();
-          final montantRaw = provenance['montant'];
+        final compteId = provenance['compte_id']?.toString();
+        final montantRaw = provenance['montant'];
 
-          if (compteId == null || compteId.isEmpty) {
-            print('DEBUG: compte_id manquant dans la provenance: $provenance');
-            continue;
-          }
-
+        if (compteId != null &&
+            compteId.isNotEmpty &&
+            pretAPlacerActuels.containsKey(compteId)) {
           double montant = 0.0;
           if (montantRaw is num) {
             montant = montantRaw.toDouble();
@@ -670,29 +699,26 @@ class ArgentService {
           }
 
           if (montant > 0) {
+            final pretAPlacerActuel = pretAPlacerActuels[compteId]!;
+            final nouveauPretAPlacer = pretAPlacerActuel + montant;
+
+            print(
+                'DEBUG: Mise à jour compte $compteId: $pretAPlacerActuel -> $nouveauPretAPlacer');
+
             final compteDoc = comptesRef.doc(compteId);
-            final compteSnap = await transaction.get(compteDoc);
-
-            if (compteSnap.exists) {
-              final compteData = compteSnap.data() as Map<String, dynamic>;
-              final pretAPlacerActuel =
-                  (compteData['pretAPlacer'] as num?)?.toDouble() ?? 0.0;
-
-              transaction.update(compteDoc, {
-                'pretAPlacer': pretAPlacerActuel + montant,
-              });
-            }
+            transaction.update(compteDoc, {
+              'pretAPlacer': nouveauPretAPlacer,
+            });
           }
-        } catch (e) {
-          print(
-              'DEBUG: Erreur lors du traitement de la provenance $provenance: $e');
-          // Continuer avec les autres provenances
         }
       }
+      print('DEBUG: Fin des écritures');
     });
 
+    print('DEBUG: Transaction terminée, invalidation du cache');
     // Invalider le cache
     CacheService.invalidateComptes();
     CacheService.invalidateCategories();
+    print('DEBUG: Vidage de l\'enveloppe terminé');
   }
 }
