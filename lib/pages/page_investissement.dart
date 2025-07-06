@@ -217,8 +217,8 @@ class _PageInvestissementState extends State<PageInvestissement> {
                     controller: quantiteController,
                     decoration: InputDecoration(labelText: 'Quantité'),
                     readOnly: true,
-                    onTap: () =>
-                        _openNumericKeyboard(quantiteController, isMoney: true),
+                    onTap: () => _openNumericKeyboard(quantiteController,
+                        isMoney: false),
                   ),
                   TextField(
                     controller: prixController,
@@ -345,7 +345,7 @@ class _PageInvestissementState extends State<PageInvestissement> {
               ),
               readOnly: true,
               onTap: () =>
-                  _openNumericKeyboard(quantiteController, isMoney: true),
+                  _openNumericKeyboard(quantiteController, isMoney: false),
             ),
             SizedBox(height: 16),
             TextField(
