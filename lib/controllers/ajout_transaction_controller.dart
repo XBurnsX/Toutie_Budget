@@ -207,7 +207,13 @@ class AjoutTransactionController extends ChangeNotifier {
         .where((c) => !c.estArchive)
         .where((c) => c.type == 'Chèque' || c.type == 'Carte de crédit')
         .toList()
-      ..sort((a, b) => (a.ordre ?? 999999).compareTo(b.ordre ?? 999999));
+       ..sort((a, b) {
+          // Placer les comptes Chèque en premier
+          if (a.type == 'Chèque' && b.type != 'Chèque') return -1;
+          if (a.type != 'Chèque' && b.type == 'Chèque') return 1;
+          // Sinon trier par champ ordre (nulls à la fin)
+          return (a.ordre ?? 999999).compareTo(b.ordre ?? 999999);
+        });
   }
 
   // Fonction utilitaire pour normaliser les chaînes de caractères
