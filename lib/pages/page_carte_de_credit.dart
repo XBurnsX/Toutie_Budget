@@ -4,6 +4,7 @@ import 'package:toutie_budget/services/firebase_service.dart'; // Assurez-vous d
 import 'dart:math'; // Pour les calculs financiers
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'page_ajout_transaction.dart';
+import '../widgets/numeric_keyboard.dart';
 
 // --- Classe helper pour gérer les contrôleurs de dépenses fixes ---
 class DepenseFixeController {
@@ -100,6 +101,23 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     super.dispose();
   }
 
+  Future<void> _openNumericKeyboard(TextEditingController controller,
+      {bool isMoney = false, bool showDecimal = true}) async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (_) => NumericKeyboard(
+        controller: controller,
+        isMoney: isMoney,
+        showDecimal: showDecimal,
+        showDone: true,
+        onDone: () {
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+    setState(() {});
+  }
+
   // --- ====================================================== ---
   // --- Logique de Configuration et Mise à Jour ---
   // --- ====================================================== ---
@@ -141,21 +159,22 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                   controller: limiteController,
                   decoration:
                       const InputDecoration(labelText: 'Limite de crédit (\$)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  readOnly: true,
+                  onTap: () => _openNumericKeyboard(limiteController, isMoney: true),
                 ),
                 TextField(
                   controller: paiementMinController,
                   decoration: const InputDecoration(
                       labelText: 'Paiement minimum requis (\$)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  readOnly: true,
+                  onTap: () => _openNumericKeyboard(paiementMinController, isMoney: true),
                 ),
                 TextField(
                   controller: jourPaiementController,
                   decoration: const InputDecoration(
                       labelText: 'Jour du paiement (1-28)'),
-                  keyboardType: TextInputType.number,
+                  readOnly: true,
+                  onTap: () => _openNumericKeyboard(jourPaiementController, showDecimal: false),
                 ),
               ],
             ),
