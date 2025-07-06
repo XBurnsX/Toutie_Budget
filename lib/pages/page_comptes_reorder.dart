@@ -266,7 +266,7 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.red[700],
+                                    color: soldeAffiche >= 0 ? Colors.green : Colors.red[700],
                                   ),
                                 ),
                           Container(

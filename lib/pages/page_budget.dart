@@ -417,7 +417,10 @@ class _PageBudgetState extends State<PageBudget> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: Text('Budget'),
+        title: MonthPickerWidget(
+          selectedMonth: selectedMonth,
+          onChanged: handleMonthChange,
+        ),
         elevation: 0,
         actions: [
           IconButton(
@@ -532,14 +535,7 @@ class _PageBudgetState extends State<PageBudget> {
 
               return Column(
                 children: [
-                  // Sélecteur de mois en haut
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: MonthPickerWidget(
-                      selectedMonth: selectedMonth,
-                      onChanged: handleMonthChange,
-                    ),
-                  ),
+
                   const SizedBox(height: 20),
                   ...comptesNonArchives
                       .where(
