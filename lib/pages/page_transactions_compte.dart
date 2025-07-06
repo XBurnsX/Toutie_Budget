@@ -618,7 +618,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                       if (t.note != null && t.note!.isNotEmpty) ...[
                         const SizedBox(width: 12),
                         Padding(
-                          padding: const EdgeInsets.only(left: 125.0),
+                          padding: const EdgeInsets.only(left: 135.0),
                           child: Flexible(
                             child: Text(
                               t.note!,
