@@ -600,15 +600,40 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    sousTitre,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                      height: 1.2,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          sousTitre,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            height: 1.2,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (t.note != null && t.note!.isNotEmpty) ...[
+                        const SizedBox(width: 12),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 125.0),
+                          child: Flexible(
+                            child: Text(
+                              t.note!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade500,
+                                height: 1.2,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
