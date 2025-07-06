@@ -315,6 +315,72 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                 .where((env) => env['archivee'] != true)
                 .toList();
 
+        // --- LOGIQUE SPÉCIALE POUR DETTE ---
+        if ((categorie['nom'] as String).toLowerCase().contains('dette')) {
+          // 1. Récupérer tous les comptes de type Carte de crédit/crédit
+          final cartesCredit = widget.comptes.where((c) {
+            final type = (c['type'] ?? '').toString().toLowerCase();
+            return type.contains('carte') || type.contains('crédit');
+          }).toList();
+
+          // 2. Noms des enveloppes déjà présentes (normalisés)
+          String normalize(String s) => s.toLowerCase().trim();
+          final nomsEnveloppes =
+              enveloppes.map((e) => normalize(e['nom'] ?? '')).toSet();
+
+          // 3. Créer des enveloppes virtuelles pour les cartes de crédit manquantes
+          final enveloppesVirtuelles = cartesCredit
+              .where((c) => !nomsEnveloppes.contains(normalize(c['nom'] ?? '')))
+              .map((c) => {
+                    'nom': c['nom'],
+                    'solde': 0.0,
+                    'objectif': 0.0,
+                    'depense': 0.0,
+                    'provenance_compte_id': c['id'],
+                    'archivee': false,
+                    'provenances': [],
+                  })
+              .toList();
+
+          // 4. Filtrer toutes les enveloppes pour ne garder qu'une seule par nom (normalisé)
+          final Set<String> nomsVus = enveloppesVirtuelles
+              .map((e) => normalize(e['nom'] ?? ''))
+              .toSet();
+          final enveloppesUniques = <Map<String, dynamic>>[];
+          for (final env in enveloppes) {
+            final nomNorm = normalize(env['nom'] ?? '');
+            if (!nomsVus.contains(nomNorm)) {
+              enveloppesUniques.add(env);
+              nomsVus.add(nomNorm);
+            }
+          }
+
+          // 5. Afficher d'abord les enveloppes virtuelles (cartes de crédit sans enveloppe), puis les enveloppes existantes uniques
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    categorie['nom'],
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              ...enveloppesVirtuelles
+                  .map((env) => _buildEnveloppeWidget(env, categorie)),
+              ...enveloppesUniques.take(enveloppesAffichees).map(
+                  (enveloppe) => _buildEnveloppeWidget(enveloppe, categorie)),
+              const SizedBox(height: 24),
+            ],
+          );
+        }
+        // --- FIN LOGIQUE SPÉCIALE DETTE ---
+
         // Vérifier si la catégorie a des enveloppes négatives
         final aEnveloppesNegatives = enveloppes.any(
           (env) => (env['solde'] ?? 0.0).toDouble() < 0,
@@ -1161,6 +1227,197 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildEnveloppeWidget(
+      Map<String, dynamic> enveloppe, Map<String, dynamic> categorie) {
+    // --- Logique d'affichage de l'historique ---
+    Map<String, dynamic> historique = enveloppe['historique'] != null
+        ? Map<String, dynamic>.from(enveloppe['historique'])
+        : {};
+    Map<String, dynamic>? histoMois = (widget.selectedMonthKey != null &&
+            historique[widget.selectedMonthKey] != null)
+        ? Map<String, dynamic>.from(historique[widget.selectedMonthKey])
+        : null;
+
+    final now = DateTime.now();
+    final currentMonthKey =
+        "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+    final selectedDate = widget.selectedMonthKey != null
+        ? DateFormat('yyyy-MM').parse(widget.selectedMonthKey!)
+        : now;
+    final isFutureMonth = selectedDate.year > now.year ||
+        (selectedDate.year == now.year && selectedDate.month > now.month);
+
+    double solde;
+    double objectif;
+    double depense;
+
+    if (widget.selectedMonthKey == null ||
+        widget.selectedMonthKey == currentMonthKey) {
+      // Mois courant -> valeurs globales
+      solde = (enveloppe['solde'] ?? 0.0).toDouble();
+      objectif = (enveloppe['objectif'] ?? 0.0).toDouble();
+      depense = (enveloppe['depense'] ?? 0.0).toDouble();
+    } else if (histoMois != null) {
+      // Mois passé avec historique -> valeurs de l'historique
+      solde = (histoMois['solde'] ?? 0.0).toDouble();
+      objectif = (histoMois['objectif'] ?? 0.0).toDouble();
+      depense = (histoMois['depense'] ?? 0.0).toDouble();
+    } else if (isFutureMonth) {
+      // Mois futur -> valeurs projetées
+      solde = (enveloppe['solde'] ?? 0.0).toDouble();
+      objectif = (enveloppe['objectif'] ?? 0.0).toDouble();
+      depense = 0.0;
+    } else {
+      // Mois passé sans historique -> 0
+      solde = 0.0;
+      objectif = 0.0;
+      depense = 0.0;
+    }
+
+    final bool estNegative = solde < 0;
+    final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
+    final double progression = (objectif > 0)
+        ? (estDepenseAtteint ? 1.0 : (solde / objectif).clamp(0.0, 1.0))
+        : 0.0;
+    final Color etatColor = _getEtatColor(solde, objectif);
+
+    // --- Widget bulle enveloppe interactif ---
+    Color bulleColor;
+    final String compteId = enveloppe['provenance_compte_id'] ?? '';
+    if (solde == 0) {
+      bulleColor = const Color(0xFF44474A);
+    } else if (estNegative) {
+      bulleColor = Colors.red;
+    } else if (compteId.isNotEmpty) {
+      final compte = widget.comptes.firstWhere(
+        (c) => c['id'].toString() == compteId.toString(),
+        orElse: () => <String, Object>{},
+      );
+      if (compte['couleur'] != null && compte['couleur'] is int) {
+        try {
+          bulleColor = Color(compte['couleur'] as int);
+        } catch (_) {
+          bulleColor = Colors.amber;
+        }
+      } else {
+        bulleColor = Colors.amber;
+      }
+    } else {
+      bulleColor = Colors.amber;
+    }
+
+    Color barreColor;
+    if (solde < 0) {
+      barreColor = Colors.red;
+    } else if (solde == 0) {
+      barreColor = const Color(0xFF44474A);
+    } else {
+      barreColor = Colors.amber;
+    }
+
+    final cardWidget = Card(
+      color: estNegative
+          ? Theme.of(context).colorScheme.error.withOpacity(0.15)
+          : const Color(0xFF232526),
+      child: Stack(
+        children: [
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 8,
+              decoration: BoxDecoration(
+                color: barreColor,
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: 10,
+              horizontal: 12,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (estNegative) ...[
+                  Icon(
+                    Icons.warning,
+                    color: Colors.red[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    enveloppe['nom'],
+                    style: TextStyle(
+                      color: estNegative ? Colors.red[800] : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Builder(
+                  builder: (context) {
+                    final List<dynamic> provenances =
+                        enveloppe['provenances'] ?? [];
+                    if (provenances.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: bulleColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${solde.toStringAsFixed(2)} \$',
+                          style: TextStyle(
+                            color: estNegative
+                                ? Colors.white
+                                : (solde == 0 ? Colors.white70 : Colors.black),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      );
+                    }
+                    return Container();
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return InkWell(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => AssignationBottomSheet(
+            enveloppe: enveloppe,
+            comptes: widget.comptes,
+          ),
+        );
+      },
+      onLongPress: () {
+        if (solde > 0) {
+          _showViderEnveloppeMenu(context, enveloppe);
+        }
+      },
+      child: cardWidget,
     );
   }
 }
