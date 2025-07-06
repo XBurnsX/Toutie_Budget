@@ -334,8 +334,8 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                     } else if (compte.type == 'Carte de crédit') {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              PageDetailCarteCredit(),
+                          builder: (_) => PageDetailCarteCredit(
+                              compteId: compte.id, nomCarte: compte.nom),
                         ),
                       );
                     } else {

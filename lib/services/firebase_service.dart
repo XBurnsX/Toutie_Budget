@@ -1036,4 +1036,11 @@ class FirebaseService {
       },
     );
   }
+
+  Future<void> setCarteCredit(
+      String compteId, Map<String, dynamic> data) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
+    await comptesRef.doc(compteId).set(data, SetOptions(merge: true));
+  }
 }

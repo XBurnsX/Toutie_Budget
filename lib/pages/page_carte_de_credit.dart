@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Assurez-vous d'avoir le package intl dans pubspec.yaml
+import 'package:intl/intl.dart';
+import 'package:toutie_budget/services/firebase_service.dart'; // Assurez-vous d'avoir le package intl dans pubspec.yaml
 import 'dart:math'; // Pour les calculs financiers
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // --- Classe helper pour gérer les contrôleurs de dépenses fixes ---
 class DepenseFixeController {
@@ -19,10 +21,22 @@ class DepenseFixeController {
 
 // --- Le Widget principal de la page ---
 class PageDetailCarteCredit extends StatefulWidget {
-  // Vous passerez l'ID de la carte ou l'objet carte ici
-  // final String carteId;
+  final String? nomCarte;
+  final double? soldeActuel;
+  final double? limiteCredit;
+  final double? paiementMinimum;
+  final DateTime? dateEcheance;
+  final String compteId;
 
-  const PageDetailCarteCredit({super.key /*, required this.carteId */});
+  const PageDetailCarteCredit({
+    super.key,
+    this.nomCarte,
+    this.soldeActuel,
+    this.limiteCredit,
+    this.paiementMinimum,
+    this.dateEcheance,
+    required this.compteId,
+  });
 
   @override
   State<PageDetailCarteCredit> createState() => _PageDetailCarteCreditState();
@@ -32,7 +46,6 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   // --- ====================================================== ---
   // --- Données d'état (à remplacer par vos vraies données) ---
   // --- ====================================================== ---
-  final String _nomCarte = 'Visa Desjardins';
   double _soldeActuel = 6200.0;
   // On initialise la limite à 0 pour simuler la première ouverture
   double _limiteCredit = 0.0;
@@ -42,11 +55,13 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   // --- Contrôleurs pour le calculateur ---
   final _tauxInteretController = TextEditingController(text: '19.99');
   final _paiementMensuelController = TextEditingController();
+  final _pourcentageCibleController = TextEditingController();
   DateTime? _dateCible;
 
   // --- État pour les résultats des calculs ---
   String _resultatCalculTemps = '';
   String _resultatCalculPaiement = '';
+  String _resultatCalculPourcentage = '';
   String _fraisInteretMensuel = '';
 
   // --- Logique pour les dépenses fixes ---
@@ -54,14 +69,19 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     DepenseFixeController()
   ];
 
+  // Variable pour suivre si c'est la première ouverture
+  bool _isFirstTime = true;
+
+  // Variable pour suivre s'il y a des modifications non sauvegardées
+  bool _hasUnsavedChanges = false;
+
+  // Ajout de la variable d'état pour le nom de la carte
+  String _nomCarte = '';
+
   @override
   void initState() {
     super.initState();
-    // NOTE: Dans une vraie app, vous chargeriez les données de la carte ici.
-    // Pour l'exemple, on vérifie si la configuration initiale a été faite.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkInitialSetup();
-    });
+    _chargerDonneesCarteCredit();
     _calculerFraisInteretMensuel();
   }
 
@@ -69,6 +89,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   void dispose() {
     _tauxInteretController.dispose();
     _paiementMensuelController.dispose();
+    _pourcentageCibleController.dispose();
     for (var controller in _depensesFixesControllers) {
       controller.dispose();
     }
@@ -80,27 +101,38 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   // --- ====================================================== ---
 
   void _checkInitialSetup() {
-    // Simule la vérification : si la limite est à 0, on considère que c'est la 1ère ouverture.
-    if (_limiteCredit == 0.0) {
+    // Vérifie si la configuration initiale a été faite
+    // Si les variables d'état locales ne sont pas configurées, on affiche le dialogue
+    if ((_limiteCredit == 0.0 || _paiementMinimum == 0.0) && _isFirstTime) {
       _showInitialSetupDialog();
+      _isFirstTime = false; // Marquer que ce n'est plus la première fois
     }
   }
 
   void _showInitialSetupDialog() {
-    final limiteController = TextEditingController();
-    final paiementMinController = TextEditingController();
-    final jourPaiementController = TextEditingController();
+    // Utiliser directement les variables d'état locales
+    final limiteController = TextEditingController(
+        text: _limiteCredit > 0 ? _limiteCredit.toStringAsFixed(0) : '');
+    final paiementMinController = TextEditingController(
+        text: _paiementMinimum > 0 ? _paiementMinimum.toStringAsFixed(2) : '');
+    final jourPaiementController = TextEditingController(
+        text: _dateEcheance != null ? _dateEcheance.day.toString() : '');
 
     showDialog(
       context: context,
-      barrierDismissible: false, // L'utilisateur doit remplir les infos
+      barrierDismissible: true, // Permettre de fermer le dialogue
       builder: (context) {
         return AlertDialog(
-          title: Text('Configurer la carte "$_nomCarte"'),
+          title: Text('Configurer ${widget.nomCarte ?? 'la carte de crédit'}'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Text(
+                  'Configurez les paramètres de votre carte de crédit pour des calculs précis.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: limiteController,
                   decoration:
@@ -117,16 +149,20 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                 ),
                 TextField(
                   controller: jourPaiementController,
-                  decoration:
-                      const InputDecoration(labelText: 'Jour du paiement (1-28)'),
+                  decoration: const InputDecoration(
+                      labelText: 'Jour du paiement (1-28)'),
                   keyboardType: TextInputType.number,
                 ),
               ],
             ),
           ),
           actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 // Sauvegarder les informations
                 final double limite =
                     double.tryParse(limiteController.text) ?? 0.0;
@@ -136,25 +172,65 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     int.tryParse(jourPaiementController.text) ?? 1;
 
                 if (limite > 0 && paiementMin > 0) {
+                  // Calcule la prochaine date d'échéance
+                  final now = DateTime.now();
+                  final dateEcheance =
+                      DateTime(now.year, now.month, jourPaiement);
+                  final dateEcheanceFinale = dateEcheance.isBefore(now)
+                      ? DateTime(now.year, now.month + 1, jourPaiement)
+                      : dateEcheance;
+
+                  // Sauvegarder dans Firebase
+                  try {
+                    await FirebaseService().setCarteCredit(
+                      widget.compteId,
+                      {
+                        'nom': _nomCarte,
+                        'soldeActuel': _soldeActuel,
+                        'limiteCredit': limite,
+                        'paiementMinimum': paiementMin,
+                        'dateEcheance': dateEcheanceFinale.toIso8601String(),
+                        'type': 'Carte de crédit',
+                        'tauxInteret':
+                            double.tryParse(_tauxInteretController.text) ?? 0.0,
+                        'depensesFixes': _depensesFixesControllers
+                            .map((controller) => {
+                                  'nom': controller.nom.text,
+                                  'montant': double.tryParse(
+                                          controller.montant.text) ??
+                                      0.0,
+                                })
+                            .toList(),
+                      },
+                    );
+                  } catch (e) {
+                    print('Erreur lors de la sauvegarde: $e');
+                  }
+
                   setState(() {
+                    // Mettre à jour les variables d'état locales
                     _limiteCredit = limite;
                     _paiementMinimum = paiementMin;
-
-                    // Calcule la prochaine date d'échéance
-                    final now = DateTime.now();
-                    _dateEcheance = DateTime(now.year, now.month, jourPaiement);
-                    if (_dateEcheance.isBefore(now)) {
-                      _dateEcheance =
-                          DateTime(now.year, now.month + 1, jourPaiement);
-                    }
+                    _dateEcheance = dateEcheanceFinale;
                   });
+                  _markAsModified();
+
+                  // Afficher un message de succès
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content:
+                              Text('Configuration sauvegardée avec succès')),
+                    );
+                  }
+
                   Navigator.of(context).pop();
                 } else {
                   // Afficher une erreur si les champs sont invalides
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content:
-                            Text('Veuillez remplir tous les champs correctement.')),
+                        content: Text(
+                            'Veuillez remplir tous les champs correctement.')),
                   );
                 }
               },
@@ -164,6 +240,84 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
         );
       },
     );
+  }
+
+  // Méthode helper pour marquer qu'il y a des modifications
+  void _markAsModified() {
+    if (!_hasUnsavedChanges) {
+      setState(() {
+        _hasUnsavedChanges = true;
+      });
+    }
+  }
+
+  // Fonction pour sauvegarder toutes les modifications
+  void _sauvegarderModifications() async {
+    // Afficher un indicateur de chargement
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Sauvegarder dans Firebase
+      await FirebaseService().setCarteCredit(
+        widget.compteId,
+        {
+          'nom': _nomCarte,
+          'soldeActuel': _soldeActuel,
+          'limiteCredit': _limiteCredit,
+          'paiementMinimum': _paiementMinimum,
+          'dateEcheance': _dateEcheance.toIso8601String(),
+          'type': 'Carte de crédit',
+          'tauxInteret': double.tryParse(_tauxInteretController.text) ?? 0.0,
+          'depensesFixes': _depensesFixesControllers
+              .map((controller) => {
+                    'nom': controller.nom.text,
+                    'montant': double.tryParse(controller.montant.text) ?? 0.0,
+                  })
+              .toList(),
+        },
+      );
+
+      // Fermer l'indicateur de chargement
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Marquer qu'il n'y a plus de modifications non sauvegardées
+      setState(() {
+        _hasUnsavedChanges = false;
+      });
+
+      // Afficher un message de succès
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Modifications sauvegardées avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Fermer l'indicateur de chargement
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Afficher un message d'erreur
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // NOUVELLE FONCTION: Affiche un dialogue pour mettre à jour le solde
@@ -189,7 +343,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
               child: const Text('Annuler'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final nouveauSolde = double.tryParse(soldeController.text);
                 if (nouveauSolde != null) {
                   setState(() {
@@ -197,9 +351,20 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     // Recalculer les frais d'intérêt basés sur le nouveau solde
                     _calculerFraisInteretMensuel();
                   });
-                  // NOTE: Ici, vous appelleriez votre service pour sauvegarder
-                  // le nouveau solde dans Firebase.
-                  // ex: _firebaseService.updateSoldeCarte(widget.carteId, nouveauSolde);
+                  _markAsModified();
+                  // Sauvegarder le nouveau solde dans Firebase
+                  try {
+                    await FirebaseService().setCarteCredit(
+                      widget.compteId,
+                      {
+                        'nom': _nomCarte,
+                        'soldeActuel': nouveauSolde,
+                        'type': 'Carte de crédit',
+                      },
+                    );
+                  } catch (e) {
+                    print('Erreur lors de la sauvegarde du solde: $e');
+                  }
                   Navigator.of(context).pop();
                 }
               },
@@ -225,6 +390,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     setState(() {
       _depensesFixesControllers.add(DepenseFixeController());
     });
+    _markAsModified();
   }
 
   void _supprimerDepenseFixe(int index) {
@@ -232,16 +398,18 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       _depensesFixesControllers[index].dispose();
       _depensesFixesControllers.removeAt(index);
     });
+    _markAsModified();
   }
 
   void _calculerFraisInteretMensuel() {
     final double tauxAnnuel =
         double.tryParse(_tauxInteretController.text) ?? 0.0;
     if (tauxAnnuel > 0) {
-      final double interet = _soldeActuel * (tauxAnnuel / 100 / 12);
+      final double soldeActuel = widget.soldeActuel ?? 0.0;
+      final double interet = soldeActuel * (tauxAnnuel / 100 / 12);
       setState(() {
         _fraisInteretMensuel =
-            'Frais d\'intérêt mensuels estimés: \$${interet.toStringAsFixed(2)}';
+            'Frais d\'intérêt mensuels: \$${interet.toStringAsFixed(2)}';
       });
     }
   }
@@ -253,7 +421,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     final double tauxMensuel = tauxAnnuel / 100 / 12;
     double paiementMensuel =
         double.tryParse(_paiementMensuelController.text) ?? 0.0;
-    double soldeCourant = _soldeActuel;
+    double soldeCourant = widget.soldeActuel ?? 0.0;
 
     // Validation
     if (paiementMensuel <= (soldeCourant * tauxMensuel) + _totalDepensesFixes) {
@@ -307,10 +475,11 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
       return;
     }
 
-    double paiementEstime = _soldeActuel / n; // Estimation de base
+    double paiementEstime =
+        (widget.soldeActuel ?? 0.0) / n; // Estimation de base
     for (int j = 0; j < 10; j++) {
       // Répéter pour affiner
-      double soldeSimule = _soldeActuel;
+      double soldeSimule = widget.soldeActuel ?? 0.0;
       for (int k = 0; k < n; k++) {
         soldeSimule += soldeSimule * i + _totalDepensesFixes - paiementEstime;
       }
@@ -323,24 +492,133 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
     });
   }
 
+  // Scénario 3: Calcule le paiement pour atteindre un pourcentage cible
+  void _calculerPaiementPourcentage() {
+    final double pourcentageCible =
+        double.tryParse(_pourcentageCibleController.text) ?? 0.0;
+    if (pourcentageCible <= 0 || pourcentageCible >= 100) {
+      setState(() {
+        _resultatCalculPourcentage = 'Le pourcentage doit être entre 0 et 100.';
+      });
+      return;
+    }
+
+    final double limiteCredit = widget.limiteCredit ?? 0.0;
+    if (limiteCredit <= 0) {
+      setState(() {
+        _resultatCalculPourcentage = 'Veuillez configurer la limite de crédit.';
+      });
+      return;
+    }
+
+    final double soldeActuel = widget.soldeActuel ?? 0.0;
+    final double soldeCible = limiteCredit * (pourcentageCible / 100);
+    final double montantARembourser = soldeActuel - soldeCible;
+
+    if (montantARembourser <= 0) {
+      setState(() {
+        _resultatCalculPourcentage =
+            'Le solde actuel (\$${soldeActuel.toStringAsFixed(0)}) est déjà inférieur à l\'objectif (\$${soldeCible.toStringAsFixed(0)}).';
+      });
+      return;
+    }
+
+    final double tauxAnnuel =
+        double.tryParse(_tauxInteretController.text) ?? 0.0;
+    final double i = tauxAnnuel / 100 / 12; // Taux d'intérêt mensuel
+
+    // Si pas de date cible, on calcule pour 12 mois par défaut
+    int n = 12;
+    if (_dateCible != null) {
+      n = _dateCible!.difference(DateTime.now()).inDays ~/ 30;
+      if (n <= 0) {
+        setState(() {
+          _resultatCalculPourcentage = 'La date doit être dans le futur.';
+        });
+        return;
+      }
+    }
+
+    // Calcul itératif pour trouver le paiement mensuel requis
+    double paiementEstime = montantARembourser / n;
+    for (int j = 0; j < 10; j++) {
+      double soldeSimule = soldeActuel;
+      for (int k = 0; k < n; k++) {
+        soldeSimule += soldeSimule * i + _totalDepensesFixes - paiementEstime;
+      }
+      paiementEstime += (soldeSimule - soldeCible) / n;
+    }
+
+    final String dateInfo = _dateCible != null
+        ? ' d\'ici ${DateFormat.yMMM('fr_CA').format(_dateCible!)}'
+        : ' en $n mois';
+
+    setState(() {
+      _resultatCalculPourcentage =
+          'Pour atteindre ${pourcentageCible}% (\$${soldeCible.toStringAsFixed(0)})$dateInfo, '
+          'paiement mensuel requis: \$${paiementEstime.toStringAsFixed(2)}';
+    });
+  }
+
   // --- ====================================================== ---
   // --- Widgets de Construction de l'UI ---
   // --- ====================================================== ---
   @override
   Widget build(BuildContext context) {
+    final nomCarte = widget.nomCarte ?? 'Ma carte de crédit';
+    final soldeActuel = widget.soldeActuel ?? _soldeActuel;
+    // Utiliser les variables d'état locales si elles sont configurées, sinon les données du widget
+    final limiteCredit =
+        _limiteCredit > 0 ? _limiteCredit : (widget.limiteCredit ?? 0.0);
+    final paiementMinimum = _paiementMinimum > 0
+        ? _paiementMinimum
+        : (widget.paiementMinimum ?? 0.0);
+    final dateEcheance = _limiteCredit > 0
+        ? _dateEcheance
+        : (widget.dateEcheance ?? DateTime.now().add(const Duration(days: 15)));
+
+    double creditUtilise = soldeActuel;
+    double creditDisponible = limiteCredit - soldeActuel;
+    double utilisationPourcentage =
+        limiteCredit > 0 ? creditUtilise / limiteCredit : 0;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_nomCarte),
+        title: Text(nomCarte),
         backgroundColor: Theme.of(context).colorScheme.surface,
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.save,
+              color: _hasUnsavedChanges ? Colors.orange : null,
+            ),
+            tooltip: _hasUnsavedChanges
+                ? 'Sauvegarder les modifications (non sauvegardées)'
+                : 'Sauvegarder les modifications',
+            onPressed: _sauvegarderModifications,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Configurer la carte',
+            onPressed: _showInitialSetupDialog,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildResumeCarte(),
+            _buildResumeCarte(
+                soldeActuel,
+                limiteCredit,
+                paiementMinimum,
+                dateEcheance,
+                creditUtilise,
+                creditDisponible,
+                utilisationPourcentage),
             const SizedBox(height: 24),
-            _buildCalculateurRemboursement(),
+            _buildCalculateurRemboursement(soldeActuel),
           ],
         ),
       ),
@@ -348,12 +626,14 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   }
 
   // --- Section Résumé de la carte ---
-  Widget _buildResumeCarte() {
-    double creditUtilise = _soldeActuel;
-    double creditDisponible = _limiteCredit - _soldeActuel;
-    double utilisationPourcentage =
-        _limiteCredit > 0 ? creditUtilise / _limiteCredit : 0;
-
+  Widget _buildResumeCarte(
+      double soldeActuel,
+      double limiteCredit,
+      double paiementMinimum,
+      DateTime dateEcheance,
+      double creditUtilise,
+      double creditDisponible,
+      double utilisationPourcentage) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -368,12 +648,13 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     style: Theme.of(context).textTheme.bodyMedium),
                 IconButton(
                   icon: const Icon(Icons.edit, size: 20),
-                  onPressed: _showUpdateSoldeDialog, // Appel de la nouvelle fonction
+                  onPressed:
+                      _showUpdateSoldeDialog, // Appel de la nouvelle fonction
                   tooltip: 'Mettre à jour le solde',
                 )
               ],
             ),
-            Text('\$${_soldeActuel.toStringAsFixed(2)}',
+            Text('\$${soldeActuel.toStringAsFixed(2)}',
                 style: Theme.of(context)
                     .textTheme
                     .headlineMedium
@@ -382,7 +663,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
 
             // Barre de progression
             Text(
-                'Utilisation du crédit: \$${creditUtilise.toStringAsFixed(2)} / \$${_limiteCredit.toStringAsFixed(2)}'),
+                'Utilisation du crédit: \$${creditUtilise.toStringAsFixed(2)} / \$${limiteCredit.toStringAsFixed(2)}'),
             const SizedBox(height: 8),
             LinearProgressIndicator(
               value: utilisationPourcentage,
@@ -398,12 +679,12 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                _buildInfoCarte('Crédit dispo.',
+                    '\$${creditDisponible.toStringAsFixed(2)}'),
                 _buildInfoCarte(
-                    'Crédit dispo.', '\$${creditDisponible.toStringAsFixed(2)}'),
-                _buildInfoCarte(
-                    'Paiement min.', '\$${_paiementMinimum.toStringAsFixed(2)}'),
+                    'Paiement min.', '\$${paiementMinimum.toStringAsFixed(2)}'),
                 _buildInfoCarte('Prochain paiement',
-                    DateFormat.yMd('fr_CA').format(_dateEcheance)),
+                    DateFormat.yMd('fr_CA').format(dateEcheance)),
               ],
             ),
             // Commentaire pour l'objectif d'enveloppe
@@ -416,7 +697,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
   }
 
   // --- Section Calculateur ---
-  Widget _buildCalculateurRemboursement() {
+  Widget _buildCalculateurRemboursement(double soldeActuel) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -436,7 +717,10 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                   border: OutlineInputBorder()),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (_) => _calculerFraisInteretMensuel(),
+              onChanged: (_) {
+                _calculerFraisInteretMensuel();
+                _markAsModified();
+              },
             ),
             const SizedBox(height: 8),
             if (_fraisInteretMensuel.isNotEmpty)
@@ -469,6 +753,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                           border: OutlineInputBorder()),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => _markAsModified(),
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton(
@@ -507,13 +792,14 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                               DateTime.now().add(const Duration(days: 365)),
                           firstDate:
                               DateTime.now().add(const Duration(days: 30)),
-                          lastDate:
-                              DateTime.now().add(const Duration(days: 365 * 10)),
+                          lastDate: DateTime.now()
+                              .add(const Duration(days: 365 * 10)),
                         );
                         if (pickedDate != null) {
                           setState(() {
                             _dateCible = pickedDate;
                           });
+                          _markAsModified();
                         }
                       },
                     ),
@@ -535,9 +821,40 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                       ),
                   ],
                 )),
-            // NOTE: Le scénario pour atteindre un % cible serait une variation du scénario 2.
-            // Il faudrait calculer le solde cible (ex: 20% de 7000$ = 1400$) et utiliser ce montant
-            // comme objectif final dans la simulation au lieu de 0.
+            const SizedBox(height: 16),
+
+            // Scénario 3: "Atteindre un pourcentage cible"
+            _buildScenarioCard(
+                titre: 'Scénario 3: Atteindre un pourcentage d\'utilisation',
+                contenu: Column(
+                  children: [
+                    TextField(
+                      controller: _pourcentageCibleController,
+                      decoration: const InputDecoration(
+                          labelText: 'Pourcentage cible (ex: 20 pour 20%)',
+                          border: OutlineInputBorder()),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => _markAsModified(),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _calculerPaiementPourcentage,
+                      child: const Text('Calculer le paiement mensuel'),
+                    ),
+                    if (_resultatCalculPourcentage.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(_resultatCalculPourcentage,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
+                      ),
+                  ],
+                )),
           ],
         ),
       ),
@@ -563,6 +880,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                 decoration: const InputDecoration(
                     hintText: 'Nom (ex: Assurance)',
                     border: OutlineInputBorder()),
+                onChanged: (_) => _markAsModified(),
               ),
             ),
             const SizedBox(width: 8),
@@ -574,6 +892,7 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
                     hintText: 'Montant', border: OutlineInputBorder()),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => _markAsModified(),
               ),
             ),
             IconButton(
@@ -617,5 +936,38 @@ class _PageDetailCarteCreditState extends State<PageDetailCarteCredit> {
         ),
       ),
     );
+  }
+
+  Future<void> _chargerDonneesCarteCredit() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('comptes')
+        .doc(widget.compteId)
+        .get();
+    if (doc.exists) {
+      final data = doc.data()!;
+      setState(() {
+        _nomCarte = data['nom'] ?? widget.nomCarte ?? '';
+        _soldeActuel = (data['soldeActuel'] as num?)?.toDouble() ?? 0.0;
+        _limiteCredit = (data['limiteCredit'] as num?)?.toDouble() ?? 0.0;
+        _paiementMinimum = (data['paiementMinimum'] as num?)?.toDouble() ?? 0.0;
+        _dateEcheance = data['dateEcheance'] != null
+            ? DateTime.tryParse(data['dateEcheance']) ?? DateTime.now()
+            : DateTime.now();
+        _tauxInteretController.text =
+            (data['tauxInteret'] as num?)?.toString() ?? '';
+        // ... autres champs si besoin
+      });
+    } else {
+      setState(() {
+        _nomCarte = widget.nomCarte ?? '';
+        _soldeActuel = 0.0;
+        _limiteCredit = 0.0;
+        _paiementMinimum = 0.0;
+        _dateEcheance = DateTime.now();
+        _tauxInteretController.text = '';
+        // ... autres champs à 0 ou vide
+      });
+    }
+    _checkInitialSetup(); // <-- APPEL ICI, APRÈS le chargement Firestore
   }
 }
