@@ -379,6 +379,7 @@ class AjoutTransactionController extends ChangeNotifier {
         await _traiterRevenuNormal(compte, montant, firebaseService);
       }
 
+      print('DEBUG: Création de l\'objet transaction');
       // Créer la transaction
       final transaction = app_model.Transaction(
         id: transactionId,
@@ -401,11 +402,15 @@ class AjoutTransactionController extends ChangeNotifier {
             : null,
       );
 
+      print('DEBUG: Transaction créée, sauvegarde dans Firebase...');
       if (_transactionExistante != null) {
+        print('DEBUG: Mise à jour de transaction existante');
         await firebaseService.mettreAJourTransaction(transaction);
       } else {
+        print('DEBUG: Ajout de nouvelle transaction');
         await firebaseService.ajouterTransaction(transaction);
       }
+      print('DEBUG: Transaction sauvegardée avec succès');
       _transactionExistante = transaction;
 
       // Retourner l'information de finalisation si applicable
@@ -438,34 +443,8 @@ class AjoutTransactionController extends ChangeNotifier {
         return; // Pour les remboursements, on ne crée pas de nouvelle dette
       }
 
-      // Vérifier s'il existe déjà une dette active pour ce tiers
-      final dettesActives = await detteService.dettesActives().first;
-      final dettesExistantes = dettesActives
-          .where(
-            (d) =>
-                normaliserChaine(d.nomTiers) == normaliserChaine(nomTiers) &&
-                d.type == typeDette,
-          )
-          .toList();
-
-      // Si une dette existe déjà, ajouter le montant à cette dette
-      if (dettesExistantes.isNotEmpty) {
-        final detteExistante =
-            dettesExistantes.first; // Prendre la première trouvée
-
-        // Créer un mouvement pour ajouter le montant à la dette existante
-        final mouvement = MouvementDette(
-          id: '${DateTime.now().millisecondsSinceEpoch}_ajout',
-          type: typeDette,
-          montant: typeDette == 'dette' ? montant : -montant,
-          date: DateTime.now(),
-          note: 'Ajout via transaction',
-        );
-
-        // Ajouter le mouvement à la dette existante
-        await detteService.ajouterMouvement(detteExistante.id, mouvement);
-        return;
-      }
+      // Créer une nouvelle dette (permettre plusieurs dettes pour le même tiers)
+      // Le système de remboursement FIFO sera géré lors des remboursements
 
       // Si aucune dette existante, créer une nouvelle dette
       final String detteId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -496,15 +475,22 @@ class AjoutTransactionController extends ChangeNotifier {
         estManuelle: false,
       );
 
+      print(
+          'DEBUG: Création de la dette - ID: $detteId, Type: $typeDette, Montant: $montant');
+
       await detteService.creerDette(
         nouvelleDette,
         creerCompteAutomatique: false,
       );
 
+      print('DEBUG: Dette créée avec succès');
       // Plus besoin de créer un compte de dette automatique
       // Les dettes sont maintenant affichées directement dans la page comptes
     } catch (e) {
-      // Erreur silencieuse
+      print('DEBUG: Erreur lors de la création de la dette: $e');
+      print('DEBUG: Stack trace: ${StackTrace.current}');
+      // Relancer l'erreur pour qu'elle soit visible
+      rethrow;
     }
   }
 

@@ -202,9 +202,26 @@ class _EcranAjoutTransactionRefactoredState
         return;
       }
 
-      // Retourner la transaction modifiée/ajoutée à la page précédente
-      if (mounted) {
-        Navigator.of(context).pop(_controller.transactionExistante);
+      print('DEBUG: Sauvegarde terminée');
+      print(
+          'DEBUG: Transaction existante: ${_controller.transactionExistante?.id}');
+
+      // Détecter le contexte de navigation
+      final bool estDansNavigationOnglets = widget.onTransactionSaved != null;
+      print('DEBUG: Contexte détecté - Onglets: $estDansNavigationOnglets');
+
+      if (estDansNavigationOnglets) {
+        // Navigation par onglets - utiliser le callback
+        print('DEBUG: Appel du callback onTransactionSaved');
+        widget.onTransactionSaved!();
+        print('DEBUG: Callback onTransactionSaved terminé');
+      } else {
+        // Navigation normale (push/pop) - retourner à la page précédente
+        if (mounted) {
+          print('DEBUG: Navigation.pop() appelé');
+          Navigator.of(context).pop(_controller.transactionExistante);
+          print('DEBUG: Navigation.pop() terminé');
+        }
       }
     } catch (e) {
       if (mounted) {
