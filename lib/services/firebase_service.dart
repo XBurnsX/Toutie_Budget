@@ -1073,4 +1073,41 @@ class FirebaseService {
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
     await comptesRef.doc(compteId).set(data, SetOptions(merge: true));
   }
+
+  Future<void> mettreAJourTransaction(app_model.Transaction transaction) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
+
+    final transactionAvecUser = app_model.Transaction(
+      id: transaction.id,
+      userId: user.uid,
+      type: transaction.type,
+      typeMouvement: transaction.typeMouvement,
+      montant: transaction.montant,
+      compteId: transaction.compteId,
+      date: transaction.date,
+      tiers: transaction.tiers,
+      compteDePassifAssocie: transaction.compteDePassifAssocie,
+      enveloppeId: transaction.enveloppeId,
+      marqueur: transaction.marqueur,
+      note: transaction.note,
+      estFractionnee: transaction.estFractionnee,
+      sousItems: transaction.sousItems,
+    );
+
+    // Logger la mise à jour de la transaction
+    FirebaseMonitorService.logWrite(
+      collection: 'transactions',
+      document: transaction.id,
+      count: 1,
+      userId: user.uid,
+      details:
+          'Mise à jour transaction: ${transaction.tiers ?? 'Sans tiers'} - ${transaction.montant}€',
+    );
+
+    await firestore
+        .collection('transactions')
+        .doc(transaction.id)
+        .set(transactionAvecUser.toJson(), SetOptions(merge: true));
+  }
 }

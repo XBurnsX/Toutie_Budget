@@ -40,6 +40,8 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
 
   final ScrollController _scrollController = ScrollController();
 
+  int _refreshKey = 0;
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -361,6 +363,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
               ),
               Expanded(
                 child: ListView.builder(
+                  key: ValueKey('transactions_$_refreshKey'),
                   itemCount: _searchResults.length + (_hasMoreSearch ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == _searchResults.length) {
@@ -430,6 +433,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
             ),
             Expanded(
               child: ListView.builder(
+                key: ValueKey('transactions_$_refreshKey'),
                 controller: _scrollController,
                 itemCount: datesTriees.length + (_isLoading ? 1 : 0),
                 itemBuilder: (context, index) {
@@ -557,7 +561,7 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         }
       },
       onTap: () async {
-        await Navigator.of(context).push(
+        final transactionMaj = await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => EcranAjoutTransactionRefactored(
               comptesExistants: const [],
@@ -566,6 +570,16 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
             ),
           ),
         );
+        if (transactionMaj != null && transactionMaj is app_model.Transaction) {
+          setState(() {
+            // Met à jour uniquement la transaction modifiée dans la liste locale
+            final idx =
+                _transactions.indexWhere((tx) => tx.id == transactionMaj.id);
+            if (idx != -1) {
+              _transactions[idx] = transactionMaj;
+            }
+          });
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(

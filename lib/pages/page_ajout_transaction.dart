@@ -202,184 +202,18 @@ class _EcranAjoutTransactionRefactoredState
         return;
       }
 
-      // Si result n'est pas null, la transaction a réussi
-      // Si result est null mais qu'aucune exception n'a été levée, la transaction a aussi réussi
+      // Retourner la transaction modifiée/ajoutée à la page précédente
       if (mounted) {
-        final tiersTexte = _controller.payeController.text.trim();
-        String message = '';
-
-        // --- Ajout logique remboursement dettes associées ---
-        // On ne fait ça que pour une nouvelle transaction de remboursement
-        if (_controller.typeMouvementSelectionne ==
-                TypeMouvementFinancier.remboursementEffectue &&
-            tiersTexte.isNotEmpty) {
-          // Chercher la carte de crédit correspondante (nom insensible à la casse/espaces)
-          final nomCarteRecherche =
-              tiersTexte.replaceAll(' ', '').toLowerCase();
-          final queryCartes = await cf.FirebaseFirestore.instance
-              .collection('comptes')
-              .where('type', isEqualTo: 'Carte de crédit')
-              .get();
-          final cartes = queryCartes.docs.where((doc) {
-            final nomCarte =
-                (doc['nom'] as String?)?.replaceAll(' ', '').toLowerCase() ??
-                    '';
-            return nomCarte == nomCarteRecherche;
-          }).toList();
-          if (cartes.isNotEmpty) {
-            final carteDoc = cartes.first;
-            final dataCarte = carteDoc.data();
-            final bool rembourserDettes =
-                dataCarte['rembourserDettesAssociees'] ?? false;
-            if (rembourserDettes) {
-              final depenses =
-                  (dataCarte['depensesFixes'] as List<dynamic>?) ?? [];
-              int dettesRemboursees = 0;
-              for (final depense in depenses) {
-                final nomDette = (depense['nom'] ?? '').toString().trim();
-                final montant = (depense['montant'] as num?)?.toDouble() ?? 0.0;
-                if (nomDette.isNotEmpty && montant > 0) {
-                  // Chercher la dette correspondante
-                  final queryDette = await cf.FirebaseFirestore.instance
-                      .collection('dettes')
-                      .where('nomTiers', isEqualTo: nomDette)
-                      .get();
-                  if (queryDette.docs.isNotEmpty) {
-                    final detteDoc = queryDette.docs.first;
-                    final dataDette = detteDoc.data();
-                    final double solde =
-                        (dataDette['solde'] as num?)?.toDouble() ?? 0.0;
-                    final double nouveauSoldeDette = solde - montant;
-                    await cf.FirebaseFirestore.instance
-                        .collection('dettes')
-                        .doc(detteDoc.id)
-                        .update({'solde': nouveauSoldeDette});
-                    dettesRemboursees++;
-                  }
-                }
-              }
-              if (dettesRemboursees > 0 && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content:
-                        Text('Dettes associées remboursées automatiquement.'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            }
-          }
-        }
-        // --- Fin logique remboursement dettes associées ---
-
-        // Différencier les messages selon le mode (ajout ou modification)
-        final estModification = widget.transactionExistante != null;
-        final prefix =
-            estModification ? 'Transaction modifiée' : 'Transaction ajoutée';
-
-        switch (_controller.typeMouvementSelectionne) {
-          case TypeMouvementFinancier.depenseNormale:
-            message = '$prefix chez $tiersTexte';
-            break;
-          case TypeMouvementFinancier.revenuNormal:
-            message = estModification
-                ? 'Votre solde a été mis à jour avec succès'
-                : 'Votre solde a été mis à jour avec succès';
-            break;
-          case TypeMouvementFinancier.pretAccorde:
-            message = estModification
-                ? 'Prêt à $tiersTexte modifié avec succès'
-                : 'Prêt à $tiersTexte créé avec succès';
-            break;
-          case TypeMouvementFinancier.detteContractee:
-            message = estModification
-                ? 'Votre dette à $tiersTexte modifiée avec succès'
-                : 'Votre dette à $tiersTexte créée avec succès';
-            break;
-          case TypeMouvementFinancier.remboursementRecu:
-            message = estModification
-                ? 'Le solde du prêt à $tiersTexte a été mis à jour'
-                : 'Le solde du prêt à $tiersTexte a été mis à jour';
-            break;
-          case TypeMouvementFinancier.remboursementEffectue:
-            message = estModification
-                ? 'Votre prêt à $tiersTexte a été mis à jour'
-                : 'Votre prêt à $tiersTexte a été mis à jour';
-            break;
-          case TypeMouvementFinancier.ajustement:
-            message = 'Ajustement de solde pour $tiersTexte enregistré';
-            break;
-        }
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-
-        // Arrêter le spinner AVANT de quitter l'écran.
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-
-        // Afficher le message de finalisation si applicable
-        if (result != null && result['finalisee'] == true) {
-          await Future.delayed(
-            const Duration(milliseconds: 500),
-          ); // Petit délai pour séparer les messages
-
-          String messageFinalisation = '';
-          if (result['typeMouvement'] ==
-              TypeMouvementFinancier.remboursementRecu) {
-            messageFinalisation = '${result['nomTiers']} a finalisé son prêt !';
-          } else if (result['typeMouvement'] ==
-              TypeMouvementFinancier.remboursementEffectue) {
-            if (result['estManuelle'] == true) {
-              messageFinalisation = 'Félicitations, votre dette est terminée !';
-            } else {
-              messageFinalisation = 'Félicitations, votre prêt est terminé !';
-            }
-          }
-
-          if (mounted && messageFinalisation.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(messageFinalisation),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        }
-
-        widget.onTransactionSaved?.call();
-
-        // Retourner à la page précédente après la sauvegarde
-        if (mounted) {
-          if (Navigator.of(context).canPop()) {
-            print('[DEBUG] Pop de la page d\'ajout transaction (canPop = true)');
-            Navigator.of(context).pop();
-          } else {
-            // Dans le cadre de l'onglet « Ajout » (bottom-nav), on ne fait pas de navigation :
-            // le callback onTransactionSaved() se charge déjà de remettre l'index précédent.
-            print('[DEBUG] Pas de pop possible ; on laisse MyHomePage gérer le retour via onTransactionSaved]');
-          }
-        }
+        Navigator.of(context).pop(_controller.transactionExistante);
       }
-    } catch (e, stack) {
-      print('[ERREUR _sauvegarderTransaction] Exception: ' + e.toString());
-      print('[ERREUR _sauvegarderTransaction] StackTrace: ' + stack.toString());
+    } catch (e) {
       if (mounted) {
-        // Afficher le message d'erreur spécifique pour la validation du remboursement
-        final errorMessage = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: ' + errorMessage),
+            content: Text('Erreur lors de la sauvegarde : $e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 6),
           ),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _isLoading = false);
       }
     }

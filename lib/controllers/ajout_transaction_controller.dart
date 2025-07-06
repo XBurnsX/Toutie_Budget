@@ -25,7 +25,8 @@ class AjoutTransactionController extends ChangeNotifier {
   String? _marqueurSelectionne;
 
   // Sélection dans ChampRemboursement
-  String? _remboursementId; // id Firestore de la carte ou de la dette sélectionnée
+  String?
+      _remboursementId; // id Firestore de la carte ou de la dette sélectionnée
   String? _remboursementType; // 'compte' ou 'dette'
 
   List<Compte> _listeComptesAffichables = [];
@@ -207,13 +208,13 @@ class AjoutTransactionController extends ChangeNotifier {
         .where((c) => !c.estArchive)
         .where((c) => c.type == 'Chèque' || c.type == 'Carte de crédit')
         .toList()
-       ..sort((a, b) {
-          // Placer les comptes Chèque en premier
-          if (a.type == 'Chèque' && b.type != 'Chèque') return -1;
-          if (a.type != 'Chèque' && b.type == 'Chèque') return 1;
-          // Sinon trier par champ ordre (nulls à la fin)
-          return (a.ordre ?? 999999).compareTo(b.ordre ?? 999999);
-        });
+      ..sort((a, b) {
+        // Placer les comptes Chèque en premier
+        if (a.type == 'Chèque' && b.type != 'Chèque') return -1;
+        if (a.type != 'Chèque' && b.type == 'Chèque') return 1;
+        // Sinon trier par champ ordre (nulls à la fin)
+        return (a.ordre ?? 999999).compareTo(b.ordre ?? 999999);
+      });
   }
 
   // Fonction utilitaire pour normaliser les chaînes de caractères
@@ -272,7 +273,8 @@ class AjoutTransactionController extends ChangeNotifier {
       if (_remboursementId == null && tiersTexte.isNotEmpty) {
         // Déduire l'ID d'une carte de crédit portant ce nom
         for (final c in _comptesFirebase) {
-          if (c.type == 'Carte de crédit' && c.nom.toLowerCase() == tiersTexte.toLowerCase()) {
+          if (c.type == 'Carte de crédit' &&
+              c.nom.toLowerCase() == tiersTexte.toLowerCase()) {
             _remboursementId = c.id;
             _remboursementType = 'compte';
             print('[SauvegardeTx] Id compte déduit: $_remboursementId');
@@ -287,7 +289,8 @@ class AjoutTransactionController extends ChangeNotifier {
 
       final firebaseService = FirebaseService();
       final detteService = DetteService();
-      final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
+      final transactionId = _transactionExistante?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString();
 
       Map<String, dynamic>? infoFinalisation;
 
@@ -307,12 +310,7 @@ class AjoutTransactionController extends ChangeNotifier {
               detteService,
             );
           }
-
-          // 2. Supprimer l'ancienne transaction de Firestore
-          await firebaseService.supprimerDocument(
-            'transactions',
-            _transactionExistante!.id,
-          );
+          // Ne plus supprimer l'ancienne transaction ici !
         } catch (e) {
           rethrow;
         }
@@ -336,7 +334,10 @@ class AjoutTransactionController extends ChangeNotifier {
           app_model.TypeMouvementFinancier.remboursementEffectue) {
         // Le remboursement effectué peut être une dette ou un paiement de carte de crédit.
         if (_compteSelectionne == null) {
-          return {'erreur': 'Veuillez sélectionner un compte source pour le remboursement.'};
+          return {
+            'erreur':
+                'Veuillez sélectionner un compte source pour le remboursement.'
+          };
         }
         if (_remboursementType == 'compte') {
           // C'est un paiement de carte de crédit.
@@ -400,7 +401,12 @@ class AjoutTransactionController extends ChangeNotifier {
             : null,
       );
 
-      await firebaseService.ajouterTransaction(transaction);
+      if (_transactionExistante != null) {
+        await firebaseService.mettreAJourTransaction(transaction);
+      } else {
+        await firebaseService.ajouterTransaction(transaction);
+      }
+      _transactionExistante = transaction;
 
       // Retourner l'information de finalisation si applicable
       return infoFinalisation;
@@ -634,7 +640,7 @@ class AjoutTransactionController extends ChangeNotifier {
     }
   }
 
-  // Traiter le remboursement d’une carte de crédit sélectionnée dans le champ "Tiers".
+  // Traiter le remboursement d'une carte de crédit sélectionnée dans le champ "Tiers".
   // 1. Met à jour le solde (ou soldeActuel) de la carte.
   // 2. Si rembourserDettesAssociees == true, répartit le montant sur les dettes
   //    listées dans depensesFixes du document compte.
@@ -650,7 +656,8 @@ class AjoutTransactionController extends ChangeNotifier {
       final user = FirebaseService().auth.currentUser;
       if (user == null) return;
 
-      print('[RemboursementCarteCredit] Début. compteId=$compteId nomCarte=$nomCarte montant=$montant');
+      print(
+          '[RemboursementCarteCredit] Début. compteId=$compteId nomCarte=$nomCarte montant=$montant');
       // Rechercher la carte de crédit par id s'il est fourni, sinon par nom
       DocumentSnapshot<Map<String, dynamic>>? compteDoc;
       if (compteId != null) {
@@ -671,22 +678,25 @@ class AjoutTransactionController extends ChangeNotifier {
         compteDoc = snap.docs.first;
       }
 
-       final doc = compteDoc;
-       final data = doc.data();
-       if (data == null) {
+      final doc = compteDoc;
+      final data = doc.data();
+      if (data == null) {
         print('[RemboursementCarteCredit] Doc sans data. Abandon');
         return;
       } // sécurité null
 
       // Vérifier que le compte appartient bien à l'utilisateur connecté
       if (data['userId'] != user.uid) {
-        print('[RemboursementCarteCredit] Compte appartient à ${data['userId']} ≠ ${user.uid}. Ignoré');
+        print(
+            '[RemboursementCarteCredit] Compte appartient à ${data['userId']} ≠ ${user.uid}. Ignoré');
         // Sécurité : on ne touche pas aux comptes d'un autre utilisateur
         return;
       }
       // Mettre à jour le solde / soldeActuel
-      final double soldeActuel = (data['soldeActuel'] ?? data['solde'] ?? 0).toDouble();
-      final double nouveauSolde = (soldeActuel - montant).clamp(0, double.infinity);
+      final double soldeActuel =
+          (data['soldeActuel'] ?? data['solde'] ?? 0).toDouble();
+      final double nouveauSolde =
+          (soldeActuel - montant).clamp(0, double.infinity);
       await firebaseService.updateCompte(doc.id, {
         'soldeActuel': nouveauSolde,
       });
