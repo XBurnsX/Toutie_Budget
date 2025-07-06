@@ -467,7 +467,9 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                         compte.type != 'Dette' &&
                         compte.type != 'Investissement',
                   )
-                  .toList();
+                  .toList()
+                ..sort(
+                    (a, b) => (a.ordre ?? 999999).compareTo(b.ordre ?? 999999));
 
               final tout = [...comptesFilters, ...enveloppes];
               if (tout.isEmpty) {
@@ -481,95 +483,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
               // Mettre à jour les objets source et destination
               _updateObjectsFromSelection(tout);
-
-              Widget getNomAvecCouleur(dynamic obj) {
-                if (obj is Compte) {
-                  return RichText(
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: "${obj.nom} -> ",
-                          style: TextStyle(
-                            color: Theme.of(
-                                  context,
-                                ).textTheme.bodyLarge?.color ??
-                                Colors.black,
-                            fontSize: 16,
-                          ),
-                        ),
-                        TextSpan(
-                          text: "Prêt à placer",
-                          style: TextStyle(
-                            color: Color(obj.couleur),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (obj is Enveloppe) {
-                  return Text(
-                    obj.nom,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 16),
-                  );
-                }
-                return const Text(
-                  '',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 16),
-                );
-              }
-
-              String getSolde(dynamic obj) {
-                double solde = 0;
-                if (obj is Compte) {
-                  solde = obj.pretAPlacer;
-                } else if (obj is Enveloppe) {
-                  solde = obj.solde;
-                }
-                return '${solde.toStringAsFixed(2)} \$';
-              }
-
-              // Couleur basée sur le montant et le compte de provenance
-              Color getSoldeColor(dynamic obj) {
-                // Obtenir le solde de l'objet
-                double solde = 0.0;
-                if (obj is Compte) {
-                  solde = obj.solde;
-                } else if (obj is Enveloppe) {
-                  solde = obj.solde;
-                }
-
-                // Déterminer la couleur par défaut du compte de provenance
-                Color couleurDefaut = Colors.grey;
-                if (obj is Compte) {
-                  couleurDefaut = Color(obj.couleur);
-                } else if (obj is Enveloppe) {
-                  // Si c'est une enveloppe, essayer de trouver le compte d'origine
-                  final compId = obj.provenanceCompteId;
-                  if (compId.isNotEmpty) {
-                    final compteProv = comptes.firstWhere(
-                      (c) => c.id == compId,
-                      orElse: () => Compte(
-                        id: '',
-                        nom: '',
-                        type: 'Chèque',
-                        solde: 0,
-                        couleur: Colors.grey.value,
-                        pretAPlacer: 0,
-                        dateCreation: DateTime.now(),
-                        estArchive: false,
-                      ),
-                    );
-                    couleurDefaut = Color(compteProv.couleur);
-                  }
-                }
-
-                // Utiliser le service de couleur pour appliquer les règles
-                return ColorService.getCouleurMontant(solde, couleurDefaut);
-              }
 
               return Column(
                 children: [
@@ -605,41 +518,21 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                             labelText: 'Source',
                             border: OutlineInputBorder(),
                           ),
-                          items: tout
-                              .where(
-                                (obj) => getId(obj) != destinationId,
-                              ) // Exclure la destination sélectionnée
-                              .map<DropdownMenuItem<String>>(
-                                (obj) => DropdownMenuItem(
-                                  value: getId(obj),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      getNomAvecCouleur(obj),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        getSolde(obj),
-                                        style: TextStyle(
-                                          color: getSoldeColor(obj),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                          items: _buildDropdownItems(
+                              tout, destinationId, catSnapshot.data!, comptes),
                           selectedItemBuilder: (BuildContext context) {
                             return tout
                                 .where((obj) => getId(obj) != destinationId)
                                 .map<Widget>(
                                   (obj) => Row(
                                     children: [
-                                      Expanded(child: getNomAvecCouleur(obj)),
+                                      Expanded(
+                                          child: _getNomAvecCouleur(
+                                              obj, catSnapshot.data!, comptes)),
                                       Text(
-                                        getSolde(obj),
+                                        _getSolde(obj),
                                         style: TextStyle(
-                                          color: getSoldeColor(obj),
+                                          color: _getSoldeColor(obj, comptes),
                                         ),
                                       ),
                                     ],
@@ -661,41 +554,21 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                             labelText: 'Destination',
                             border: OutlineInputBorder(),
                           ),
-                          items: tout
-                              .where(
-                                (obj) => getId(obj) != sourceId,
-                              ) // Exclure la source sélectionnée
-                              .map<DropdownMenuItem<String>>(
-                                (obj) => DropdownMenuItem(
-                                  value: getId(obj),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      getNomAvecCouleur(obj),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        getSolde(obj),
-                                        style: TextStyle(
-                                          color: getSoldeColor(obj),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                          items: _buildDropdownItems(
+                              tout, sourceId, catSnapshot.data!, comptes),
                           selectedItemBuilder: (BuildContext context) {
                             return tout
                                 .where((obj) => getId(obj) != sourceId)
                                 .map<Widget>(
                                   (obj) => Row(
                                     children: [
-                                      Expanded(child: getNomAvecCouleur(obj)),
+                                      Expanded(
+                                          child: _getNomAvecCouleur(
+                                              obj, catSnapshot.data!, comptes)),
                                       Text(
-                                        getSolde(obj),
+                                        _getSolde(obj),
                                         style: TextStyle(
-                                          color: getSoldeColor(obj),
+                                          color: _getSoldeColor(obj, comptes),
                                         ),
                                       ),
                                     ],
@@ -774,6 +647,191 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
     setState(() {
       _refreshKey++;
     });
+  }
+
+  // Fonction pour construire les items du dropdown avec séparateurs par catégorie
+  List<DropdownMenuItem<String>> _buildDropdownItems(List<dynamic> tout,
+      String? excludeId, List<Categorie> categories, List<Compte> comptes) {
+    final items = <DropdownMenuItem<String>>[];
+
+    // Ajouter d'abord tous les comptes
+    final comptesFiltres =
+        tout.where((obj) => obj is Compte && getId(obj) != excludeId).toList();
+    for (var compte in comptesFiltres) {
+      items.add(DropdownMenuItem(
+        value: getId(compte),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _getNomAvecCouleur(compte, categories, comptes),
+            const SizedBox(width: 8),
+            Text(
+              _getSolde(compte),
+              style: TextStyle(
+                color: _getSoldeColor(compte, comptes),
+              ),
+            ),
+          ],
+        ),
+      ));
+    }
+
+    // Ajouter les enveloppes groupées par catégorie
+    final enveloppes = tout
+        .where((obj) => obj is Enveloppe && getId(obj) != excludeId)
+        .toList();
+    final categoriesMap = <String, List<Enveloppe>>{};
+
+    // Grouper les enveloppes par catégorie
+    for (var enveloppe in enveloppes) {
+      final nomCategorie =
+          _getNomCategorieEnveloppe(enveloppe as Enveloppe, categories);
+      categoriesMap.putIfAbsent(nomCategorie, () => []).add(enveloppe);
+    }
+
+    // Ajouter les enveloppes avec séparateurs
+    categoriesMap.forEach((nomCategorie, enveloppesCategorie) {
+      // Ajouter le séparateur de catégorie
+      items.add(DropdownMenuItem<String>(
+        value: null, // Valeur null pour le séparateur
+        enabled: false, // Désactiver le séparateur
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            nomCategorie,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ));
+
+      // Ajouter les enveloppes de cette catégorie
+      for (var enveloppe in enveloppesCategorie) {
+        items.add(DropdownMenuItem(
+          value: getId(enveloppe),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _getNomAvecCouleur(enveloppe, categories, comptes),
+                const SizedBox(width: 8),
+                Text(
+                  _getSolde(enveloppe),
+                  style: TextStyle(
+                    color: _getSoldeColor(enveloppe, comptes),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ));
+      }
+    });
+
+    return items;
+  }
+
+  // Fonction pour obtenir le nom de la catégorie d'une enveloppe
+  String _getNomCategorieEnveloppe(
+      Enveloppe enveloppe, List<Categorie> categories) {
+    for (var categorie in categories) {
+      if (categorie.enveloppes.any((e) => e.id == enveloppe.id)) {
+        return categorie.nom;
+      }
+    }
+    return 'Catégorie inconnue';
+  }
+
+  // Fonctions utilitaires pour l'affichage
+  Widget _getNomAvecCouleur(
+      dynamic obj, List<Categorie> categories, List<Compte> comptes) {
+    if (obj is Compte) {
+      return RichText(
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: "${obj.nom} -> ",
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color ??
+                    Colors.black,
+                fontSize: 16,
+              ),
+            ),
+            TextSpan(
+              text: "Prêt à placer",
+              style: TextStyle(
+                color: Color(obj.couleur),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (obj is Enveloppe) {
+      return Text(
+        obj.nom,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 16),
+      );
+    }
+    return const Text(
+      '',
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontSize: 16),
+    );
+  }
+
+  String _getSolde(dynamic obj) {
+    double solde = 0;
+    if (obj is Compte) {
+      solde = obj.pretAPlacer;
+    } else if (obj is Enveloppe) {
+      solde = obj.solde;
+    }
+    return '${solde.toStringAsFixed(2)} \$';
+  }
+
+  Color _getSoldeColor(dynamic obj, List<Compte> comptes) {
+    // Obtenir le solde de l'objet
+    double solde = 0.0;
+    if (obj is Compte) {
+      solde = obj.solde;
+    } else if (obj is Enveloppe) {
+      solde = obj.solde;
+    }
+
+    // Déterminer la couleur par défaut du compte de provenance
+    Color couleurDefaut = Colors.grey;
+    if (obj is Compte) {
+      couleurDefaut = Color(obj.couleur);
+    } else if (obj is Enveloppe) {
+      // Si c'est une enveloppe, essayer de trouver le compte d'origine
+      final compId = obj.provenanceCompteId;
+      if (compId.isNotEmpty) {
+        final compteProv = comptes.firstWhere(
+          (c) => c.id == compId,
+          orElse: () => Compte(
+            id: '',
+            nom: '',
+            type: 'Chèque',
+            solde: 0,
+            couleur: Colors.grey.value,
+            pretAPlacer: 0,
+            dateCreation: DateTime.now(),
+            estArchive: false,
+          ),
+        );
+        couleurDefaut = Color(compteProv.couleur);
+      }
+    }
+
+    // Utiliser le service de couleur pour appliquer les règles
+    return ColorService.getCouleurMontant(solde, couleurDefaut);
   }
 
   // Méthode alternative pour charger directement depuis Firebase
