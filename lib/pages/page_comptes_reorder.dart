@@ -12,6 +12,7 @@ import 'page_pret_personnel.dart';
 import 'page_investissement.dart';
 import 'page_carte_de_credit.dart';
 import 'package:toutie_budget/services/investissement_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PageComptesReorder extends StatefulWidget {
   const PageComptesReorder({super.key});
@@ -265,9 +266,7 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: soldeAffiche >= 0
-                                        ? Colors.green[700]
-                                        : Colors.red[700],
+                                    color: Colors.red[700],
                                   ),
                                 ),
                           Container(
@@ -285,6 +284,101 @@ class _PageComptesReorderState extends State<PageComptesReorder> {
                                 color: Colors.black,
                                 fontWeight: FontWeight.w500,
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      editing
+                          ? const Icon(Icons.drag_handle, color: Colors.white54)
+                          : Icon(Icons.chevron_right, color: Colors.grey[400]),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } else if (compte.type == 'Carte de crédit') {
+      // Affichage spécial pour carte de crédit : lire soldeActuel Firestore
+      return FutureBuilder<DocumentSnapshot>(
+        future: FirebaseFirestore.instance
+            .collection('comptes')
+            .doc(compte.id)
+            .get(),
+        builder: (context, snapshot) {
+          double soldeAffiche = compte.solde;
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            soldeAffiche =
+                -((data['soldeActuel'] as num?)?.toDouble() ?? compte.solde);
+          }
+          return Container(
+            key: ValueKey(compte.id),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 2,
+              color: const Color(0xFF232526),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: editing
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PageDetailCarteCredit(
+                                compteId: compte.id, nomCarte: compte.nom),
+                          ),
+                        );
+                      },
+                onLongPress: editing
+                    ? null
+                    : () => _showCompteMenu(context, compte, isCheque),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Color(compte.couleur),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              compte.nom,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              compte.type,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${soldeAffiche.toStringAsFixed(2)} \$',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red[700],
                             ),
                           ),
                         ],
