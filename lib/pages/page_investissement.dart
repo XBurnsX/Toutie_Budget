@@ -122,6 +122,8 @@ class _PageInvestissementState extends State<PageInvestissement> {
       // On sauvegarde le snapshot du jour si nécessaire
       await _investissementService
           .sauvegarderSnapshotJournalier(widget.compteId);
+      print(
+          '🔍 DEBUG - Sauvegarde snapshot appelée pour le compte ${widget.compteId}');
 
       setState(() {
         _compte = compte;
@@ -745,10 +747,21 @@ class _PageInvestissementState extends State<PageInvestissement> {
     final cashDisponible = _compte?.pretAPlacer ?? 0.0;
     final valeurTotalePortefeuille = valeurActionsActuelle + cashDisponible;
 
-    if (valeurTotalePortefeuille == 0.0) return const SizedBox.shrink();
+    print('🔍 DEBUG Graphique Plat - Valeur actions: $valeurActionsActuelle');
+    print('🔍 DEBUG Graphique Plat - Cash disponible: $cashDisponible');
+    print('🔍 DEBUG Graphique Plat - Valeur totale: $valeurTotalePortefeuille');
+
+    if (valeurTotalePortefeuille == 0.0) {
+      print(
+          '🔍 DEBUG Graphique Plat - Valeur totale = 0, retour SizedBox.shrink');
+      return const SizedBox.shrink();
+    }
 
     final List<FlSpot> spots = List.generate(
         30, (i) => FlSpot(i.toDouble(), valeurTotalePortefeuille));
+
+    print(
+        '🔍 DEBUG Graphique Plat - Création de ${spots.length} points avec valeur $valeurTotalePortefeuille');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -770,7 +783,7 @@ class _PageInvestissementState extends State<PageInvestissement> {
                   lineBarsData: [
                     LineChartBarData(
                       spots: spots,
-                      isCurved: true,
+                      isCurved: false, // Ligne droite pour le graphique plat
                       color: Colors.greenAccent,
                       barWidth: 3,
                       dotData: FlDotData(show: false),
@@ -813,6 +826,20 @@ class _PageInvestissementState extends State<PageInvestissement> {
           .limit(30)
           .get(),
       builder: (context, snapshot) {
+        // DEBUG: Ajouter des logs pour comprendre le problème
+        print(
+            '🔍 DEBUG Graphique - ConnectionState: ${snapshot.connectionState}');
+        print('🔍 DEBUG Graphique - HasData: ${snapshot.hasData}');
+        if (snapshot.hasData) {
+          print(
+              '🔍 DEBUG Graphique - Nombre de docs: ${snapshot.data!.docs.length}');
+          if (snapshot.data!.docs.isNotEmpty) {
+            print(
+                '🔍 DEBUG Graphique - Premier doc: ${snapshot.data!.docs.first.data()}');
+          }
+        }
+        print('🔍 DEBUG Graphique - Error: ${snapshot.error}');
+
         // Pendant le chargement de l'historique...
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Card(
@@ -826,6 +853,8 @@ class _PageInvestissementState extends State<PageInvestissement> {
 
         // S'il n'y a pas d'historique du tout (ex: premier jour d'utilisation)
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          print(
+              '🔍 DEBUG Graphique - Pas d\'historique, affichage graphique plat');
           // On affiche le graphique "plat" avec la valeur actuelle
           return _buildGraphiqueAvecValeurActuelle();
         }
@@ -839,6 +868,9 @@ class _PageInvestissementState extends State<PageInvestissement> {
           spots.add(FlSpot(i.toDouble(), (data['valeur'] as num).toDouble()));
         }
 
+        print('🔍 DEBUG Graphique - Nombre de points: ${spots.length}');
+        print('🔍 DEBUG Graphique - Points: $spots');
+
         // Le dernier point du graphique doit TOUJOURS être la valeur "live"
         final valeurActuelle = _performanceCompte['totalValeurActuelle'] ?? 0.0;
         final cash = _compte?.pretAPlacer ?? 0.0;
@@ -851,6 +883,13 @@ class _PageInvestissementState extends State<PageInvestissement> {
                 aujourdhuiKey) {
           spots[spots.length - 1] =
               FlSpot((spots.length - 1).toDouble(), valeurTotaleAujourdhui);
+        }
+
+        // CORRECTION : Si on n'a qu'un seul point, on en ajoute un deuxième pour créer une ligne visible
+        if (spots.length == 1) {
+          print(
+              '🔍 DEBUG Graphique - Un seul point détecté, ajout d\'un point supplémentaire');
+          spots.add(FlSpot(1.0, spots[0].y)); // Même valeur, point suivant
         }
 
         // On retourne la carte finale avec le graphique
@@ -874,10 +913,13 @@ class _PageInvestissementState extends State<PageInvestissement> {
                       lineBarsData: [
                         LineChartBarData(
                           spots: spots,
-                          isCurved: true,
+                          isCurved: spots.length >
+                              2, // Désactiver la courbe si moins de 3 points
                           color: Colors.greenAccent,
                           barWidth: 3,
-                          dotData: FlDotData(show: false),
+                          dotData: FlDotData(
+                              show: spots.length <=
+                                  2), // Afficher les points si peu de données
                           belowBarData: BarAreaData(
                             show: true,
                             color: Colors.greenAccent.withOpacity(0.2),
