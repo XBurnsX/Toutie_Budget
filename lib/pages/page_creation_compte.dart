@@ -100,50 +100,53 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
               },
             ),
             const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () => _ouvrirClavierNumerique(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _type == 'Dette'
-                                ? 'Montant de la dette'
-                                : 'Solde initial',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
+            // Champ solde initial ou montant de la dette
+            if (_type != 'Carte de crédit' && _type != 'Investissement') ...[
+              GestureDetector(
+                onTap: () => _ouvrirClavierNumerique(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _type == 'Dette'
+                                  ? 'Montant de la dette'
+                                  : 'Solde initial',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _soldeController.text.isEmpty
-                                ? (_type == 'Dette' ? '-0.00' : '0.00')
-                                : (_type == 'Dette'
-                                    ? '-${_soldeController.text}'
-                                    : _soldeController.text),
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              _soldeController.text.isEmpty
+                                  ? (_type == 'Dette' ? '-0.00' : '0.00')
+                                  : (_type == 'Dette'
+                                      ? '-${_soldeController.text}'
+                                      : _soldeController.text),
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const Text('\$', style: TextStyle(fontSize: 16)),
-                  ],
+                      const Text('\$', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
             // Afficher le sélecteur de couleur seulement si ce n'est pas une dette
             if (_type != 'Dette') ...[
               Row(
