@@ -332,6 +332,11 @@ class _EcranAjoutTransactionRefactoredState
         }
 
         widget.onTransactionSaved?.call();
+
+        // Retourner à la page précédente après la sauvegarde
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       if (mounted) {
