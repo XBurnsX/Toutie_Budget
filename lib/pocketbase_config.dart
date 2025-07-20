@@ -14,9 +14,10 @@ class PocketBaseConfig {
   // URL active (sera définie après test)
   static String? _activeUrl;
 
-  // Noms exacts des collections (selon le guide de migration)
+  // Collections
   static const String usersCollection = 'users';
   static const String comptesChequesCollection = 'comptes_cheques';
+  static const String comptesEpargneCollection = 'comptes_epargne';
   static const String comptesCreditsCollection = 'comptes_credits';
   static const String comptesDettesCollection = 'comptes_dettes';
   static const String comptesInvestissementCollection =
@@ -26,6 +27,7 @@ class PocketBaseConfig {
   static const String transactionsCollection = 'transactions';
   static const String allocationsMensuellesCollection =
       'allocations_mensuelles';
+  static const String pretPersonnelCollection = 'pret_personnel';
   static const String tiersCollection = 'tiers';
 
   // Getter pour l'URL active

@@ -43,7 +43,6 @@ Configurer les collections PocketBase selon la structure réelle de votre applic
   - `paiement_minimum` (number)
   - `ordre` (number)
   - `archive` (bool)
-  - `couleur` (text)
 
 ### 5. Collection `comptes_investissement`
 - **Type** : Base collection
@@ -155,3 +154,86 @@ Pour chaque collection, configurer :
 ---
 
 *Guide créé le ${DateTime.now().toString().substring(0, 10)}* 
+
+## Collection: comptes_dettes
+
+Cette collection gère les dettes qui apparaissent dans la page comptes.
+
+### Types de dettes dans cette collection:
+
+1. **Dettes manuelles** → Page paramètres dettes
+2. **Dettes contractées** (`type: 'dette'`) → Page comptes
+
+### Champs requis:
+
+| Nom du champ | Type | Description | Requis |
+|--------------|------|-------------|--------|
+| `nom_tiers` | Text | Nom du tiers (personne/entité) | ✅ |
+| `montant_initial` | Number | Montant initial du prêt/dette | ✅ |
+| `solde` | Number | Solde actuel restant | ✅ |
+| `type` | Select | Type: 'dette' | ✅ |
+| `archive` | Bool | Si la dette est archivée | ✅ |
+| `date_creation` | Date | Date de création | ✅ |
+| `utilisateur_id` | Relation | Référence vers users | ✅ |
+
+### Champs optionnels:
+
+| Nom du champ | Type | Description | Requis |
+|--------------|------|-------------|--------|
+| `note` | Text | Note optionnelle | ❌ |
+| `historique` | Json | Liste des mouvements | ❌ |
+
+### Note:
+- **Couleur** : Les dettes sont automatiquement affichées en rouge
+- **Pas de champ couleur** nécessaire
+- **Pas de champ `est_manuel`** : Cette collection est pour toutes les dettes
+
+### Règles d'accès:
+
+```javascript
+// Lecture: Utilisateur connecté peut lire ses propres dettes
+@request.auth.id != "" && utilisateur_id = @request.auth.id
+
+// Création: Utilisateur connecté peut créer ses propres dettes
+@request.auth.id != "" && utilisateur_id = @request.auth.id
+
+// Modification: Utilisateur connecté peut modifier ses propres dettes
+@request.auth.id != "" && utilisateur_id = @request.auth.id
+
+// Suppression: Utilisateur connecté peut supprimer ses propres dettes
+@request.auth.id != "" && utilisateur_id = @request.auth.id
+```
+
+### Index recommandés:
+
+- `utilisateur_id` (pour les requêtes par utilisateur)
+- `archive` (pour filtrer actives/archivées)
+- `type` (pour filtrer dettes)
+- `nom_tiers` (pour rechercher par tiers)
+
+## Collection `pret_personnel`
+
+**Description :** Prêts accordés à d'autres personnes (n'apparaissent PAS dans les comptes)
+
+### Champs :
+- `nom_tiers` (text, required) - Nom de la personne qui a emprunté
+- `montant_initial` (number, required) - Montant initial du prêt
+- `solde` (number, required) - Solde restant à rembourser
+- `type` (text, required) - Type de prêt (ex: "pret")
+- `archive` (bool, default: false) - Si le prêt est archivé
+- `date_creation` (date, required) - Date de création du prêt
+- `utilisateur_id` (relation, required) - Référence vers l'utilisateur
+- `note` (text, optional) - Notes sur le prêt
+- `historique` (json, optional) - Historique des paiements
+
+### Règles d'accès :
+- **Liste :** `@request.auth.id != ""` (utilisateur connecté)
+- **Voir :** `@request.auth.id = utilisateur_id` (propriétaire)
+- **Créer :** `@request.auth.id != ""` (utilisateur connecté)
+- **Modifier :** `@request.auth.id = utilisateur_id` (propriétaire)
+- **Supprimer :** `@request.auth.id = utilisateur_id` (propriétaire)
+
+### Notes :
+- Cette collection est pour les prêts accordés à d'autres personnes
+- Ne pas confondre avec les dettes contractées (dans `comptes_dettes`)
+- Les prêts accordés n'apparaissent PAS dans la liste des comptes

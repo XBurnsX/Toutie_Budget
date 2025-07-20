@@ -77,6 +77,14 @@ class PocketBaseService {
         .create(body: data);
   }
 
+  static Future<RecordModel> createCompteCredit(
+      Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.comptesCreditsCollection)
+        .create(body: data);
+  }
+
   static Future<RecordModel> updateCompte(
       String id, Map<String, dynamic> data) async {
     final pb = await instance;
@@ -147,6 +155,65 @@ class PocketBaseService {
     await pb.collection(PocketBaseConfig.transactionsCollection).delete(id);
   }
 
+  // Gestion des enveloppes
+  static Future<List<RecordModel>> getEnveloppes() async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.enveloppesCollection)
+        .getFullList();
+  }
+
+  static Future<RecordModel> createEnveloppe(Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.enveloppesCollection)
+        .create(body: data);
+  }
+
+  static Future<RecordModel> updateEnveloppe(
+      String id, Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.enveloppesCollection)
+        .update(id, body: data);
+  }
+
+  static Future<void> deleteEnveloppe(String id) async {
+    final pb = await instance;
+    await pb.collection(PocketBaseConfig.enveloppesCollection).delete(id);
+  }
+
+  // Gestion des allocations mensuelles
+  static Future<List<RecordModel>> getAllocationsMensuelles() async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.allocationsMensuellesCollection)
+        .getFullList();
+  }
+
+  static Future<RecordModel> createAllocationMensuelle(
+      Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.allocationsMensuellesCollection)
+        .create(body: data);
+  }
+
+  static Future<RecordModel> updateAllocationMensuelle(
+      String id, Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.allocationsMensuellesCollection)
+        .update(id, body: data);
+  }
+
+  static Future<void> deleteAllocationMensuelle(String id) async {
+    final pb = await instance;
+    await pb
+        .collection(PocketBaseConfig.allocationsMensuellesCollection)
+        .delete(id);
+  }
+
   // Gestion des dettes
   static Future<List<RecordModel>> getDettes() async {
     final pb = await instance;
@@ -204,6 +271,61 @@ class PocketBaseService {
     await pb
         .collection(PocketBaseConfig.comptesInvestissementCollection)
         .delete(id);
+  }
+
+  // Gestion des prêts personnels
+  static Future<List<RecordModel>> getPretsPersonnels() async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.pretPersonnelCollection)
+        .getFullList();
+  }
+
+  static Future<RecordModel> createPretPersonnel(
+      Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.pretPersonnelCollection)
+        .create(body: data);
+  }
+
+  static Future<RecordModel> updatePretPersonnel(
+      String id, Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.pretPersonnelCollection)
+        .update(id, body: data);
+  }
+
+  static Future<void> deletePretPersonnel(String id) async {
+    final pb = await instance;
+    await pb.collection(PocketBaseConfig.pretPersonnelCollection).delete(id);
+  }
+
+  // Gestion des tiers
+  static Future<List<RecordModel>> getTiers() async {
+    final pb = await instance;
+    return await pb.collection(PocketBaseConfig.tiersCollection).getFullList();
+  }
+
+  static Future<RecordModel> createTiers(Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.tiersCollection)
+        .create(body: data);
+  }
+
+  static Future<RecordModel> updateTiers(
+      String id, Map<String, dynamic> data) async {
+    final pb = await instance;
+    return await pb
+        .collection(PocketBaseConfig.tiersCollection)
+        .update(id, body: data);
+  }
+
+  static Future<void> deleteTiers(String id) async {
+    final pb = await instance;
+    await pb.collection(PocketBaseConfig.tiersCollection).delete(id);
   }
 
   // Vérifier si l'utilisateur est connecté

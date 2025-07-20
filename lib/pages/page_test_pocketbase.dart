@@ -178,6 +178,65 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
     _addLog('📋 Rapport de migration généré');
   }
 
+  // Test de migration (simulation)
+  Future<void> _testMigration() async {
+    try {
+      _addLog('🧪 Test de migration (simulation)...');
+
+      // Utiliser l'utilisateur actuel ou le premier du mapping
+      final currentUser = PocketBaseService.currentUser;
+      String userId;
+
+      if (currentUser != null) {
+        userId = currentUser.id;
+        _addLog('✅ Utilisateur connecté: $userId');
+      } else {
+        // Utiliser le premier utilisateur du mapping comme fallback
+        userId = '3gisghkqm6uau4b'; // Premier utilisateur du mapping
+        _addLog(
+            '⚠️ Aucun utilisateur connecté, utilisation du mapping: $userId');
+      }
+
+      _addLog('📋 Démarrage de la simulation...');
+
+      // Lancer le test de migration
+      await _migrationService.testMigration(userId);
+
+      _addLog('✅ Test de migration terminé');
+      _addLog('📊 Vérifiez les logs ci-dessus pour voir les détails');
+    } catch (e) {
+      _addLog('❌ Erreur lors du test de migration: $e');
+    }
+  }
+
+  // Migration complète
+  Future<void> _migrateAllData() async {
+    try {
+      _addLog('🔄 Migration complète...');
+
+      // Utiliser l'utilisateur actuel ou le premier du mapping
+      final currentUser = PocketBaseService.currentUser;
+      String userId;
+
+      if (currentUser != null) {
+        userId = currentUser.id;
+        _addLog('✅ Utilisateur connecté: $userId');
+      } else {
+        // Utiliser le premier utilisateur du mapping comme fallback
+        userId = '3gisghkqm6uau4b'; // Premier utilisateur du mapping
+        _addLog(
+            '⚠️ Aucun utilisateur connecté, utilisation du mapping: $userId');
+      }
+
+      // Lancer la migration complète
+      await _migrationService.migrateAllData();
+
+      _addLog('✅ Migration complète terminée');
+    } catch (e) {
+      _addLog('❌ Erreur lors de la migration: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -261,6 +320,59 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
                       'Générer Rapport',
                       _generateReport,
                       Colors.indigo,
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await _migrationService.migrateTestData();
+                      },
+                      child: const Text('Migration de Test'),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await _testMigration();
+                      },
+                      child: const Text('Test Migration (Simulation)'),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await _migrateAllData();
+                      },
+                      child: const Text('Migration Complète'),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final migrationService = MigrationService();
+                        await migrationService.analyzeFirebaseExport();
+                      },
+                      child: const Text('🔍 Analyser Export Firebase'),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final migrationService = MigrationService();
+                        await migrationService.migrateAllDataWithRealIds();
+                      },
+                      child: Text('🚀 Migration Complète (Vrais IDs)'),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final migrationService = MigrationService();
+                        await migrationService.migrateCurrentUserData();
+                      },
+                      child: Text('👤 Migration Utilisateur Connecté'),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final migrationService = MigrationService();
+                        await migrationService.verifyAllPocketBaseCollections();
+                      },
+                      child: Text('🔍 Vérifier Collections PocketBase'),
                     ),
                   ],
                 ),
