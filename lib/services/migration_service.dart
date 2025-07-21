@@ -58,7 +58,7 @@ class MigrationService {
 
   // Méthodes de compatibilité pour l'ancienne page de test
   Future<Map<String, bool>> testConnections() => testerConnexions();
-  
+
   Future<Map<String, Map<String, int>>> compareData() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
@@ -114,7 +114,8 @@ class MigrationService {
 
   Future<void> migrateCurrentUserData() => migrerUtilisateurConnecte();
 
-  Future<void> verifyAllPocketBaseCollections() => verifierToutesLesCollections();
+  Future<void> verifyAllPocketBaseCollections() =>
+      verifierToutesLesCollections();
 
   // Initialiser le mapping utilisateur Firebase → PocketBase
   Future<void> _initialiserMappingUtilisateur() async {
@@ -122,7 +123,12 @@ class MigrationService {
       print('🔄 Initialisation du mapping utilisateur...');
 
       // Récupérer tous les utilisateurs Firebase uniques
-      final collectionsFirebase = ['comptes', 'categories', 'transactions', 'dettes'];
+      final collectionsFirebase = [
+        'comptes',
+        'categories',
+        'transactions',
+        'dettes'
+      ];
       final utilisateursFirebase = <String>{};
 
       for (final collection in collectionsFirebase) {
@@ -151,18 +157,19 @@ class MigrationService {
           final utilisateurPocketBase = await PocketBaseService.signUp(
             donneesUtilisateur['email']!,
             donneesUtilisateur['password']!,
-            donneesUtilisateur['passwordConfirm']!,
-            data: donneesUtilisateur,
+            donneesUtilisateur['name'] ?? 'Utilisateur',
           );
 
           _mappingUtilisateur[firebaseUserId] = utilisateurPocketBase.id;
-          print('   ✅ Utilisateur créé: $firebaseUserId → ${utilisateurPocketBase.id}');
+          print(
+              '   ✅ Utilisateur créé: $firebaseUserId → ${utilisateurPocketBase.id}');
         } catch (e) {
           print('   ⚠️ Erreur création utilisateur $firebaseUserId: $e');
         }
       }
 
-      print('✅ Mapping utilisateur terminé: ${_mappingUtilisateur.length} utilisateurs');
+      print(
+          '✅ Mapping utilisateur terminé: ${_mappingUtilisateur.length} utilisateurs');
     } catch (e) {
       print('❌ Erreur initialisation mapping: $e');
     }
@@ -206,10 +213,12 @@ class MigrationService {
       }
 
       final idFirebase = utilisateurFirebase.uid;
-      print('👤 Utilisateur connecté: ${utilisateurFirebase.email} ($idFirebase)');
+      print(
+          '👤 Utilisateur connecté: ${utilisateurFirebase.email} ($idFirebase)');
 
       // 2. Créer ou récupérer le compte PocketBase pour cet utilisateur
-      final utilisateurPocketBase = await _creerComptePocketBase(utilisateurFirebase);
+      final utilisateurPocketBase =
+          await _creerComptePocketBase(utilisateurFirebase);
       final idPocketBase = utilisateurPocketBase.id;
       print('✅ Compte PocketBase ID: $idPocketBase');
 
@@ -220,7 +229,8 @@ class MigrationService {
       final pb = await PocketBaseService.instance;
       final currentAuth = pb.authStore.model;
       if (currentAuth == null || currentAuth.id != idPocketBase) {
-        throw Exception('❌ Utilisateur PocketBase non authentifié correctement');
+        throw Exception(
+            '❌ Utilisateur PocketBase non authentifié correctement');
       }
       print('✅ Utilisateur PocketBase authentifié: ${currentAuth.id}');
 
@@ -241,12 +251,12 @@ class MigrationService {
   Future<void> _supprimerCategoriesDettes(String utilisateurId) async {
     try {
       print('🧹 Nettoyage des catégories "Dettes" existantes...');
-      
+
       final pb = await PocketBaseService.instance;
-      final categories = await pb.collection('categories').getFullList(
-        filter: 'utilisateur_id = "$utilisateurId"'
-      );
-      
+      final categories = await pb
+          .collection('categories')
+          .getFullList(filter: 'utilisateur_id = "$utilisateurId"');
+
       int supprimees = 0;
       for (final categorie in categories) {
         final nom = categorie.data['nom'] ?? '';
@@ -256,7 +266,7 @@ class MigrationService {
           print('   🗑️ Catégorie supprimée: $nom');
         }
       }
-      
+
       if (supprimees > 0) {
         print('✅ $supprimees catégorie(s) "Dettes" supprimée(s)');
       } else {
@@ -276,7 +286,8 @@ class MigrationService {
       final pb = await PocketBaseService.instance;
       print('✅ PocketBase instance récupérée');
 
-      final email = utilisateurFirebase.email ?? '${utilisateurFirebase.uid}@migration.local';
+      final email = utilisateurFirebase.email ??
+          '${utilisateurFirebase.uid}@migration.local';
       final password = 'migration123456';
 
       print('📝 Email utilisateur: $email');
@@ -284,28 +295,34 @@ class MigrationService {
       // Essayer de se connecter d'abord (au cas où l'utilisateur existe déjà)
       try {
         print('🔄 Tentative de connexion avec utilisateur existant...');
-        final authData = await pb.collection('users').authWithPassword(email, password);
-        print('✅ Connexion réussie avec utilisateur existant: ${authData.record?.id}');
+        final authData =
+            await pb.collection('users').authWithPassword(email, password);
+        print(
+            '✅ Connexion réussie avec utilisateur existant: ${authData.record?.id}');
         return authData.record!;
       } catch (loginError) {
         print('⚠️ Connexion échouée, création d\'un nouvel utilisateur...');
-        
+
         // Si la connexion échoue, créer un nouvel utilisateur
         final donneesUtilisateur = {
           'email': email,
           'password': password,
           'passwordConfirm': password,
-          'name': utilisateurFirebase.displayName ?? 'Utilisateur ${utilisateurFirebase.uid}',
+          'name': utilisateurFirebase.displayName ??
+              'Utilisateur ${utilisateurFirebase.uid}',
         };
 
         try {
-          final utilisateurPocketBase = await pb.collection('users').create(body: donneesUtilisateur);
+          final utilisateurPocketBase =
+              await pb.collection('users').create(body: donneesUtilisateur);
           print('✅ Nouvel utilisateur créé: ${utilisateurPocketBase.id}');
-          
+
           // Se connecter avec le nouvel utilisateur
-          final authData = await pb.collection('users').authWithPassword(email, password);
-          print('✅ Connexion automatique réussie avec token: ${authData.token.isNotEmpty}');
-          
+          final authData =
+              await pb.collection('users').authWithPassword(email, password);
+          print(
+              '✅ Connexion automatique réussie avec token: ${authData.token.isNotEmpty}');
+
           return utilisateurPocketBase;
         } catch (createError) {
           print('❌ Erreur création utilisateur: $createError');
@@ -319,14 +336,15 @@ class MigrationService {
   }
 
   // Migrer toutes les données d'un utilisateur spécifique
-  Future<void> _migrerDonneesUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerDonneesUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('📦 Migration des données pour l\'utilisateur $idFirebase...');
 
       // 1. Migrer les catégories de cet utilisateur
       await _migrerCategoriesUtilisateur(idFirebase, idPocketBase);
 
-      // 2. Migrer les comptes de cet utilisateur  
+      // 2. Migrer les comptes de cet utilisateur
       await _migrerComptesUtilisateur(idFirebase, idPocketBase);
 
       // 3. Migrer les enveloppes de cet utilisateur
@@ -352,7 +370,8 @@ class MigrationService {
   }
 
   // Migrer les catégories d'un utilisateur spécifique
-  Future<void> _migrerCategoriesUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerCategoriesUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('📁 Migration des catégories pour $idFirebase...');
 
@@ -360,7 +379,7 @@ class MigrationService {
           .collection('categories')
           .where('userId', isEqualTo: idFirebase)
           .get();
-      
+
       print('   📊 ${snapshot.docs.length} catégorie(s) trouvée(s)');
 
       for (final doc in snapshot.docs) {
@@ -373,21 +392,26 @@ class MigrationService {
             'ordre': donnees['ordre'] ?? 0,
           };
 
-          print('   📝 Création catégorie: ${categorieData['nom']} avec utilisateur_id: $idPocketBase');
+          print(
+              '   📝 Création catégorie: ${categorieData['nom']} avec utilisateur_id: $idPocketBase');
           final pb = await PocketBaseService.instance;
-          
+
           // Vérifier que l'utilisateur est bien connecté
           final currentAuth = pb.authStore.model;
           if (currentAuth == null || currentAuth.id != idPocketBase) {
-            throw Exception('Utilisateur PocketBase non connecté correctement: auth=${currentAuth?.id}, expected=$idPocketBase');
+            throw Exception(
+                'Utilisateur PocketBase non connecté correctement: auth=${currentAuth?.id}, expected=$idPocketBase');
           }
           print('   🔐 Utilisateur connecté vérifié: ${currentAuth.id}');
-          
+
           // S'assurer que l'utilisateur_id est bien l'ID et non le nom
-          categorieData['utilisateur_id'] = currentAuth.id; // Forcer l'ID authentifié
-          
-          final result = await pb.collection('categories').create(body: categorieData);
-          print('   ✅ Catégorie créée avec ID: ${result.id} pour utilisateur: ${result.data['utilisateur_id']}');
+          categorieData['utilisateur_id'] =
+              currentAuth.id; // Forcer l'ID authentifié
+
+          final result =
+              await pb.collection('categories').create(body: categorieData);
+          print(
+              '   ✅ Catégorie créée avec ID: ${result.id} pour utilisateur: ${result.data['utilisateur_id']}');
         } catch (e) {
           print('   ❌ Erreur détaillée migration catégorie: $e');
           print('   📋 Données: ${doc.data()}');
@@ -399,7 +423,8 @@ class MigrationService {
   }
 
   // Migrer les comptes d'un utilisateur spécifique
-  Future<void> _migrerComptesUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerComptesUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('🏦 Migration des comptes pour $idFirebase...');
 
@@ -407,7 +432,7 @@ class MigrationService {
           .collection('comptes')
           .where('userId', isEqualTo: idFirebase)
           .get();
-      
+
       print('   📊 ${snapshot.docs.length} compte(s) trouvé(s)');
 
       Map<String, int> compteurParType = {};
@@ -434,7 +459,8 @@ class MigrationService {
             'archive': compte.estArchive,
           };
 
-          print('   📝 Création compte: ${compte.nom} avec utilisateur_id: ${currentAuth.id}');
+          print(
+              '   📝 Création compte: ${compte.nom} avec utilisateur_id: ${currentAuth.id}');
 
           // Données spécifiques par type
           if (typeCollection == 'comptes_cheques') {
@@ -442,16 +468,22 @@ class MigrationService {
               'solde': compte.solde,
               'pret_a_placer': compte.pretAPlacer,
             });
-            final result = await pb.collection('comptes_cheques').create(body: donneesBase);
-            print('   🔍 Compte chèques créé, utilisateur_id: ${result.data['utilisateur_id']}');
+            final result = await pb
+                .collection('comptes_cheques')
+                .create(body: donneesBase);
+            print(
+                '   🔍 Compte chèques créé, utilisateur_id: ${result.data['utilisateur_id']}');
           } else if (typeCollection == 'comptes_credits') {
             donneesBase.addAll({
               'solde_utilise': compte.solde.abs(),
               'limite_credit': compte.solde.abs() + 1000,
               'taux_interet': 19.99,
             });
-            final result = await pb.collection('comptes_credits').create(body: donneesBase);
-            print('   🔍 Compte crédit créé, utilisateur_id: ${result.data['utilisateur_id']}');
+            final result = await pb
+                .collection('comptes_credits')
+                .create(body: donneesBase);
+            print(
+                '   🔍 Compte crédit créé, utilisateur_id: ${result.data['utilisateur_id']}');
           } else if (typeCollection == 'comptes_dettes') {
             donneesBase.addAll({
               'nom_tiers': compte.nom,
@@ -460,8 +492,10 @@ class MigrationService {
               'taux_interet': 0.0,
               'paiement_minimum': 0.0,
             });
-            final result = await pb.collection('comptes_dettes').create(body: donneesBase);
-            print('   🔍 Compte dette créé, utilisateur_id: ${result.data['utilisateur_id']}');
+            final result =
+                await pb.collection('comptes_dettes').create(body: donneesBase);
+            print(
+                '   🔍 Compte dette créé, utilisateur_id: ${result.data['utilisateur_id']}');
           } else if (typeCollection == 'comptes_investissement') {
             donneesBase.addAll({
               'valeur_marche': compte.solde,
@@ -473,11 +507,15 @@ class MigrationService {
               'variation_pourcentage': 0.0,
               'date_derniere_maj': DateTime.now().toIso8601String(),
             });
-            final result = await pb.collection('comptes_investissement').create(body: donneesBase);
-            print('   🔍 Compte investissement créé, utilisateur_id: ${result.data['utilisateur_id']}');
+            final result = await pb
+                .collection('comptes_investissement')
+                .create(body: donneesBase);
+            print(
+                '   🔍 Compte investissement créé, utilisateur_id: ${result.data['utilisateur_id']}');
           }
 
-          compteurParType[typeCollection] = (compteurParType[typeCollection] ?? 0) + 1;
+          compteurParType[typeCollection] =
+              (compteurParType[typeCollection] ?? 0) + 1;
           print('   ✅ Compte migré: ${compte.nom} → $typeCollection');
         } catch (e) {
           print('   ❌ Erreur migration compte: $e');
@@ -491,7 +529,8 @@ class MigrationService {
   }
 
   // Migrer les enveloppes d'un utilisateur spécifique
-  Future<void> _migrerEnveloppesUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerEnveloppesUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('💰 Migration des enveloppes pour $idFirebase...');
 
@@ -504,16 +543,18 @@ class MigrationService {
 
       // D'abord, créer un mapping des catégories Firebase → PocketBase
       final pb = await PocketBaseService.instance;
-      final categoriesPocketBase = await pb.collection('categories').getFullList();
+      final categoriesPocketBase =
+          await pb.collection('categories').getFullList();
       final mappingCategories = <String, String>{};
-      
+
       for (final catPB in categoriesPocketBase) {
         // Associer par nom de catégorie
         for (final docFirebase in snapshot.docs) {
           final donneesFirebase = docFirebase.data();
           if (donneesFirebase['nom'] == catPB.data['nom']) {
             mappingCategories[docFirebase.id] = catPB.id;
-            print('   🔗 Mapping catégorie: ${docFirebase.id} → ${catPB.id} (${catPB.data['nom']})');
+            print(
+                '   🔗 Mapping catégorie: ${docFirebase.id} → ${catPB.id} (${catPB.data['nom']})');
           }
         }
       }
@@ -522,16 +563,17 @@ class MigrationService {
         try {
           final donnees = doc.data();
           final nomCategorie = donnees['nom'] ?? '';
-          
+
           // IMPORTANT: EXCLURE les enveloppes de la catégorie "Dettes"
           if (_estCategorieDettes(nomCategorie)) {
-            print('   ⚠️ Enveloppes de catégorie EXCLUES (auto-créées): $nomCategorie');
+            print(
+                '   ⚠️ Enveloppes de catégorie EXCLUES (auto-créées): $nomCategorie');
             continue; // Ignorer toutes les enveloppes de cette catégorie
           }
-          
+
           final enveloppes = donnees['enveloppes'] as List<dynamic>? ?? [];
           final categorieIdPocketBase = mappingCategories[doc.id];
-          
+
           if (categorieIdPocketBase == null) {
             print('   ⚠️ Catégorie PocketBase non trouvée pour ${doc.id}');
             continue;
@@ -541,17 +583,21 @@ class MigrationService {
             try {
               final enveloppeData = {
                 'utilisateur_id': idPocketBase,
-                'categorie_id': categorieIdPocketBase, // Utiliser l'ID PocketBase
+                'categorie_id':
+                    categorieIdPocketBase, // Utiliser l'ID PocketBase
                 'nom': enveloppe['nom'] ?? 'Enveloppe sans nom',
-                'objectif_date': enveloppe['objectifDate'] ?? DateTime.now().toIso8601String(),
-                'frequence_objectif': _adapterFrequenceObjectif(enveloppe['frequenceObjectif']),
+                'objectif_date': enveloppe['objectifDate'] ??
+                    DateTime.now().toIso8601String(),
+                'frequence_objectif':
+                    _adapterFrequenceObjectif(enveloppe['frequenceObjectif']),
                 'compte_provenance_id': enveloppe['provenanceCompteId'] ?? '',
                 'ordre': enveloppe['ordre'] ?? 0,
                 'solde_enveloppe': (enveloppe['solde'] ?? 0.0).toDouble(),
                 'depense': (enveloppe['depense'] ?? 0.0).toDouble(),
                 'est_archive': enveloppe['archivee'] ?? false,
                 'objectif_montant': (enveloppe['objectif'] ?? 0.0).toDouble(),
-                'moisObjectif': enveloppe['objectifDate'] ?? DateTime.now().toIso8601String(),
+                'moisObjectif': enveloppe['objectifDate'] ??
+                    DateTime.now().toIso8601String(),
               };
 
               await pb.collection('enveloppes').create(body: enveloppeData);
@@ -573,7 +619,8 @@ class MigrationService {
   }
 
   // Migrer les transactions d'un utilisateur spécifique
-  Future<void> _migrerTransactionsUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerTransactionsUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('💸 Migration des transactions pour $idFirebase...');
 
@@ -581,14 +628,15 @@ class MigrationService {
           .collection('transactions')
           .where('userId', isEqualTo: idFirebase)
           .get();
-      
+
       print('   📊 ${snapshot.docs.length} transaction(s) trouvée(s)');
 
       // Créer un mapping des enveloppes Firebase → PocketBase
       final pb = await PocketBaseService.instance;
-      final enveloppesPocketBase = await pb.collection('enveloppes').getFullList();
+      final enveloppesPocketBase =
+          await pb.collection('enveloppes').getFullList();
       final mappingEnveloppes = <String, String>{};
-      
+
       for (final envPB in enveloppesPocketBase) {
         mappingEnveloppes[envPB.data['nom']] = envPB.id;
       }
@@ -605,13 +653,17 @@ class MigrationService {
           // 1. Créer la transaction normale
           final transactionData = {
             'utilisateur_id': idPocketBase,
-            'type': _adapterTypeTransaction(transaction.type.name), // Adapter le type
+            'type': _adapterTypeTransaction(
+                transaction.type.name), // Adapter le type
             'type_mouvement': transaction.typeMouvement.name,
-            'montant': transaction.montant,
+            'montant': transaction.type == TypeTransaction.depense
+                ? -transaction.montant
+                : transaction.montant,
             'date': transaction.date.toIso8601String(),
             'note': transaction.note ?? '',
             'compte_id': transaction.compteId,
-            'collection_compte': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+            'collection_compte': _adapterTypeCompte(
+                _obtenirTypeCompteDepuisId(transaction.compteId)),
             'tiers_id': transaction.tiers ?? '',
             'marqueur': transaction.marqueur ?? '',
             'est_fractionnee': transaction.estFractionnee,
@@ -620,89 +672,188 @@ class MigrationService {
             'compte_passif_id': transaction.compteDePassifAssocie ?? '',
           };
 
-          await pb.collection('transactions').create(body: transactionData);
-          totalTransactions++;
+          // 2. Créer les allocations mensuelles
+          if (transaction.estFractionnee &&
+              transaction.sousItems != null &&
+              transaction.sousItems!.isNotEmpty) {
+            // Transaction fractionnée : créer une allocation pour chaque sous-item
+            print(
+                '   🔄 Transaction fractionnée détectée avec ${transaction.sousItems!.length} sous-items');
 
-          // 2. Créer l'allocation mensuelle seulement si on a une enveloppe
-          if (transaction.enveloppeId != null && transaction.enveloppeId!.isNotEmpty) {
-            String? enveloppeIdPocketBase;
-            
-            // Améliorer la recherche d'enveloppe par ID Firebase → Nom → ID PocketBase
-            // Méthode 1: Chercher par ID direct (peu probable de marcher)
-            for (final envPB in enveloppesPocketBase) {
-              if (envPB.id == transaction.enveloppeId) {
-                enveloppeIdPocketBase = envPB.id;
-                break;
+            for (final sousItem in transaction.sousItems!) {
+              final enveloppeIdFirebase = sousItem['enveloppeId'] as String?;
+              final montant = (sousItem['montant'] as num?)?.toDouble() ?? 0.0;
+
+              if (enveloppeIdFirebase != null &&
+                  enveloppeIdFirebase.isNotEmpty) {
+                // Rechercher l'enveloppe par nom depuis Firebase
+                String? nomEnveloppeFirebase;
+                final categoriesFirebase = await _firestore
+                    .collection('categories')
+                    .where('userId', isEqualTo: idFirebase)
+                    .get();
+
+                for (final catDoc in categoriesFirebase.docs) {
+                  final catData = catDoc.data();
+                  final enveloppes =
+                      catData['enveloppes'] as List<dynamic>? ?? [];
+
+                  for (final enveloppe in enveloppes) {
+                    if (enveloppe['id'] == enveloppeIdFirebase) {
+                      nomEnveloppeFirebase = enveloppe['nom'];
+                      break;
+                    }
+                  }
+                  if (nomEnveloppeFirebase != null) break;
+                }
+
+                // Utiliser le mapping par nom pour trouver l'ID PocketBase
+                String? enveloppeIdPocketBase;
+                if (nomEnveloppeFirebase != null &&
+                    mappingEnveloppes.containsKey(nomEnveloppeFirebase)) {
+                  enveloppeIdPocketBase =
+                      mappingEnveloppes[nomEnveloppeFirebase];
+                  print(
+                      '   ✅ Enveloppe trouvée pour sous-item: "$nomEnveloppeFirebase" → $enveloppeIdPocketBase');
+                }
+
+                if (enveloppeIdPocketBase != null) {
+                  final allocationData = {
+                    'utilisateur_id': idPocketBase,
+                    'enveloppe_id': enveloppeIdPocketBase,
+                    'mois': _forcerPremierDuMoisMinuit(transaction.date)
+                        .toIso8601String(),
+                    'solde': transaction.type == TypeTransaction.depense
+                        ? -montant
+                        : montant,
+                    'alloue': transaction.type == TypeTransaction.revenu
+                        ? montant
+                        : 0.0,
+                    'depense': transaction.type == TypeTransaction.depense
+                        ? montant
+                        : 0.0,
+                    'compte_source_id': transaction.compteId,
+                    'collection_compte_source': _adapterTypeCompte(
+                        _obtenirTypeCompteDepuisId(transaction.compteId)),
+                  };
+
+                  final allocationRecord = await pb
+                      .collection('allocations_mensuelles')
+                      .create(body: allocationData);
+                  totalAllocations++;
+                  print(
+                      '   ✅ Allocation créée pour sous-item: ${sousItem['description'] ?? 'Sans description'} (${montant.toStringAsFixed(2)}\$)');
+
+                  // Pour les transactions fractionnées, on ne met pas d'allocation_mensuelle_id
+                  // car on utilise le JSON des sous_items pour afficher les enveloppes
+                } else {
+                  print(
+                      '   ⚠️ Enveloppe non trouvée pour sous-item: $enveloppeIdFirebase');
+                }
               }
             }
-            
-            // Méthode 2: Si pas trouvé, prendre la première enveloppe disponible pour test
-            if (enveloppeIdPocketBase == null && enveloppesPocketBase.isNotEmpty) {
-              enveloppeIdPocketBase = enveloppesPocketBase.first.id;
-              print('   🔄 Utilisation enveloppe par défaut: ${enveloppesPocketBase.first.data['nom']} pour transaction');
+          } else if (transaction.enveloppeId != null &&
+              transaction.enveloppeId!.isNotEmpty) {
+            String? enveloppeIdPocketBase;
+
+            // Rechercher l'enveloppe par nom depuis Firebase
+            String? nomEnveloppeFirebase;
+            final categoriesFirebase = await _firestore
+                .collection('categories')
+                .where('userId', isEqualTo: idFirebase)
+                .get();
+
+            for (final catDoc in categoriesFirebase.docs) {
+              final catData = catDoc.data();
+              final enveloppes = catData['enveloppes'] as List<dynamic>? ?? [];
+
+              for (final enveloppe in enveloppes) {
+                if (enveloppe['id'] == transaction.enveloppeId) {
+                  nomEnveloppeFirebase = enveloppe['nom'];
+                  break;
+                }
+              }
+              if (nomEnveloppeFirebase != null) break;
+            }
+
+            // Utiliser le mapping par nom pour trouver l'ID PocketBase
+            if (nomEnveloppeFirebase != null &&
+                mappingEnveloppes.containsKey(nomEnveloppeFirebase)) {
+              enveloppeIdPocketBase = mappingEnveloppes[nomEnveloppeFirebase];
+              print(
+                  '   ✅ Enveloppe trouvée: "$nomEnveloppeFirebase" → $enveloppeIdPocketBase');
             }
 
             if (enveloppeIdPocketBase != null) {
               final allocationData = {
                 'utilisateur_id': idPocketBase,
-                'enveloppe_id': enveloppeIdPocketBase, // Utiliser l'ID PocketBase
-                'mois': _forcerPremierDuMoisMinuit(transaction.date).toIso8601String(),
-                'solde': transaction.montant,
-                'alloue': transaction.type == TypeTransaction.revenu ? transaction.montant : 0.0,
-                'depense': transaction.type == TypeTransaction.depense ? transaction.montant : 0.0,
+                'enveloppe_id': enveloppeIdPocketBase,
+                'mois': _forcerPremierDuMoisMinuit(transaction.date)
+                    .toIso8601String(),
+                'solde': transaction.type == TypeTransaction.depense
+                    ? -transaction.montant
+                    : transaction.montant,
+                'alloue': transaction.type == TypeTransaction.revenu
+                    ? transaction.montant
+                    : 0.0,
+                'depense': transaction.type == TypeTransaction.depense
+                    ? transaction.montant
+                    : 0.0,
                 'compte_source_id': transaction.compteId,
-                'collection_compte_source': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+                'collection_compte_source': _adapterTypeCompte(
+                    _obtenirTypeCompteDepuisId(transaction.compteId)),
               };
 
-              await pb.collection('allocations_mensuelles').create(body: allocationData);
+              final allocationRecord = await pb
+                  .collection('allocations_mensuelles')
+                  .create(body: allocationData);
               totalAllocations++;
-              print('   ✅ Allocation mensuelle créée pour enveloppe: $enveloppeIdPocketBase');
+              print(
+                  '   ✅ Allocation mensuelle créée pour enveloppe: $enveloppeIdPocketBase');
+
+              // Ajouter l'ID de l'allocation dans la transaction
+              transactionData['allocation_mensuelle_id'] = allocationRecord.id;
             } else {
-              print('   ⚠️ Aucune enveloppe disponible pour créer allocation mensuelle');
-              
-              // CRÉER QUAND MÊME une allocation mensuelle SANS enveloppe pour test
-              final allocationSansEnveloppe = {
-                'utilisateur_id': idPocketBase,
-                'enveloppe_id': '', // Vide temporairement
-                'mois': _forcerPremierDuMoisMinuit(transaction.date).toIso8601String(),
-                'solde': transaction.montant,
-                'alloue': transaction.type == TypeTransaction.revenu ? transaction.montant : 0.0,
-                'depense': transaction.type == TypeTransaction.depense ? transaction.montant : 0.0,
-                'compte_source_id': transaction.compteId,
-                'collection_compte_source': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
-              };
-              
-              try {
-                await pb.collection('allocations_mensuelles').create(body: allocationSansEnveloppe);
-                totalAllocations++;
-                print('   ✅ Allocation mensuelle créée SANS enveloppe (pour test)');
-              } catch (e) {
-                print('   ❌ Impossible de créer allocation même sans enveloppe: $e');
-              }
+              print('   ⚠️ Enveloppe non trouvée: ${transaction.enveloppeId}');
             }
           } else {
-            print('   ⚠️ Transaction sans enveloppeId, création allocation quand même...');
-            
-            // Créer allocation mensuelle même sans enveloppe
+            print(
+                '   ⚠️ Transaction sans enveloppeId, création allocation quand même...');
+
+            // Créer allocation mensuelle même sans enveloppe pour les revenus
             final allocationData = {
               'utilisateur_id': idPocketBase,
               'enveloppe_id': '', // Vide
-              'mois': _forcerPremierDuMoisMinuit(transaction.date).toIso8601String(),
-              'solde': transaction.montant,
-              'alloue': transaction.type == TypeTransaction.revenu ? transaction.montant : 0.0,
-              'depense': transaction.type == TypeTransaction.depense ? transaction.montant : 0.0,
+              'mois': _forcerPremierDuMoisMinuit(transaction.date)
+                  .toIso8601String(),
+              'solde': transaction.type == TypeTransaction.depense
+                  ? -transaction.montant
+                  : transaction.montant,
+              'alloue': transaction.type == TypeTransaction.revenu
+                  ? transaction.montant
+                  : 0.0,
+              'depense': transaction.type == TypeTransaction.depense
+                  ? transaction.montant
+                  : 0.0,
               'compte_source_id': transaction.compteId,
-              'collection_compte_source': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+              'collection_compte_source': _adapterTypeCompte(
+                  _obtenirTypeCompteDepuisId(transaction.compteId)),
             };
-            
+
             try {
-              await pb.collection('allocations_mensuelles').create(body: allocationData);
+              await pb
+                  .collection('allocations_mensuelles')
+                  .create(body: allocationData);
               totalAllocations++;
               print('   ✅ Allocation mensuelle créée sans enveloppe');
             } catch (e) {
               print('   ❌ Erreur création allocation sans enveloppe: $e');
             }
           }
+
+          // Créer la transaction pour TOUTES les transactions
+          await pb.collection('transactions').create(body: transactionData);
+          totalTransactions++;
 
           if (totalTransactions % 10 == 0) {
             print('   📊 $totalTransactions transactions migrées...');
@@ -720,7 +871,8 @@ class MigrationService {
   }
 
   // Migrer les dettes d'un utilisateur spécifique
-  Future<void> _migrerDettesUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerDettesUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('💳 Migration des dettes pour $idFirebase...');
 
@@ -728,7 +880,7 @@ class MigrationService {
           .collection('dettes')
           .where('userId', isEqualTo: idFirebase)
           .get();
-      
+
       print('   📊 ${snapshot.docs.length} dette(s) trouvée(s)');
 
       int dettesVersPretPersonnel = 0;
@@ -747,15 +899,19 @@ class MigrationService {
             'solde': dette.solde,
             'type': dette.type,
             'archive': dette.archive,
-            'date_creation': dette.dateCreation.toIso8601String(), // Convertir en string
+            'date_creation':
+                dette.dateCreation.toIso8601String(), // Convertir en string
             'note': '',
-            'historique': dette.historique.map((m) => {
-              'id': m.id,
-              'date': m.date.toIso8601String(), // Convertir les Timestamps
-              'montant': m.montant,
-              'type': m.type,
-              'note': m.note,
-            }).toList(),
+            'historique': dette.historique
+                .map((m) => {
+                      'id': m.id,
+                      'date':
+                          m.date.toIso8601String(), // Convertir les Timestamps
+                      'montant': m.montant,
+                      'type': m.type,
+                      'note': m.note,
+                    })
+                .toList(),
           };
 
           // Logique de séparation selon estManuelle
@@ -786,14 +942,16 @@ class MigrationService {
         }
       }
 
-      print('   📊 pret_personnel: $dettesVersPretPersonnel, comptes_dettes: $dettesVersComptesDettes');
+      print(
+          '   📊 pret_personnel: $dettesVersPretPersonnel, comptes_dettes: $dettesVersComptesDettes');
     } catch (e) {
       print('❌ Erreur migration dettes utilisateur: $e');
     }
   }
 
   // Migrer les investissements d'un utilisateur spécifique
-  Future<void> _migrerInvestissementsUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerInvestissementsUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('📈 Migration des investissements pour $idFirebase...');
 
@@ -801,7 +959,7 @@ class MigrationService {
           .collection('investissements')
           .where('userId', isEqualTo: idFirebase)
           .get();
-      
+
       print('   📊 ${snapshot.docs.length} investissement(s) trouvé(s)');
 
       int totalMigres = 0;
@@ -824,12 +982,16 @@ class MigrationService {
             'prix_moyen_achat': investissement.prixMoyen,
             'prix_actuel': investissement.prixActuel,
             'variation_pourcentage': investissement.variation,
-            'date_derniere_maj': investissement.dateDerniereMiseAJour.toIso8601String(),
-            'transactions_details': investissement.transactions.map((t) => t.toMap()).toList(),
+            'date_derniere_maj':
+                investissement.dateDerniereMiseAJour.toIso8601String(),
+            'transactions_details':
+                investissement.transactions.map((t) => t.toMap()).toList(),
           };
 
           final pb = await PocketBaseService.instance;
-          await pb.collection('comptes_investissement').create(body: investissementData);
+          await pb
+              .collection('comptes_investissement')
+              .create(body: investissementData);
           totalMigres++;
           print('   ✅ Investissement migré: ${investissement.symbole}');
         } catch (e) {
@@ -844,7 +1006,8 @@ class MigrationService {
   }
 
   // Migrer les tiers d'un utilisateur spécifique
-  Future<void> _migrerTiersUtilisateur(String idFirebase, String idPocketBase) async {
+  Future<void> _migrerTiersUtilisateur(
+      String idFirebase, String idPocketBase) async {
     try {
       print('👥 Migration des tiers pour $idFirebase...');
 
@@ -852,7 +1015,7 @@ class MigrationService {
           .collection('tiers')
           .where('userId', isEqualTo: idFirebase)
           .get();
-      
+
       print('   📊 ${snapshot.docs.length} tiers trouvé(s)');
 
       for (final doc in snapshot.docs) {
@@ -879,15 +1042,16 @@ class MigrationService {
   // Vérifier si une catégorie est la catégorie "Dettes" (à exclure)
   bool _estCategorieDettes(String nomCategorie) {
     if (nomCategorie.isEmpty) return false;
-    
+
     final nomLower = nomCategorie.toLowerCase().trim();
-    final estDette = nomLower == 'dettes' || 
-                     nomLower == 'dette' || 
-                     nomLower == 'debts' || 
-                     nomLower == 'debt' ||
-                     nomLower.contains('dette');
-    
-    print('   🔍 Test exclusion: "$nomCategorie" → nomLower="$nomLower" → exclure=$estDette');
+    final estDette = nomLower == 'dettes' ||
+        nomLower == 'dette' ||
+        nomLower == 'debts' ||
+        nomLower == 'debt' ||
+        nomLower.contains('dette');
+
+    print(
+        '   🔍 Test exclusion: "$nomCategorie" → nomLower="$nomLower" → exclure=$estDette');
     return estDette;
   }
 
@@ -966,7 +1130,8 @@ class MigrationService {
   }
 
   // Comparer les données entre Firebase et PocketBase pour un utilisateur
-  Future<Map<String, Map<String, int>>> comparerDonneesUtilisateur(String idFirebase) async {
+  Future<Map<String, Map<String, int>>> comparerDonneesUtilisateur(
+      String idFirebase) async {
     final comparaison = <String, Map<String, int>>{};
 
     try {
@@ -1009,8 +1174,10 @@ class MigrationService {
           .where('userId', isEqualTo: idFirebase)
           .get();
       final pb = await PocketBaseService.instance;
-      final dettesPocketBase = await pb.collection('comptes_dettes').getFullList();
-      final pretsPocketBase = await pb.collection('pret_personnel').getFullList();
+      final dettesPocketBase =
+          await pb.collection('comptes_dettes').getFullList();
+      final pretsPocketBase =
+          await pb.collection('pret_personnel').getFullList();
       comparaison['dettes'] = {
         'firebase': dettesFirebase.docs.length,
         'pocketbase': dettesPocketBase.length + pretsPocketBase.length,
@@ -1018,9 +1185,9 @@ class MigrationService {
 
       print('📊 Comparaison des données pour $idFirebase :');
       comparaison.forEach((type, counts) {
-        print('   $type: Firebase=${counts['firebase']}, PocketBase=${counts['pocketbase']}');
+        print(
+            '   $type: Firebase=${counts['firebase']}, PocketBase=${counts['pocketbase']}');
       });
-
     } catch (e) {
       print('❌ Erreur comparaison données: $e');
     }
@@ -1038,32 +1205,39 @@ class MigrationService {
 
     try {
       final comparaison = await comparerDonneesUtilisateur(idFirebase);
-      
+
       rapport.writeln('📊 STATISTIQUES DE MIGRATION:');
       comparaison.forEach((type, counts) {
         final firebase = counts['firebase'] ?? 0;
         final pocketbase = counts['pocketbase'] ?? 0;
-        final taux = firebase > 0 ? (pocketbase / firebase * 100).toStringAsFixed(1) : '0.0';
+        final taux = firebase > 0
+            ? (pocketbase / firebase * 100).toStringAsFixed(1)
+            : '0.0';
         rapport.writeln('   $type: $pocketbase/$firebase migrés ($taux%)');
       });
 
       rapport.writeln();
       rapport.writeln('✅ COLLECTIONS MIGRÉES:');
-      rapport.writeln('   - Comptes → Séparés par type (cheques, credits, dettes, investissement)');
-      rapport.writeln('   - Dettes → Séparées selon estManuelle (pret_personnel vs comptes_dettes)');
-      rapport.writeln('   - Transactions → Double écriture (transactions + allocations_mensuelles)');
+      rapport.writeln(
+          '   - Comptes → Séparés par type (cheques, credits, dettes, investissement)');
+      rapport.writeln(
+          '   - Dettes → Séparées selon estManuelle (pret_personnel vs comptes_dettes)');
+      rapport.writeln(
+          '   - Transactions → Double écriture (transactions + allocations_mensuelles)');
       rapport.writeln('   - Catégories & Enveloppes → Structure adaptée');
       rapport.writeln('   - Investissements → Structure enrichie');
       rapport.writeln('   - Tiers → Migration directe');
 
       rapport.writeln();
       rapport.writeln('🔧 LOGIQUE MÉTIER APPLIQUÉE:');
-      rapport.writeln('   - Toutes les transactions → Collection transactions (vraie date/heure)');
-      rapport.writeln('   - Toutes les transactions → Collection allocations_mensuelles (1er du mois à minuit)');
+      rapport.writeln(
+          '   - Toutes les transactions → Collection transactions (vraie date/heure)');
+      rapport.writeln(
+          '   - Toutes les transactions → Collection allocations_mensuelles (1er du mois à minuit)');
       rapport.writeln('   - estManuelle = false → Collection pret_personnel');
       rapport.writeln('   - estManuelle = true → Collection comptes_dettes');
-      rapport.writeln('   - Types de comptes → Collections séparées automatiquement');
-
+      rapport.writeln(
+          '   - Types de comptes → Collections séparées automatiquement');
     } catch (e) {
       rapport.writeln('❌ Erreur génération rapport: $e');
     }
@@ -1075,8 +1249,10 @@ class MigrationService {
   Future<void> migrerToutesLesDonnees() async {
     try {
       print('🚀 Début de la migration complète...');
-      print('⚠️  ATTENTION: Cette méthode migre TOUS les utilisateurs à la fois');
-      print('⚠️  Il est recommandé d\'utiliser migrerUtilisateurConnecte() à la place');
+      print(
+          '⚠️  ATTENTION: Cette méthode migre TOUS les utilisateurs à la fois');
+      print(
+          '⚠️  Il est recommandé d\'utiliser migrerUtilisateurConnecte() à la place');
 
       // 1. Initialiser le mapping utilisateur
       await _initialiserMappingUtilisateur();
@@ -1085,7 +1261,7 @@ class MigrationService {
       for (final entry in _mappingUtilisateur.entries) {
         final idFirebase = entry.key;
         final idPocketBase = entry.value;
-        
+
         print('\n👤 Migration utilisateur: $idFirebase → $idPocketBase');
         await _migrerDonneesUtilisateur(idFirebase, idPocketBase);
       }

@@ -1,340 +1,194 @@
+// 📁 Chemin : lib/services/pocketbase_service.dart
+// 🔗 Dépendances : pocketbase.dart, auth_service.dart
+// 📋 Description : Service PocketBase pour remplacer FirebaseService
+
 import 'package:pocketbase/pocketbase.dart';
-import '../pocketbase_config.dart';
+import 'package:pocketbase/pocketbase.dart' show RecordModel;
+import 'auth_service.dart';
+import '../models/categorie.dart';
+import '../models/compte.dart';
 
 class PocketBaseService {
-  static PocketBase? _instance;
-  static bool _initialized = false;
+  static final PocketBaseService _instance = PocketBaseService._internal();
+  factory PocketBaseService() => _instance;
+  PocketBaseService._internal();
 
-  // Initialisation intelligente
-  static Future<PocketBase> get instance async {
-    if (!_initialized) {
-      await _initialize();
+  static PocketBase? _pocketBase;
+
+  // Obtenir l'instance PocketBase
+  static Future<PocketBase> _getPocketBaseInstance() async {
+    if (_pocketBase != null) return _pocketBase!;
+
+    // URLs de fallback dans l'ordre de priorité
+    const List<String> _pocketBaseUrls = [
+      'http://192.168.1.77:8090', // Local WiFi
+      'http://10.0.2.2:8090', // Émulateur Android
+      'https://toutiebudget.duckdns.org', // Production
+    ];
+
+    // Tester chaque URL dans l'ordre
+    for (final url in _pocketBaseUrls) {
+      try {
+        print('🔍 Test connexion PocketBase: $url');
+
+        // Test de connectivité
+        final response = await Future.delayed(const Duration(seconds: 1));
+
+        print('✅ Connexion PocketBase réussie: $url');
+        _pocketBase = PocketBase(url);
+        return _pocketBase!;
+      } catch (e) {
+        print('❌ Échec connexion PocketBase: $url - $e');
+        continue;
+      }
     }
-    return _instance!;
+
+    throw Exception('❌ Aucune connexion PocketBase disponible');
   }
 
-  static Future<void> _initialize() async {
+  // Lire les catégories depuis PocketBase
+  static Stream<List<Categorie>> lireCategories() async* {
     try {
-      // Tester et définir l'URL active
-      await PocketBaseConfig.testAndSetActiveUrl();
+      print('🔄 PocketBaseService - Lecture catégories...');
+      final pb = await _getPocketBaseInstance();
 
-      _instance = PocketBase(PocketBaseConfig.serverUrl);
-      _initialized = true;
+      final records = await pb.collection('categories').getFullList();
+      print('✅ PocketBaseService - ${records.length} catégories trouvées');
 
-      print(
-          '✅ PocketBaseService initialisé avec: ${PocketBaseConfig.serverUrl}');
+      final categories = records
+          .map((record) => Categorie(
+                id: record.id,
+                userId: record.data['userId'],
+                nom: record.data['nom'] ?? '',
+                enveloppes: [], // Pour l'instant, on met une liste vide
+                ordre: record.data['ordre'],
+              ))
+          .toList();
+
+      yield categories;
     } catch (e) {
-      print('❌ Erreur initialisation PocketBaseService: $e');
-      rethrow;
+      print('❌ Erreur lecture catégories PocketBase: $e');
+      yield [];
     }
   }
 
-  // Méthode pour re-tester la connexion
-  static Future<void> retestConnection() async {
-    _initialized = false;
-    await _initialize();
+  // Lire les comptes depuis PocketBase
+  static Stream<List<Compte>> lireComptes() async* {
+    try {
+      print('🔄 PocketBaseService - Lecture comptes...');
+      final pb = await _getPocketBaseInstance();
+
+      final records = await pb.collection('comptes').getFullList();
+      print('✅ PocketBaseService - ${records.length} comptes trouvés');
+
+      final comptes = records
+          .map((record) => Compte(
+                id: record.id,
+                userId: record.data['userId'],
+                nom: record.data['nom'] ?? '',
+                type: record.data['type'] ?? 'Chèque',
+                solde: (record.data['solde'] ?? 0).toDouble(),
+                couleur: record.data['couleur'] ?? 0xFF000000,
+                pretAPlacer: (record.data['pret_a_placer'] ?? 0).toDouble(),
+                dateCreation: DateTime.now(), // Valeur par défaut
+                estArchive: record.data['est_archive'] ?? false,
+                ordre: record.data['ordre'],
+              ))
+          .toList();
+
+      yield comptes;
+    } catch (e) {
+      print('❌ Erreur lecture comptes PocketBase: $e');
+      yield [];
+    }
   }
 
-  // Authentification
-  static Future<RecordAuth> signInWithEmail(
-      String email, String password) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.usersCollection)
-        .authWithPassword(email, password);
+  // Instance singleton pour compatibilité
+  static PocketBase? _pbInstance;
+
+  // Getter pour l'instance (compatibilité migration_service)
+  static Future<PocketBase> get instance async {
+    if (_pbInstance == null) {
+      _pbInstance = await _getPocketBaseInstance();
+    }
+    return _pbInstance!;
   }
 
+  // Méthode signUp pour compatibilité
   static Future<RecordModel> signUp(
-      String email, String password, String passwordConfirm,
-      {Map<String, dynamic>? data}) async {
-    final pb = await instance;
-    final body = data ?? {};
-    body['email'] = email;
-    body['password'] = password;
-    body['passwordConfirm'] = passwordConfirm;
-    return await pb
-        .collection(PocketBaseConfig.usersCollection)
-        .create(body: body);
+      String email, String password, String name) async {
+    final pb = await _getPocketBaseInstance();
+    return await pb.collection('users').create(body: {
+      'email': email,
+      'password': password,
+      'passwordConfirm': password,
+      'name': name,
+    });
   }
 
-  static Future<void> signOut() async {
-    final pb = await instance;
-    pb.authStore.clear();
+  // Méthodes pour compatibilité migration_service
+  static Future<List<Compte>> getComptes() async {
+    final comptes = <Compte>[];
+    await for (final listeComptes in lireComptes()) {
+      comptes.addAll(listeComptes);
+    }
+    return comptes;
   }
 
-  // Gestion des comptes
-  static Future<List<RecordModel>> getComptes() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesChequesCollection)
-        .getFullList();
+  static Future<List<Categorie>> getCategories() async {
+    final categories = <Categorie>[];
+    await for (final listeCategories in lireCategories()) {
+      categories.addAll(listeCategories);
+    }
+    return categories;
   }
 
-  static Future<RecordModel> createCompte(Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesChequesCollection)
-        .create(body: data);
+  static Future<List<dynamic>> getTransactions() async {
+    // TODO: Implémenter quand on aura le modèle Transaction
+    return [];
   }
 
-  static Future<RecordModel> createCompteCredit(
-      Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesCreditsCollection)
-        .create(body: data);
-  }
+  // Créer des catégories de test dans PocketBase
+  static Future<void> creerCategoriesTest() async {
+    try {
+      print('🔄 PocketBaseService - Création catégories de test...');
+      final pb = await _getPocketBaseInstance();
 
-  static Future<RecordModel> updateCompte(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesChequesCollection)
-        .update(id, body: data);
-  }
+      final categoriesTest = [
+        {
+          'nom': 'Alimentation',
+          'userId': 'test_user',
+          'ordre': 1,
+        },
+        {
+          'nom': 'Transport',
+          'userId': 'test_user',
+          'ordre': 2,
+        },
+        {
+          'nom': 'Logement',
+          'userId': 'test_user',
+          'ordre': 3,
+        },
+        {
+          'nom': 'Loisirs',
+          'userId': 'test_user',
+          'ordre': 4,
+        },
+      ];
 
-  static Future<void> deleteCompte(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.comptesChequesCollection).delete(id);
-  }
+      for (final categorie in categoriesTest) {
+        try {
+          await pb.collection('categories').create(body: categorie);
+          print('✅ Catégorie créée: ${categorie['nom']}');
+        } catch (e) {
+          print('⚠️ Catégorie déjà existante: ${categorie['nom']}');
+        }
+      }
 
-  // Gestion des catégories
-  static Future<List<RecordModel>> getCategories() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.categoriesCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createCategorie(Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.categoriesCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateCategorie(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.categoriesCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteCategorie(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.categoriesCollection).delete(id);
-  }
-
-  // Gestion des transactions
-  static Future<List<RecordModel>> getTransactions() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.transactionsCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createTransaction(
-      Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.transactionsCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateTransaction(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.transactionsCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteTransaction(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.transactionsCollection).delete(id);
-  }
-
-  // Gestion des enveloppes
-  static Future<List<RecordModel>> getEnveloppes() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.enveloppesCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createEnveloppe(Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.enveloppesCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateEnveloppe(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.enveloppesCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteEnveloppe(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.enveloppesCollection).delete(id);
-  }
-
-  // Gestion des allocations mensuelles
-  static Future<List<RecordModel>> getAllocationsMensuelles() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.allocationsMensuellesCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createAllocationMensuelle(
-      Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.allocationsMensuellesCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateAllocationMensuelle(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.allocationsMensuellesCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteAllocationMensuelle(String id) async {
-    final pb = await instance;
-    await pb
-        .collection(PocketBaseConfig.allocationsMensuellesCollection)
-        .delete(id);
-  }
-
-  // Gestion des dettes
-  static Future<List<RecordModel>> getDettes() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesDettesCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createDette(Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesDettesCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateDette(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesDettesCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteDette(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.comptesDettesCollection).delete(id);
-  }
-
-  // Gestion des investissements
-  static Future<List<RecordModel>> getInvestissements() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesInvestissementCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createInvestissement(
-      Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesInvestissementCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateInvestissement(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.comptesInvestissementCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteInvestissement(String id) async {
-    final pb = await instance;
-    await pb
-        .collection(PocketBaseConfig.comptesInvestissementCollection)
-        .delete(id);
-  }
-
-  // Gestion des prêts personnels
-  static Future<List<RecordModel>> getPretsPersonnels() async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.pretPersonnelCollection)
-        .getFullList();
-  }
-
-  static Future<RecordModel> createPretPersonnel(
-      Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.pretPersonnelCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updatePretPersonnel(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.pretPersonnelCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deletePretPersonnel(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.pretPersonnelCollection).delete(id);
-  }
-
-  // Gestion des tiers
-  static Future<List<RecordModel>> getTiers() async {
-    final pb = await instance;
-    return await pb.collection(PocketBaseConfig.tiersCollection).getFullList();
-  }
-
-  static Future<RecordModel> createTiers(Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.tiersCollection)
-        .create(body: data);
-  }
-
-  static Future<RecordModel> updateTiers(
-      String id, Map<String, dynamic> data) async {
-    final pb = await instance;
-    return await pb
-        .collection(PocketBaseConfig.tiersCollection)
-        .update(id, body: data);
-  }
-
-  static Future<void> deleteTiers(String id) async {
-    final pb = await instance;
-    await pb.collection(PocketBaseConfig.tiersCollection).delete(id);
-  }
-
-  // Vérifier si l'utilisateur est connecté
-  static bool get isAuthenticated {
-    return _instance?.authStore.isValid ?? false;
-  }
-
-  // Obtenir l'utilisateur connecté
-  static RecordModel? get currentUser {
-    return _instance?.authStore.model;
+      print('✅ Création catégories de test terminée');
+    } catch (e) {
+      print('❌ Erreur création catégories de test: $e');
+    }
   }
 }

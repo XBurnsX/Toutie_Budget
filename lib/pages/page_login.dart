@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/auth_service.dart';
+import 'package:toutie_budget/services/auth_service_firebase.dart';
+import 'package:toutie_budget/main.dart';
+import 'package:toutie_budget/pages/page_test_simple.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:toutie_budget/services/pocketbase_service.dart';
 
 class PageLogin extends StatefulWidget {
   const PageLogin({super.key});
@@ -13,7 +19,7 @@ class _PageLoginState extends State<PageLogin> {
   bool _isLoading = false;
   final FirebaseService _authService = FirebaseService();
 
-  void _signInWithGoogle() async {
+  void _signInWithGoogleFirebase() async {
     setState(() {
       _isLoading = true;
     });
@@ -29,7 +35,88 @@ class _PageLoginState extends State<PageLogin> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la connexion : ${e.toString()}'),
+            content:
+                Text('Erreur lors de la connexion Firebase : ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _signInWithGooglePocketBase() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('🔄 Début connexion PocketBase...');
+      final user = await AuthService.signInWithGoogle();
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (user != null) {
+        print('✅ Connexion PocketBase réussie: ${user.data['email']}');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Connexion PocketBase réussie !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Forcer la navigation vers l'app principale
+          print('🔄 Navigation vers MyHomePage...');
+
+          // Se connecter aussi à Firebase pour les données
+          try {
+            print('🔄 Tentative connexion Firebase...');
+            // Utiliser la méthode Firebase directe au lieu de Google Sign-In
+            await FirebaseAuth.instance.signInAnonymously();
+            print('✅ Connexion Firebase anonyme réussie');
+          } catch (e) {
+            print('❌ Erreur connexion Firebase temporaire: $e');
+            print('⚠️ On continue sans Firebase...');
+          }
+
+          print('🔄 Navigation vers MyHomePage...');
+
+          // Créer des catégories de test dans PocketBase
+          try {
+            await PocketBaseService.creerCategoriesTest();
+          } catch (e) {
+            print('⚠️ Erreur création catégories de test: $e');
+          }
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const MyHomePage()),
+          );
+          print('✅ Navigation vers MyHomePage terminée');
+        }
+      } else {
+        print('❌ Connexion PocketBase annulée');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Connexion annulée'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur connexion PocketBase: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur connexion PocketBase : ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -392,28 +479,48 @@ class _PageLoginState extends State<PageLogin> {
               : SizedBox(
                   width: double.infinity,
                   height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _signInWithGoogle,
-                    icon: Image.asset(
-                      'assets/images/app_icon.png',
-                      width: 20,
-                      height: 20,
-                    ),
-                    label: const Text(
-                      'Se connecter avec Google',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                  child: Column(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _signInWithGoogleFirebase,
+                        icon: const Icon(Icons.local_fire_department),
+                        label: const Text(
+                          'Firebase (Ancien)',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.orange,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 2,
+                        ),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: const Color(0xFF1a237e),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _signInWithGooglePocketBase,
+                        icon: const Icon(Icons.cloud),
+                        label: const Text(
+                          'PocketBase (Nouveau)',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 2,
+                        ),
                       ),
-                      elevation: 2,
-                    ),
+                    ],
                   ),
                 ),
 
@@ -450,18 +557,36 @@ class _PageLoginState extends State<PageLogin> {
               const SizedBox(height: 550),
               _isLoading
                   ? const CircularProgressIndicator()
-                  : ElevatedButton.icon(
-                      onPressed: _signInWithGoogle,
-                      icon: const Icon(Icons.login),
-                      label: const Text('Se connecter avec Google'),
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        backgroundColor: Colors.white,
-                        minimumSize: const Size(250, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0),
+                  : Column(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _signInWithGoogleFirebase,
+                          icon: const Icon(Icons.local_fire_department),
+                          label: const Text('Firebase (Ancien)'),
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            backgroundColor: Colors.orange,
+                            minimumSize: const Size(250, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: _signInWithGooglePocketBase,
+                          icon: const Icon(Icons.cloud),
+                          label: const Text('PocketBase (Nouveau)'),
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            backgroundColor: Colors.green,
+                            minimumSize: const Size(250, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
             ],
           ),

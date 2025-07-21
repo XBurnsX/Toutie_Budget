@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/pocketbase_service.dart';
 import 'package:toutie_budget/services/rollover_service.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
@@ -427,15 +428,7 @@ class _PageBudgetState extends State<PageBudget> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: SvgPicture.asset(
-              'assets/icons/transfert_argent.svg',
-              width: 25,
-              height: 25,
-              colorFilter: ColorFilter.mode(
-                Theme.of(context).iconTheme.color ?? Colors.white,
-                BlendMode.srcIn,
-              ),
-            ),
+            icon: const Icon(Icons.swap_horiz),
             tooltip: 'Virer de l\'argent',
             onPressed: () {
               Navigator.of(context).push(
@@ -446,15 +439,7 @@ class _PageBudgetState extends State<PageBudget> {
             },
           ),
           IconButton(
-            icon: SvgPicture.asset(
-              'assets/icons/gerer_categorie.svg',
-              width: 20,
-              height: 20,
-              colorFilter: ColorFilter.mode(
-                Theme.of(context).iconTheme.color ?? Colors.white,
-                BlendMode.srcIn,
-              ),
-            ),
+            icon: const Icon(Icons.category),
             tooltip: 'Catégories',
             onPressed: () {
               Navigator.of(context).push(
@@ -503,9 +488,17 @@ class _PageBudgetState extends State<PageBudget> {
         ],
       ),
       body: StreamBuilder<List<Compte>>(
-        stream: FirebaseService().lireComptes(),
+        stream: PocketBaseService.lireComptes(),
         builder: (context, snapshot) {
+          print(
+              '🔄 PageBudget - StreamBuilder comptes - ConnectionState: ${snapshot.connectionState}');
+          print(
+              '🔄 PageBudget - StreamBuilder comptes - hasData: ${snapshot.hasData}');
+          print(
+              '🔄 PageBudget - StreamBuilder comptes - hasError: ${snapshot.hasError}');
+
           if (!snapshot.hasData || !mounted) {
+            print('🔄 PageBudget - Affichage CircularProgressIndicator');
             return const Center(child: CircularProgressIndicator());
           }
           final comptes = snapshot.data ?? [];
@@ -513,6 +506,7 @@ class _PageBudgetState extends State<PageBudget> {
               comptes.where((c) => !c.estArchive).toList();
 
           if (comptes.isEmpty) {
+            print('🔄 PageBudget - Aucun compte disponible');
             return const Center(
               child: Text(
                 'Aucun compte disponible',
@@ -520,22 +514,38 @@ class _PageBudgetState extends State<PageBudget> {
               ),
             );
           }
+          print(
+              '🔄 PageBudget - ${comptes.length} comptes trouvés, début StreamBuilder catégories');
           return StreamBuilder<List<Categorie>>(
-            stream: FirebaseService().lireCategories(),
+            stream: PocketBaseService.lireCategories(),
             builder: (context, catSnapshot) {
+              print(
+                  '🔄 PageBudget - StreamBuilder catégories - ConnectionState: ${catSnapshot.connectionState}');
+              print(
+                  '🔄 PageBudget - StreamBuilder catégories - hasData: ${catSnapshot.hasData}');
+              print(
+                  '🔄 PageBudget - StreamBuilder catégories - hasError: ${catSnapshot.hasError}');
+
               if (!mounted) {
+                print(
+                    '🔄 PageBudget - Catégories - Affichage CircularProgressIndicator (pas mounted)');
                 return const Center(child: CircularProgressIndicator());
               }
               final categories = catSnapshot.data ?? [];
+              print('🔄 PageBudget - Calcul montant négatif...');
               final montantNegatif = _calculerMontantNegatifTotal(
                 comptesNonArchives,
                 categories,
               );
+              print(
+                  '✅ PageBudget - Calcul montant négatif terminé: $montantNegatif');
               final aSituationsUrgence = _aSituationsUrgence(
                 comptesNonArchives,
                 categories,
               );
 
+              print(
+                  '🔄 PageBudget - Début rendu interface avec ${comptesNonArchives.length} comptes et ${categories.length} catégories');
               return Column(
                 children: [
                   const SizedBox(height: 20),

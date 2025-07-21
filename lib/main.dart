@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
 import 'package:toutie_budget/pages/page_comptes_reorder.dart';
 import 'package:toutie_budget/pages/page_login.dart';
 import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/auth_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
 import 'package:toutie_budget/widgets/bandeau_bienvenue.dart';
 
@@ -119,7 +121,12 @@ class MyApp extends StatelessWidget {
                     body: Center(child: CircularProgressIndicator()),
                   );
                 }
-                if (snapshot.hasData) {
+
+                // Vérifier si connecté à Firebase OU PocketBase
+                final isFirebaseConnected = snapshot.hasData;
+                final isPocketBaseConnected = AuthService.isSignedIn;
+
+                if (isFirebaseConnected || isPocketBaseConnected) {
                   return const MyHomePage();
                 }
                 return const PageLogin();
@@ -194,13 +201,18 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    print('🔄 MyHomePage initState() - Début initialisation');
 
     // Mettre à jour les dettes existantes pour ajouter le champ estManuelle
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
+        print('🔄 MyHomePage - Mise à jour dettes existantes');
         DetteService().mettreAJourDettesExistantes();
+        print('✅ MyHomePage - Mise à jour dettes terminée');
       }
     });
+
+    print('✅ MyHomePage initState() - Initialisation terminée');
   }
 
   @override
@@ -251,14 +263,10 @@ class _MyHomePageState extends State<MyHomePage> {
               BottomNavigationBarItem(
                 icon: Opacity(
                   opacity: _selectedIndex == 0 ? 1.0 : 0.6,
-                  child: SvgPicture.asset(
-                    'assets/icons/budget.svg',
-                    width: _selectedIndex == 0 ? 36 : 32,
-                    height: _selectedIndex == 0 ? 36 : 32,
-                    colorFilter: ColorFilter.mode(
-                      themeService.primaryColor,
-                      BlendMode.srcIn,
-                    ),
+                  child: Icon(
+                    Icons.account_balance_wallet,
+                    color: themeService.primaryColor,
+                    size: _selectedIndex == 0 ? 36 : 32,
                   ),
                 ),
                 label: '',
@@ -266,14 +274,10 @@ class _MyHomePageState extends State<MyHomePage> {
               BottomNavigationBarItem(
                 icon: Opacity(
                   opacity: _selectedIndex == 1 ? 1.0 : 0.6,
-                  child: SvgPicture.asset(
-                    'assets/icons/compte.svg',
-                    width: _selectedIndex == 1 ? 36 : 32,
-                    height: _selectedIndex == 1 ? 36 : 32,
-                    colorFilter: ColorFilter.mode(
-                      themeService.primaryColor,
-                      BlendMode.srcIn,
-                    ),
+                  child: Icon(
+                    Icons.account_balance,
+                    color: themeService.primaryColor,
+                    size: _selectedIndex == 1 ? 36 : 32,
                   ),
                 ),
                 label: '',
@@ -281,14 +285,10 @@ class _MyHomePageState extends State<MyHomePage> {
               BottomNavigationBarItem(
                 icon: Opacity(
                   opacity: _selectedIndex == 2 ? 1.0 : 0.6,
-                  child: SvgPicture.asset(
-                    'assets/icons/ajout_transaction.svg',
-                    width: _selectedIndex == 2 ? 36 : 32,
-                    height: _selectedIndex == 2 ? 36 : 32,
-                    colorFilter: ColorFilter.mode(
-                      themeService.primaryColor,
-                      BlendMode.srcIn,
-                    ),
+                  child: Icon(
+                    Icons.add_circle,
+                    color: themeService.primaryColor,
+                    size: _selectedIndex == 2 ? 36 : 32,
                   ),
                 ),
                 label: '',

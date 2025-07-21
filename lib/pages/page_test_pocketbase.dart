@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/migration_service.dart';
 import '../services/auth_service.dart';
+import 'page_test_auth_pocketbase.dart';
+import 'page_double_auth.dart';
 
 class PageTestPocketBase extends StatefulWidget {
   const PageTestPocketBase({super.key});
@@ -59,7 +61,7 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
     try {
       _addLog('🔄 Test des connexions...');
       final results = await _migrationService.testConnections();
-      
+
       if (results['firebase'] == true) {
         _addLog('✅ Connexion Firebase OK');
       } else {
@@ -95,9 +97,9 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
 
     try {
       _addLog('🔄 Connexion avec Google...');
-      final success = await _authService.signInWithGoogle();
-      
-      if (success) {
+      final user = await AuthService.signInWithGoogle();
+
+      if (user != null) {
         final user = FirebaseAuth.instance.currentUser;
         _addLog('✅ Connexion Google réussie: ${user?.email}');
         setState(() {
@@ -137,7 +139,7 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
       _addLog('🚀 Début de la migration pour ${user.email}...');
       await _migrationService.migrateCurrentUserData();
       _addLog('✅ Migration terminée avec succès !');
-      
+
       setState(() {
         _statusMessage = 'Migration terminée';
       });
@@ -163,7 +165,7 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
       _addLog('📊 Comparaison des données...');
       await _migrationService.compareData();
       _addLog('✅ Comparaison terminée');
-      
+
       setState(() {
         _statusMessage = 'Comparaison terminée';
       });
@@ -189,7 +191,7 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
       _addLog('🔍 Vérification des collections PocketBase...');
       await _migrationService.verifyAllPocketBaseCollections();
       _addLog('✅ Vérification terminée');
-      
+
       setState(() {
         _statusMessage = 'Vérification terminée';
       });
@@ -210,7 +212,7 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
       _addLog('📋 Génération du rapport...');
       final rapport = await _migrationService.generateMigrationReport();
       _addLog('📄 Rapport généré:');
-      
+
       // Afficher les premières lignes du rapport dans les logs
       final lignes = rapport.split('\n').take(5).toList();
       for (final ligne in lignes) {
@@ -220,7 +222,6 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
       }
       _addLog('📄 Voir console pour rapport complet');
       print('\n' + rapport); // Afficher le rapport complet dans la console
-      
     } catch (e) {
       _addLog('❌ Erreur génération rapport: $e');
     }
@@ -296,6 +297,33 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
                       'Se connecter avec Google',
                       _connexionGoogle,
                       Colors.red,
+                    ),
+                    _buildActionButton(
+                      '🔐 Test Auth PocketBase',
+                      'Tester l\'authentification PocketBase',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const PageTestAuthPocketBase(),
+                          ),
+                        );
+                      },
+                      Colors.green,
+                    ),
+                    _buildActionButton(
+                      '🔐 Double Authentification',
+                      'Tester Firebase + PocketBase',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PageDoubleAuth(),
+                          ),
+                        );
+                      },
+                      Colors.purple,
                     ),
 
                     const SizedBox(height: 16),
@@ -390,7 +418,7 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
                                   itemBuilder: (context, index) {
                                     final log = _logs[index];
                                     Color textColor = Colors.black87;
-                                    
+
                                     // Coloration selon le type de message
                                     if (log.contains('✅')) {
                                       textColor = Colors.green[700]!;
