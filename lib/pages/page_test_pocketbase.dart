@@ -1,8 +1,11 @@
+// 📁 Chemin : lib/pages/page_test_pocketbase.dart
+// 🔗 Dépendances : migration_service.dart, auth_service.dart
+// 📋 Description : Page de test et migration PocketBase simplifiée
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/migration_service.dart';
-import '../services/pocketbase_service.dart';
 import '../services/auth_service.dart';
-import '../pocketbase_config.dart';
 
 class PageTestPocketBase extends StatefulWidget {
   const PageTestPocketBase({super.key});
@@ -13,93 +16,161 @@ class PageTestPocketBase extends StatefulWidget {
 
 class _PageTestPocketBaseState extends State<PageTestPocketBase> {
   final MigrationService _migrationService = MigrationService();
-  final PocketBaseService _pocketBaseService = PocketBaseService();
   final AuthService _authService = AuthService();
 
   bool _isLoading = false;
-  String _statusMessage = '';
+  String _statusMessage = 'Prêt';
   List<String> _logs = [];
 
   @override
   void initState() {
     super.initState();
-    _initializePocketBase();
-  }
-
-  Future<void> _initializePocketBase() async {
-    setState(() {
-      _isLoading = true;
-      _statusMessage = 'Initialisation de PocketBase...';
-    });
-
-    try {
-      await _authService.initialize();
-      _addLog('✅ PocketBase initialisé avec succès');
-      setState(() {
-        _statusMessage = 'PocketBase initialisé';
-        _isLoading = false;
-      });
-    } catch (e) {
-      _addLog('❌ Erreur d\'initialisation PocketBase: $e');
-      setState(() {
-        _statusMessage = 'Erreur d\'initialisation';
-        _isLoading = false;
-      });
-    }
+    _verifierStatutConnexion();
   }
 
   void _addLog(String message) {
     setState(() {
       _logs.add('${DateTime.now().toString().substring(11, 19)}: $message');
     });
+    print(message); // Afficher aussi dans la console
   }
 
-  Future<void> _testPocketBaseConnection() async {
-    try {
-      final results = await _migrationService.testConnections();
-      final isConnected = results['pocketbase'] ?? false;
-
-      if (isConnected) {
-        _addLog('✅ Connexion PocketBase réussie');
-      } else {
-        _addLog('❌ Échec de connexion PocketBase');
-      }
-    } catch (e) {
-      _addLog('❌ Erreur test PocketBase: $e');
+  Future<void> _verifierStatutConnexion() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _addLog('✅ Utilisateur connecté: ${user.email}');
+      setState(() {
+        _statusMessage = 'Utilisateur connecté: ${user.email}';
+      });
+    } else {
+      _addLog('⚠️ Aucun utilisateur connecté');
+      setState(() {
+        _statusMessage = 'Aucun utilisateur connecté';
+      });
     }
   }
 
-  Future<void> _testFirebaseConnection() async {
-    try {
-      final results = await _migrationService.testConnections();
-      final isConnected = results['firebase'] ?? false;
+  Future<void> _testerConnexions() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Test des connexions...';
+    });
 
-      if (isConnected) {
-        _addLog('✅ Connexion Firebase réussie');
+    try {
+      _addLog('🔄 Test des connexions...');
+      final results = await _migrationService.testConnections();
+      
+      if (results['firebase'] == true) {
+        _addLog('✅ Connexion Firebase OK');
       } else {
-        _addLog('❌ Échec de connexion Firebase');
+        _addLog('❌ Connexion Firebase échouée');
       }
+
+      if (results['pocketbase'] == true) {
+        _addLog('✅ Connexion PocketBase OK');
+      } else {
+        _addLog('❌ Connexion PocketBase échouée');
+      }
+
+      setState(() {
+        _statusMessage = 'Tests de connexion terminés';
+      });
     } catch (e) {
-      _addLog('❌ Erreur test Firebase: $e');
+      _addLog('❌ Erreur test connexions: $e');
+      setState(() {
+        _statusMessage = 'Erreur lors des tests';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  Future<void> _compareData() async {
+  Future<void> _connexionGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Connexion Google...';
+    });
+
+    try {
+      _addLog('🔄 Connexion avec Google...');
+      final success = await _authService.signInWithGoogle();
+      
+      if (success) {
+        final user = FirebaseAuth.instance.currentUser;
+        _addLog('✅ Connexion Google réussie: ${user?.email}');
+        setState(() {
+          _statusMessage = 'Connecté: ${user?.email}';
+        });
+      } else {
+        _addLog('❌ Connexion Google échouée');
+        setState(() {
+          _statusMessage = 'Échec connexion Google';
+        });
+      }
+    } catch (e) {
+      _addLog('❌ Erreur connexion Google: $e');
+      setState(() {
+        _statusMessage = 'Erreur connexion Google';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _migrerDonnees() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _addLog('❌ Vous devez être connecté pour migrer');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Migration en cours...';
+    });
+
+    try {
+      _addLog('🚀 Début de la migration pour ${user.email}...');
+      await _migrationService.migrateCurrentUserData();
+      _addLog('✅ Migration terminée avec succès !');
+      
+      setState(() {
+        _statusMessage = 'Migration terminée';
+      });
+    } catch (e) {
+      _addLog('❌ Erreur migration: $e');
+      setState(() {
+        _statusMessage = 'Erreur migration';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _comparerDonnees() async {
     setState(() {
       _isLoading = true;
       _statusMessage = 'Comparaison des données...';
     });
 
     try {
+      _addLog('📊 Comparaison des données...');
       await _migrationService.compareData();
       _addLog('✅ Comparaison terminée');
+      
       setState(() {
         _statusMessage = 'Comparaison terminée';
       });
     } catch (e) {
-      _addLog('❌ Erreur lors de la comparaison: $e');
+      _addLog('❌ Erreur comparaison: $e');
       setState(() {
-        _statusMessage = 'Erreur de comparaison';
+        _statusMessage = 'Erreur comparaison';
       });
     } finally {
       setState(() {
@@ -108,22 +179,24 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
     }
   }
 
-  Future<void> _migrateTestData() async {
+  Future<void> _verifierCollections() async {
     setState(() {
       _isLoading = true;
-      _statusMessage = 'Migration des données de test...';
+      _statusMessage = 'Vérification collections...';
     });
 
     try {
-      await _migrationService.migrateTestData();
-      _addLog('✅ Migration de test terminée');
+      _addLog('🔍 Vérification des collections PocketBase...');
+      await _migrationService.verifyAllPocketBaseCollections();
+      _addLog('✅ Vérification terminée');
+      
       setState(() {
-        _statusMessage = 'Migration de test terminée';
+        _statusMessage = 'Vérification terminée';
       });
     } catch (e) {
-      _addLog('❌ Erreur lors de la migration: $e');
+      _addLog('❌ Erreur vérification: $e');
       setState(() {
-        _statusMessage = 'Erreur de migration';
+        _statusMessage = 'Erreur vérification';
       });
     } finally {
       setState(() {
@@ -132,142 +205,71 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
+  Future<void> _genererRapport() async {
+    try {
+      _addLog('📋 Génération du rapport...');
+      final rapport = await _migrationService.generateMigrationReport();
+      _addLog('📄 Rapport généré:');
+      
+      // Afficher les premières lignes du rapport dans les logs
+      final lignes = rapport.split('\n').take(5).toList();
+      for (final ligne in lignes) {
+        if (ligne.isNotEmpty) {
+          _addLog('   $ligne');
+        }
+      }
+      _addLog('📄 Voir console pour rapport complet');
+      print('\n' + rapport); // Afficher le rapport complet dans la console
+      
+    } catch (e) {
+      _addLog('❌ Erreur génération rapport: $e');
+    }
+  }
+
+  void _viderLogs() {
     setState(() {
-      _isLoading = true;
-      _statusMessage = 'Authentification Google...';
+      _logs.clear();
     });
-
-    try {
-      final success = await _authService.signInWithGoogle();
-      if (success) {
-        _addLog('✅ Authentification Google réussie');
-        setState(() {
-          _statusMessage = 'Authentification Google réussie';
-        });
-      } else {
-        _addLog('❌ Échec authentification Google');
-        setState(() {
-          _statusMessage = 'Échec authentification Google';
-        });
-      }
-    } catch (e) {
-      _addLog('❌ Erreur authentification Google: $e');
-      setState(() {
-        _statusMessage = 'Erreur authentification Google';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _syncAuthentication() async {
-    try {
-      final authService = AuthService();
-      await authService.signInWithGoogle();
-      _addLog('✅ Authentification synchronisée');
-    } catch (e) {
-      _addLog('❌ Erreur synchronisation: $e');
-    }
-  }
-
-  void _generateReport() {
-    _migrationService.generateMigrationReport();
-    _addLog('📋 Rapport de migration généré');
-  }
-
-  // Test de migration (simulation)
-  Future<void> _testMigration() async {
-    try {
-      _addLog('🧪 Test de migration (simulation)...');
-
-      // Utiliser l'utilisateur actuel ou le premier du mapping
-      final currentUser = PocketBaseService.currentUser;
-      String userId;
-
-      if (currentUser != null) {
-        userId = currentUser.id;
-        _addLog('✅ Utilisateur connecté: $userId');
-      } else {
-        // Utiliser le premier utilisateur du mapping comme fallback
-        userId = '3gisghkqm6uau4b'; // Premier utilisateur du mapping
-        _addLog(
-            '⚠️ Aucun utilisateur connecté, utilisation du mapping: $userId');
-      }
-
-      _addLog('📋 Démarrage de la simulation...');
-
-      // Lancer le test de migration
-      await _migrationService.testMigration(userId);
-
-      _addLog('✅ Test de migration terminé');
-      _addLog('📊 Vérifiez les logs ci-dessus pour voir les détails');
-    } catch (e) {
-      _addLog('❌ Erreur lors du test de migration: $e');
-    }
-  }
-
-  // Migration complète
-  Future<void> _migrateAllData() async {
-    try {
-      _addLog('🔄 Migration complète...');
-
-      // Utiliser l'utilisateur actuel ou le premier du mapping
-      final currentUser = PocketBaseService.currentUser;
-      String userId;
-
-      if (currentUser != null) {
-        userId = currentUser.id;
-        _addLog('✅ Utilisateur connecté: $userId');
-      } else {
-        // Utiliser le premier utilisateur du mapping comme fallback
-        userId = '3gisghkqm6uau4b'; // Premier utilisateur du mapping
-        _addLog(
-            '⚠️ Aucun utilisateur connecté, utilisation du mapping: $userId');
-      }
-
-      // Lancer la migration complète
-      await _migrationService.migrateAllData();
-
-      _addLog('✅ Migration complète terminée');
-    } catch (e) {
-      _addLog('❌ Erreur lors de la migration: $e');
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Test PocketBase'),
+        title: const Text('Migration PocketBase'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: _viderLogs,
+            icon: const Icon(Icons.clear_all),
+            tooltip: 'Vider les logs',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Status
+            // Statut
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
                     Text(
-                      'Status: $_statusMessage',
+                      _statusMessage,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: CircularProgressIndicator(),
-                      ),
+                    if (_isLoading) ...[
+                      const SizedBox(height: 8),
+                      const CircularProgressIndicator(),
+                    ],
                   ],
                 ),
               ),
@@ -275,104 +277,59 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
 
             const SizedBox(height: 16),
 
-            // Boutons de test
+            // Boutons principaux
             Expanded(
+              flex: 2,
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _buildTestButton(
-                      'Test Connexion PocketBase',
-                      _testPocketBaseConnection,
-                      Colors.green,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildTestButton(
-                      'Test Connexion Firebase',
-                      _testFirebaseConnection,
-                      Colors.orange,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildTestButton(
-                      'Comparer les Données',
-                      _compareData,
+                    // Section Préparation
+                    _buildSectionHeader('🔧 Préparation'),
+                    _buildActionButton(
+                      '🔍 Tester Connexions',
+                      'Vérifier Firebase + PocketBase',
+                      _testerConnexions,
                       Colors.blue,
                     ),
-                    const SizedBox(height: 8),
-                    _buildTestButton(
-                      'Auth Google',
-                      _signInWithGoogle,
+                    _buildActionButton(
+                      '👤 Connexion Google',
+                      'Se connecter avec Google',
+                      _connexionGoogle,
                       Colors.red,
                     ),
-                    const SizedBox(height: 8),
-                    _buildTestButton(
-                      'Synchroniser Auth',
-                      _syncAuthentication,
-                      Colors.teal,
+
+                    const SizedBox(height: 16),
+
+                    // Section Migration
+                    _buildSectionHeader('🚀 Migration'),
+                    _buildActionButton(
+                      '📦 Migrer Mes Données',
+                      'Migrer données de l\'utilisateur connecté',
+                      _migrerDonnees,
+                      Colors.green,
                     ),
-                    const SizedBox(height: 8),
-                    _buildTestButton(
-                      'Migration de Test',
-                      _migrateTestData,
+                    _buildActionButton(
+                      '📊 Comparer Données',
+                      'Comparer Firebase vs PocketBase',
+                      _comparerDonnees,
+                      Colors.orange,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Section Vérification
+                    _buildSectionHeader('🔎 Vérification'),
+                    _buildActionButton(
+                      '🗄️ Vérifier Collections',
+                      'Vérifier les collections PocketBase',
+                      _verifierCollections,
                       Colors.purple,
                     ),
-                    const SizedBox(height: 8),
-                    _buildTestButton(
-                      'Générer Rapport',
-                      _generateReport,
-                      Colors.indigo,
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        await _migrationService.migrateTestData();
-                      },
-                      child: const Text('Migration de Test'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        await _testMigration();
-                      },
-                      child: const Text('Test Migration (Simulation)'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        await _migrateAllData();
-                      },
-                      child: const Text('Migration Complète'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final migrationService = MigrationService();
-                        await migrationService.analyzeFirebaseExport();
-                      },
-                      child: const Text('🔍 Analyser Export Firebase'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final migrationService = MigrationService();
-                        await migrationService.migrateAllDataWithRealIds();
-                      },
-                      child: Text('🚀 Migration Complète (Vrais IDs)'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final migrationService = MigrationService();
-                        await migrationService.migrateCurrentUserData();
-                      },
-                      child: Text('👤 Migration Utilisateur Connecté'),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final migrationService = MigrationService();
-                        await migrationService.verifyAllPocketBaseCollections();
-                      },
-                      child: Text('🔍 Vérifier Collections PocketBase'),
+                    _buildActionButton(
+                      '📋 Générer Rapport',
+                      'Générer rapport de migration',
+                      _genererRapport,
+                      Colors.teal,
                     ),
                   ],
                 ),
@@ -382,43 +339,89 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
             const SizedBox(height: 16),
 
             // Logs
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Logs:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 200,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ListView.builder(
-                        itemCount: _logs.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
-                              vertical: 2.0,
+            Expanded(
+              flex: 1,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '📜 Logs',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Text(
-                              _logs[index],
-                              style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            '${_logs.length} entrées',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.grey[50],
+                          ),
+                          child: _logs.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'Aucun log pour le moment',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: _logs.length,
+                                  itemBuilder: (context, index) {
+                                    final log = _logs[index];
+                                    Color textColor = Colors.black87;
+                                    
+                                    // Coloration selon le type de message
+                                    if (log.contains('✅')) {
+                                      textColor = Colors.green[700]!;
+                                    } else if (log.contains('❌')) {
+                                      textColor = Colors.red[700]!;
+                                    } else if (log.contains('⚠️')) {
+                                      textColor = Colors.orange[700]!;
+                                    } else if (log.contains('🔄')) {
+                                      textColor = Colors.blue[700]!;
+                                    }
+
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8.0,
+                                        vertical: 2.0,
+                                      ),
+                                      child: Text(
+                                        log,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: textColor,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -428,17 +431,60 @@ class _PageTestPocketBaseState extends State<PageTestPocketBase> {
     );
   }
 
-  Widget _buildTestButton(String text, VoidCallback onPressed, Color color) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
         ),
-        child: Text(text),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    String title,
+    String subtitle,
+    VoidCallback onPressed,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

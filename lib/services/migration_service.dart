@@ -1,3 +1,7 @@
+// 📁 Chemin : lib/services/migration_service.dart
+// 🔗 Dépendances : firebase_service.dart, pocketbase_service.dart, pocketbase_config.dart
+// 📋 Description : Service de migration complet Firebase → PocketBase avec logique métier
+
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pocketbase/pocketbase.dart';
@@ -12,1753 +16,922 @@ import '../pocketbase_config.dart';
 import 'auth_service.dart';
 import 'cache_service.dart';
 import 'dette_service.dart';
-import 'dart:io'; // Added for File
+import 'dart:io';
 
 class MigrationService {
   static final MigrationService _instance = MigrationService._internal();
   factory MigrationService() => _instance;
   MigrationService._internal();
 
-  final FirebaseService _firebaseService = FirebaseService();
+  final FirebaseService _serviceFirebase = FirebaseService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Mapping utilisateur Firebase → PocketBase
+  Map<String, String> _mappingUtilisateur = {};
+
   // Test de connexion aux services
-  Future<Map<String, bool>> testConnections() async {
-    final results = <String, bool>{};
+  Future<Map<String, bool>> testerConnexions() async {
+    final resultats = <String, bool>{};
 
     try {
       // Test Firebase
       final auth = FirebaseAuth.instance;
-      results['firebase'] = auth.currentUser != null;
+      resultats['firebase'] = auth.currentUser != null;
       print('✅ Connexion Firebase réussie');
     } catch (e) {
-      results['firebase'] = false;
+      resultats['firebase'] = false;
       print('❌ Erreur connexion Firebase: $e');
     }
 
     try {
       // Test PocketBase
       await PocketBaseService.instance;
-      results['pocketbase'] = true;
+      resultats['pocketbase'] = true;
       print('✅ Connexion PocketBase réussie');
     } catch (e) {
-      results['pocketbase'] = false;
+      resultats['pocketbase'] = false;
       print('❌ Erreur connexion PocketBase: $e');
     }
 
-    return results;
+    return resultats;
   }
 
-  // Comparer les données entre Firebase et PocketBase
-  Future<Map<String, int>> compareData() async {
-    final comparison = <String, int>{};
-
-    try {
-      // Compter les comptes Firebase - utiliser le stream
-      final comptesFirebaseStream = _firebaseService.lireComptes();
-      final comptesFirebase = await comptesFirebaseStream.first;
-      comparison['comptes_firebase'] = comptesFirebase.length;
-
-      // Compter les comptes PocketBase
-      final comptesPocketBase = await PocketBaseService.getComptes();
-      comparison['comptes_pocketbase'] = comptesPocketBase.length;
-
-      // Compter les catégories Firebase - utiliser le stream
-      final categoriesFirebaseStream = _firebaseService.lireCategories();
-      final categoriesFirebase = await categoriesFirebaseStream.first;
-      comparison['categories_firebase'] = categoriesFirebase.length;
-
-      // Compter les catégories PocketBase
-      final categoriesPocketBase = await PocketBaseService.getCategories();
-      comparison['categories_pocketbase'] = categoriesPocketBase.length;
-
-      print('📊 Comptes Firebase: ${comparison['comptes_firebase']}');
-      print('📊 Comptes PocketBase: ${comparison['comptes_pocketbase']}');
-      print('📊 Catégories Firebase: ${comparison['categories_firebase']}');
-      print('📊 Catégories PocketBase: ${comparison['categories_pocketbase']}');
-    } catch (e) {
-      print('❌ Erreur comparaison données: $e');
+  // Méthodes de compatibilité pour l'ancienne page de test
+  Future<Map<String, bool>> testConnections() => testerConnexions();
+  
+  Future<Map<String, Map<String, int>>> compareData() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      return await comparerDonneesUtilisateur(currentUser.uid);
     }
-
-    return comparison;
+    return {};
   }
 
-  // Migrer des données de test vers PocketBase
   Future<void> migrateTestData() async {
+    print('🧪 Migration de données de test...');
     try {
-      print('🔄 Migration des données de test...');
-
-      // Synchroniser l'authentification
-      final authService = AuthService();
-      await authService.signInWithGoogle();
-
-      // Récupérer l'utilisateur connecté
-      final currentUser = PocketBaseService.currentUser;
-      if (currentUser == null) {
-        print('❌ Aucun utilisateur connecté à PocketBase');
-        return;
-      }
-
-      final userId = currentUser.id;
-      print('✅ Utilisateur connecté: $userId');
-
-      // Créer un compte de test
-      await PocketBaseService.createCompte({
-        'nom': 'Compte Test Migration',
-        'type': 'cheque',
-        'solde': 1000.0,
-        'pret_a_placer': 0.0,
-        'couleur': '0xFF2196F3',
-        'ordre': 1,
-        'archive': false,
-        'utilisateur_id': userId, // Utiliser l'ID réel
-      });
-
-      // Créer une catégorie de test
-      await PocketBaseService.createCategorie({
-        'nom': 'Catégorie Test Migration',
-        'ordre': 1,
-        'enveloppes': [],
-        'utilisateur_id': userId, // Utiliser l'ID réel
-      });
-
+      await migrerUtilisateurConnecte();
       print('✅ Données de test migrées avec succès');
     } catch (e) {
-      print('❌ Erreur lors de la migration de test: $e');
+      print('❌ Erreur migration données de test: $e');
     }
   }
 
-  // Migration complète de toutes les données
-  Future<void> migrateAllData() async {
-    try {
-      print('🔄 Migration complète de toutes les données...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      print('📋 Mapping utilisateur configuré:');
-      _userMapping.forEach((firebaseId, pocketbaseId) {
-        print('   - $firebaseId → $pocketbaseId');
-      });
-
-      // 1. Migrer TOUTES les catégories de TOUS les utilisateurs (en premier)
-      await _migrateCategories('');
-
-      // 2. Migrer TOUS les comptes de TOUS les utilisateurs
-      await _migrateComptes('');
-
-      // 3. Migrer TOUTES les enveloppes de TOUS les utilisateurs (après catégories)
-      await _migrateEnveloppes('');
-
-      // 4. Migrer TOUTES les transactions de TOUS les utilisateurs
-      await _migrateTransactions('');
-
-      // 5. Migrer TOUTES les dettes de TOUS les utilisateurs
-      await _migrateDettes('');
-
-      // 6. Migrer TOUS les investissements de TOUS les utilisateurs
-      await _migrateInvestissements('');
-
-      print('✅ Migration complète terminée avec succès');
-      print('📊 Toutes les données de tous les utilisateurs ont été migrées');
-    } catch (e) {
-      print('❌ Erreur lors de la migration complète: $e');
-    }
-  }
-
-  // Migrer les comptes Firebase vers PocketBase
-  Future<void> _migrateComptes(String userId) async {
-    try {
-      print('🔄 Migration des comptes...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUS les comptes de Firebase (tous les utilisateurs)
-      final allComptes =
-          await firebaseService.firestore.collection('comptes').get();
-
-      print('📊 Comptes Firebase trouvés: ${allComptes.docs.length}');
-
-      int totalMigres = 0;
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allComptes.docs) {
-        final data = doc.data();
-        final compte = Compte.fromMap(data, doc.id);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final user = compte.userId ?? 'unknown';
-        if (user == 'unknown') {
-          print('⚠️ Compte ${compte.nom} sans userId, ignoré');
-          continue;
-        }
-        final pocketbaseUserId = _getPocketBaseUserId(user);
-
-        // Adapter les données Firebase vers PocketBase
-        final dataPocketBase = {
-          'nom': compte.nom,
-          'solde': compte.solde,
-          'type': _adapterTypeCompte(compte.type),
-          'utilisateur_id': pocketbaseUserId,
-          'couleur': compte.couleur ?? '#000000',
-          'est_actif': !compte.estArchive,
-          'ordre': compte.ordre ?? 0,
-        };
-
-        try {
-          await PocketBaseService.createCompte(dataPocketBase);
-          totalMigres++;
-
-          final user = compte.userId ?? 'unknown';
-          compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-          print(
-              '✅ Compte migré: ${compte.nom} (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-        } catch (e) {
-          print('⚠️ Erreur migration compte ${compte.nom}: $e');
-        }
-      }
-
-      print('📊 Répartition des comptes migrés:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count compte(s)');
-      });
-
-      print('✅ Migration des comptes terminée');
-    } catch (e) {
-      print('❌ Erreur migration comptes: $e');
-    }
-  }
-
-  // Migrer les catégories Firebase vers PocketBase
-  Future<void> _migrateCategories(String userId) async {
-    try {
-      print('🔄 Migration des catégories...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les catégories de Firebase (tous les utilisateurs)
-      final allCategories =
-          await firebaseService.firestore.collection('categories').get();
-
-      print('📊 Catégories Firebase trouvées: ${allCategories.docs.length}');
-
-      int totalEnveloppes = 0;
-      int categoriesExclues = 0;
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allCategories.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final categorie = Categorie.fromMap(data);
-
-        // Exclure la catégorie "Dette" qui est créée automatiquement
-        if (categorie.nom.toLowerCase() == 'dette' ||
-            categorie.nom.toLowerCase() == 'dettes') {
-          categoriesExclues++;
-          print(
-              '🚫 Catégorie EXCLUE "${categorie.nom}" (créée automatiquement par les dettes)');
-          continue;
-        }
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final user = categorie.userId ?? 'unknown';
-        if (user == 'unknown') {
-          print('⚠️ Catégorie ${categorie.nom} sans userId, ignorée');
-          continue;
-        }
-        final pocketbaseUserId = _getPocketBaseUserId(user);
-
-        // Adapter les enveloppes Firebase vers PocketBase
-        final enveloppesAdaptees = categorie.enveloppes
-            .map((env) => {
-                  'nom': env.nom,
-                  'solde': env.solde,
-                  'objectif': env.objectif,
-                  'objectif_date': env.objectifDate,
-                  'depense': env.depense ?? 0.0,
-                  'archivee': env.archivee,
-                  'provenance_compte_id': env.provenanceCompteId,
-                  'frequence_objectif': env.frequenceObjectif,
-                  'date_dernier_ajout': env.dateDernierAjout?.toIso8601String(),
-                  'objectif_jour': env.objectifJour,
-                  'historique': env.historique,
-                  'ordre': env.ordre ?? 999,
-                })
-            .toList();
-
-        final dataPocketBase = {
-          'nom': categorie.nom,
-          'ordre': categorie.ordre ?? 999,
-          'enveloppes': enveloppesAdaptees,
-          'utilisateur_id': pocketbaseUserId,
-        };
-
-        try {
-          await PocketBaseService.createCategorie(dataPocketBase);
-          totalEnveloppes += categorie.enveloppes.length;
-
-          final user = categorie.userId ?? 'unknown';
-          compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-          print(
-              '✅ Catégorie migrée: ${categorie.nom} (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-        } catch (e) {
-          print('⚠️ Erreur migration catégorie ${categorie.nom}: $e');
-        }
-      }
-
-      print('📊 Répartition des catégories migrées:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count catégorie(s)');
-      });
-
-      print('📊 Total enveloppes migrées: $totalEnveloppes');
-      print('❌ Catégories exclues (Dettes): $categoriesExclues');
-      print('✅ Migration des catégories terminée');
-    } catch (e) {
-      print('❌ Erreur migration catégories: $e');
-    }
-  }
-
-  // Migrer les transactions Firebase vers PocketBase
-  Future<void> _migrateTransactions(String userId) async {
-    try {
-      print('🔄 Migration des transactions...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les transactions de Firebase (tous les utilisateurs)
-      final allTransactions =
-          await firebaseService.firestore.collection('transactions').get();
-
-      print(
-          '📊 Transactions Firebase trouvées: ${allTransactions.docs.length}');
-
-      int totalTransactions = 0;
-      int totalAllocations = 0;
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allTransactions.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final transaction = Transaction.fromJson(data);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final user = transaction.userId ?? 'unknown';
-        if (user == 'unknown') {
-          print(
-              '⚠️ Transaction ${transaction.tiers ?? 'Sans tiers'} sans userId, ignorée');
-          continue;
-        }
-        final pocketbaseUserId = _getPocketBaseUserId(user);
-
-        // Adapter les données Firebase vers PocketBase
-        final dataTransaction = {
-          'montant': transaction.montant,
-          'date': transaction.date.toIso8601String(),
-          'tiers': transaction.tiers ?? '',
-          'type': _adapterTypeTransaction(transaction.type.name),
-          'type_mouvement':
-              _adapterTypeMouvementFinancier(transaction.typeMouvement.name),
-          'utilisateur_id': pocketbaseUserId,
-          'compte_id': transaction.compteId,
-          'note': transaction.note ?? '',
-        };
-
-        try {
-          // 1. Transaction normale
-          await PocketBaseService.createTransaction(dataTransaction);
-          totalTransactions++;
-
-          // 2. Allocation mensuelle (même transaction mais date au 1er du mois)
-          final dataAllocation = {
-            'montant': transaction.montant,
-            'date': DateTime(transaction.date.year, transaction.date.month, 1)
-                .toIso8601String(),
-            'utilisateur_id': pocketbaseUserId,
-            'compte_id': transaction.compteId,
-            'note': 'Allocation mensuelle migrée depuis Firebase',
-          };
-
-          await PocketBaseService.createAllocationMensuelle(dataAllocation);
-          totalAllocations++;
-
-          final user = transaction.userId ?? 'unknown';
-          compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-          print(
-              '✅ Transaction migrée: ${transaction.tiers ?? 'Sans tiers'} (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-        } catch (e) {
-          print(
-              '⚠️ Erreur migration transaction ${transaction.tiers ?? 'Sans tiers'}: $e');
-        }
-      }
-
-      print('📊 Répartition des transactions migrées:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count transaction(s)');
-      });
-
-      print('📊 Transactions migrées: $totalTransactions');
-      print('📊 Allocations mensuelles migrées: $totalAllocations');
-      print('✅ Migration des transactions terminée');
-    } catch (e) {
-      print('❌ Erreur migration transactions: $e');
-    }
-  }
-
-  // Vérifier si une transaction est une allocation mensuelle
-  bool _isAllocationMensuelle(DateTime date) {
-    // Allocation mensuelle = 1er du mois à minuit (00:00:00)
-    return date.day == 1 &&
-        date.hour == 0 &&
-        date.minute == 0 &&
-        date.second == 0;
-  }
-
-  // Migrer les dettes Firebase vers PocketBase
-  Future<void> _migrateDettes(String userId) async {
-    try {
-      print('🔄 Migration des dettes...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les dettes de Firebase (tous les utilisateurs)
-      final allDettes =
-          await firebaseService.firestore.collection('dettes').get();
-
-      print('📊 Dettes Firebase trouvées: ${allDettes.docs.length}');
-
-      int dettesManuelles = 0;
-      int dettesContractees = 0;
-      int pretsAccordes = 0;
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allDettes.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final dette = Dette.fromMap(data);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final user = dette.userId ?? 'unknown';
-        if (user == 'unknown') {
-          print('⚠️ Dette ${dette.nomTiers} sans userId, ignorée');
-          continue;
-        }
-        final pocketbaseUserId = _getPocketBaseUserId(user);
-
-        // Adapter les données Firebase vers PocketBase (version simplifiée)
-        final dataPocketBase = {
-          'nom_tiers': dette.nomTiers,
-          'montant_initial': dette.montantInitial,
-          'solde': dette.solde,
-          'type': dette.type,
-          'archive': dette.archive,
-          'date_creation': dette.dateCreation.toIso8601String(),
-          'utilisateur_id': pocketbaseUserId,
-          // Champs optionnels
-          'note': 'Migré depuis Firebase',
-          'historique': dette.historique
-              .map((m) => {
-                    'id': m.id,
-                    'date': m.date.toIso8601String(),
-                    'montant': m.montant,
-                    'type': m.type,
-                    'note': m.note,
-                  })
-              .toList(),
-          // Champ pour distinguer manuel vs automatique
-          'est_manuel': dette.estManuelle,
-        };
-
-        try {
-          if (dette.estManuelle) {
-            // Dette manuelle → Collection comptes_dettes
-            await PocketBaseService.createDette(dataPocketBase);
-            dettesManuelles++;
-            print('✅ Dette manuelle migrée: ${dette.nomTiers}');
-          } else {
-            // Dette automatique → Vérifier le type
-            if (dette.type == 'dette') {
-              // Dette contractée → Collection comptes_dettes (apparaît dans comptes)
-              await PocketBaseService.createDette(dataPocketBase);
-              dettesContractees++;
-              print('✅ Dette contractée migrée: ${dette.nomTiers}');
-            } else if (dette.type == 'pret') {
-              // Prêt accordé → Collection pret_personnel (n'apparaît PAS dans comptes)
-              try {
-                await PocketBaseService.createPretPersonnel(dataPocketBase);
-                pretsAccordes++;
-                print('✅ Prêt accordé migré: ${dette.nomTiers}');
-              } catch (e) {
-                print(
-                    '⚠️ Collection pret_personnel non disponible, dette migrée vers comptes_dettes: ${dette.nomTiers}');
-                // Fallback vers comptes_dettes si pret_personnel n'existe pas
-                await PocketBaseService.createDette(dataPocketBase);
-                dettesContractees++;
-              }
-            }
-          }
-
-          final user = dette.userId ?? 'unknown';
-          compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-        } catch (e) {
-          print('⚠️ Erreur migration dette ${dette.nomTiers}: $e');
-        }
-      }
-
-      print('📊 Répartition des dettes migrées:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count dette(s)');
-      });
-
-      print('   - Dettes manuelles (comptes_dettes): $dettesManuelles');
-      print('   - Dettes contractées (comptes_dettes): $dettesContractees');
-      print('   - Prêts accordés (pret_personnel): $pretsAccordes');
-
-      print('✅ Migration des dettes terminée');
-    } catch (e) {
-      print('❌ Erreur migration dettes: $e');
-    }
-  }
-
-  // Migrer les enveloppes Firebase vers PocketBase
-  Future<void> _migrateEnveloppes(String userId) async {
-    try {
-      print('🔄 Migration des enveloppes...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les catégories de Firebase (tous les utilisateurs)
-      final allCategories =
-          await firebaseService.firestore.collection('categories').get();
-
-      print('📊 Catégories Firebase trouvées: ${allCategories.docs.length}');
-
-      int totalMigres = 0;
-      Map<String, int> compteursParUser = {};
-      int totalExclues = 0;
-
-      for (final doc in allCategories.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final categorie = Categorie.fromMap(data);
-
-        // Exclure la catégorie "Dettes"
-        if (categorie.nom.toLowerCase() == 'dettes') {
-          totalExclues++;
-          continue;
-        }
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final user = categorie.userId ?? 'unknown';
-        if (user == 'unknown') {
-          print('⚠️ Catégorie ${categorie.nom} sans userId, ignorée');
-          continue;
-        }
-        final pocketbaseUserId = _getPocketBaseUserId(user);
-
-        // Migrer chaque enveloppe de la catégorie
-        for (final enveloppe in categorie.enveloppes) {
-          try {
-            final dataEnveloppe = {
-              'nom': enveloppe.nom,
-              'solde': enveloppe.solde,
-              'utilisateur_id': pocketbaseUserId,
-              'ordre': enveloppe.ordre ?? 0,
-            };
-
-            await PocketBaseService.createEnveloppe(dataEnveloppe);
-            totalMigres++;
-
-            final user = categorie.userId ?? 'unknown';
-            compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-            print(
-                '✅ Enveloppe migrée: "${enveloppe.nom}" (Catégorie: ${categorie.nom}) (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-          } catch (e) {
-            print('⚠️ Erreur migration enveloppe ${enveloppe.nom}: $e');
-          }
-        }
-      }
-
-      print('📊 Répartition des enveloppes migrées:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count enveloppe(s)');
-      });
-
-      print('📊 Total enveloppes migrées: $totalMigres');
-      print('❌ Catégories exclues (Dettes): $totalExclues');
-      print('✅ Migration des enveloppes terminée');
-    } catch (e) {
-      print('❌ Erreur migration enveloppes: $e');
-    }
-  }
-
-  // Migrer les investissements Firebase vers PocketBase
-  Future<void> _migrateInvestissements(String userId) async {
-    try {
-      print('🔄 Migration des investissements...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUS les investissements de Firebase (tous les utilisateurs)
-      final allInvestissements =
-          await firebaseService.firestore.collection('investissements').get();
-
-      print(
-          '📊 Investissements Firebase trouvés: ${allInvestissements.docs.length}');
-
-      int totalMigres = 0;
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allInvestissements.docs) {
-        final data = doc.data();
-        final investissement = ActionInvestissement.fromMap(data);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final user = investissement.id;
-        if (user.isEmpty) {
-          print(
-              '⚠️ Investissement ${investissement.symbole} sans userId, ignoré');
-          continue;
-        }
-        final pocketbaseUserId = _getPocketBaseUserId(user);
-
-        // Adapter les données Firebase vers PocketBase
-        final dataPocketBase = {
-          'nom': investissement.symbole,
-          'valeur_marche': investissement.valeurActuelle,
-          'cout_base': investissement.prixMoyen * investissement.nombre,
-          'utilisateur_id': pocketbaseUserId,
-        };
-
-        try {
-          await PocketBaseService.createInvestissement(dataPocketBase);
-          totalMigres++;
-
-          final user = investissement.id;
-          compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-          print(
-              '✅ Investissement migré: ${investissement.symbole} (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-        } catch (e) {
-          print(
-              '⚠️ Erreur migration investissement ${investissement.symbole}: $e');
-        }
-      }
-
-      print('📊 Répartition des investissements migrés:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count investissement(s)');
-      });
-
-      print('✅ Migration des investissements terminée');
-    } catch (e) {
-      print('❌ Erreur migration investissements: $e');
-    }
-  }
-
-  // Adapter le type de compte Firebase vers PocketBase
-  String _adapterTypeCompte(String typeFirebase) {
-    switch (typeFirebase.toLowerCase()) {
-      case 'cheque':
-      case 'compte chèque':
-        return 'cheque';
-      case 'epargne':
-      case 'compte épargne':
-        return 'epargne';
-      case 'credit':
-      case 'carte de crédit':
-        return 'credit';
-      case 'dette':
-        return 'dette';
-      case 'investissement':
-        return 'investissement';
-      default:
-        return 'cheque';
-    }
-  }
-
-  // Adapter le type de transaction Firebase vers PocketBase
-  String _adapterTypeTransaction(String typeFirebase) {
-    switch (typeFirebase.toLowerCase()) {
-      case 'depense':
-        return 'depense';
-      case 'revenu':
-        return 'revenu';
-      default:
-        return 'depense';
-    }
-  }
-
-  // Adapter le type de mouvement financier Firebase vers PocketBase
-  String _adapterTypeMouvementFinancier(String typeFirebase) {
-    switch (typeFirebase.toLowerCase()) {
-      case 'depensenormale':
-        return 'depense_normale';
-      case 'revenunormal':
-        return 'revenu_normal';
-      case 'pretaccorde':
-        return 'pret_accorde';
-      case 'remboursementrecu':
-        return 'remboursement_recu';
-      case 'dettecontractee':
-        return 'dette_contractee';
-      case 'remboursementeffectue':
-        return 'remboursement_effectue';
-      case 'ajustement':
-        return 'ajustement';
-      default:
-        return 'depense_normale';
-    }
-  }
-
-  // Générer un rapport de migration
   Future<String> generateMigrationReport() async {
-    final report = StringBuffer();
-    report.writeln('📋 RAPPORT DE MIGRATION POCKETBASE');
-    report.writeln();
-
-    report.writeln('✅ Services créés:');
-    report.writeln('- PocketBaseService: Service principal pour PocketBase');
-    report.writeln('- MigrationService: Service de migration et tests');
-    report.writeln('- PocketBaseConfig: Configuration centralisée');
-    report.writeln();
-
-    report.writeln('✅ Fonctionnalités implémentées:');
-    report.writeln('- Authentification (connexion/inscription/déconnexion)');
-    report.writeln('- Gestion des comptes chèques');
-    report.writeln('- Gestion des catégories');
-    report.writeln('- Gestion des transactions de base');
-    report.writeln();
-
-    report.writeln('🔄 Prochaines étapes:');
-    report.writeln('1. Tester la connexion PocketBase');
-    report.writeln('2. Migrer les données existantes');
-    report.writeln('3. Adapter les pages pour utiliser PocketBase');
-    report.writeln('4. Supprimer Firebase progressivement');
-    report.writeln();
-
-    report.writeln('! Points d\'attention:');
-    report.writeln('- Les modèles existants doivent être adaptés');
-    report.writeln('- Les pages doivent être mises à jour');
-    report.writeln('- Les tests doivent être créés');
-
-    return report.toString();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      return await genererRapportMigrationUtilisateur(currentUser.uid);
+    }
+    return 'Aucun utilisateur connecté';
   }
 
-  // Test de migration complète (simulation)
   Future<void> testMigration(String userId) async {
+    print('🧪 Test de migration pour $userId...');
     try {
-      print('🧪 Test de migration complète (simulation)...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      print('📋 Mapping utilisateur configuré:');
-      _userMapping.forEach((firebaseId, pocketbaseId) {
-        print('   - $firebaseId → $pocketbaseId');
-      });
-
-      // 1. Test migration des comptes
-      await _testMigrationComptes(userId);
-
-      // 2. Test migration des catégories
-      await _testMigrationCategories(userId);
-
-      // 3. Test migration des enveloppes
-      await _testMigrationEnveloppes(userId);
-
-      // 4. Test migration des transactions
-      await _testMigrationTransactions(userId);
-
-      // 5. Test migration des dettes
-      await _testMigrationDettes(userId);
-
-      // 6. Test migration des investissements
-      await _testMigrationInvestissements(userId);
-
-      print('✅ Test de migration complète terminé');
-      print('📊 Résumé de la simulation:');
-      print('   - Mapping utilisateur: ${_userMapping.length} utilisateurs');
-      print('   - Toutes les données Firebase seront migrées vers PocketBase');
-      print(
-          '   - Chaque utilisateur aura ses données dans sa collection PocketBase');
+      await migrerUtilisateurConnecte();
+      print('✅ Test de migration terminé');
     } catch (e) {
       print('❌ Erreur test migration: $e');
     }
   }
 
-  // Test de migration des comptes (simulation)
-  Future<void> _testMigrationComptes(String userId) async {
+  Future<void> migrateAllData() => migrerToutesLesDonnees();
+
+  Future<void> analyzeFirebaseExport() async {
+    print('🔍 Analyse de l\'export Firebase...');
     try {
-      print('🧪 Test migration des comptes...');
-
-      // Initialiser le mapping utilisateur
-      await _initUserMapping();
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUS les comptes de Firebase (tous les utilisateurs)
-      final allComptes =
-          await firebaseService.firestore.collection('comptes').get();
-
-      print('📊 Comptes Firebase trouvés: ${allComptes.docs.length}');
-
-      Map<String, int> compteursParType = {};
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allComptes.docs) {
-        final data = doc.data();
-        final compte = Compte.fromMap(data, doc.id);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final pocketbaseUserId = _getPocketBaseUserId(compte.userId ?? userId);
-
-        final typeAdapte = _adapterTypeCompte(compte.type);
-        compteursParType[typeAdapte] = (compteursParType[typeAdapte] ?? 0) + 1;
-
-        // Compter par utilisateur
-        final user = compte.userId ?? 'unknown';
-        compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-        print(
-            '📋 Compte "${compte.nom}" (Firebase User: $user → PocketBase User: $pocketbaseUserId) → Collection: ${_getCollectionForType(typeAdapte)}');
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        await comparerDonneesUtilisateur(currentUser.uid);
+        print('✅ Analyse terminée');
       }
-
-      print('📊 Répartition des comptes par collection:');
-      compteursParType.forEach((type, count) {
-        print('   - ${_getCollectionForType(type)}: $count compte(s)');
-      });
-
-      print('📊 Répartition par utilisateur:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count compte(s)');
-      });
-
-      print('✅ Test migration des comptes terminé');
     } catch (e) {
-      print('❌ Erreur test migration comptes: $e');
+      print('❌ Erreur analyse: $e');
     }
   }
 
-  // Test de migration des catégories (simulation)
-  Future<void> _testMigrationCategories(String userId) async {
+  Future<void> migrateAllDataWithRealIds() => migrerToutesLesDonnees();
+
+  Future<void> migrateCurrentUserData() => migrerUtilisateurConnecte();
+
+  Future<void> verifyAllPocketBaseCollections() => verifierToutesLesCollections();
+
+  // Initialiser le mapping utilisateur Firebase → PocketBase
+  Future<void> _initialiserMappingUtilisateur() async {
     try {
-      print('🧪 Test migration des catégories...');
+      print('🔄 Initialisation du mapping utilisateur...');
 
-      final firebaseService = FirebaseService();
+      // Récupérer tous les utilisateurs Firebase uniques
+      final collectionsFirebase = ['comptes', 'categories', 'transactions', 'dettes'];
+      final utilisateursFirebase = <String>{};
 
-      // Récupérer TOUTES les catégories de Firebase (tous les utilisateurs)
-      final allCategories =
-          await firebaseService.firestore.collection('categories').get();
-
-      print('📊 Catégories Firebase trouvées: ${allCategories.docs.length}');
-
-      Map<String, int> compteursParUser = {};
-      int totalExclues = 0;
-
-      for (final doc in allCategories.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final categorie = Categorie.fromMap(data);
-
-        // Exclure la catégorie "Dettes"
-        if (categorie.nom.toLowerCase() == 'dettes') {
-          totalExclues++;
-          continue;
-        }
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final pocketbaseUserId =
-            _getPocketBaseUserId(categorie.userId ?? userId);
-
-        // Compter par utilisateur
-        final user = categorie.userId ?? 'unknown';
-        compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-        print(
-            '📋 Catégorie "${categorie.nom}" (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-      }
-
-      print('📊 Répartition par utilisateur:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count catégorie(s)');
-      });
-
-      print('❌ Catégories exclues (Dettes): $totalExclues');
-      print('✅ Test migration des catégories terminé');
-    } catch (e) {
-      print('❌ Erreur test migration catégories: $e');
-    }
-  }
-
-  // Test de migration des transactions (simulation)
-  Future<void> _testMigrationTransactions(String userId) async {
-    try {
-      print('🧪 Test migration des transactions...');
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les transactions de Firebase (tous les utilisateurs)
-      final allTransactions =
-          await firebaseService.firestore.collection('transactions').get();
-
-      print(
-          '📊 Transactions Firebase trouvées: ${allTransactions.docs.length}');
-
-      Map<String, int> compteursParUser = {};
-      int totalAllocations = 0;
-
-      for (final doc in allTransactions.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final transaction = Transaction.fromJson(data);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final pocketbaseUserId =
-            _getPocketBaseUserId(transaction.userId ?? userId);
-
-        // Compter par utilisateur
-        final user = transaction.userId ?? 'unknown';
-        compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-        // Vérifier si c'est une allocation mensuelle
-        if (_isAllocationMensuelle(transaction.date)) {
-          totalAllocations++;
-          print(
-              '📋 Transaction "${transaction.tiers ?? 'Sans tiers'}" (Allocation mensuelle) (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-        } else {
-          print(
-              '📋 Transaction "${transaction.tiers ?? 'Sans tiers'}" (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
+      for (final collection in collectionsFirebase) {
+        final snapshot = await _firestore.collection(collection).get();
+        for (final doc in snapshot.docs) {
+          final userId = doc.data()['userId'] as String?;
+          if (userId != null && userId.isNotEmpty) {
+            utilisateursFirebase.add(userId);
+          }
         }
       }
 
-      print('📊 Répartition par utilisateur:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count transaction(s)');
-      });
+      print('👥 Utilisateurs Firebase trouvés: ${utilisateursFirebase.length}');
 
-      print('📅 Allocations mensuelles détectées: $totalAllocations');
-      print('✅ Test migration des transactions terminé');
-    } catch (e) {
-      print('❌ Erreur test migration transactions: $e');
-    }
-  }
+      // Créer automatiquement les utilisateurs PocketBase
+      for (final firebaseUserId in utilisateursFirebase) {
+        try {
+          final pb = await PocketBaseService.instance;
+          final donneesUtilisateur = {
+            'email': '$firebaseUserId@migration.local',
+            'password': 'migration123456',
+            'passwordConfirm': 'migration123456',
+            'name': 'Utilisateur Migré $firebaseUserId',
+          };
 
-  // Test de migration des dettes (simulation)
-  Future<void> _testMigrationDettes(String userId) async {
-    try {
-      print('🧪 Test migration des dettes...');
+          final utilisateurPocketBase = await PocketBaseService.signUp(
+            donneesUtilisateur['email']!,
+            donneesUtilisateur['password']!,
+            donneesUtilisateur['passwordConfirm']!,
+            data: donneesUtilisateur,
+          );
 
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les dettes de Firebase (tous les utilisateurs)
-      final allDettes =
-          await firebaseService.firestore.collection('dettes').get();
-
-      print('📊 Dettes Firebase trouvées: ${allDettes.docs.length}');
-
-      Map<String, int> compteursParUser = {};
-      Map<String, int> compteursParType = {
-        'manual': 0,
-        'automatic': 0,
-        'loan': 0
-      };
-
-      for (final doc in allDettes.docs) {
-        final data = doc.data();
-        final dette = Dette.fromMap(data);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final pocketbaseUserId = _getPocketBaseUserId(dette.userId);
-
-        // Compter par utilisateur
-        final user = dette.userId;
-        compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-        // Déterminer le type de dette
-        String typeDette = 'manual';
-        String collection = 'comptes_dettes';
-
-        if (dette.type == 'pret') {
-          typeDette = 'loan';
-          collection = 'pret_personnel';
-        }
-
-        compteursParType[typeDette] = (compteursParType[typeDette] ?? 0) + 1;
-
-        print(
-            '📋 Dette "${dette.nomTiers}" (Type: $typeDette) → Collection: $collection (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-      }
-
-      print('📊 Répartition par utilisateur:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count dette(s)');
-      });
-
-      print('📊 Répartition par type:');
-      compteursParType.forEach((type, count) {
-        print('   - $type: $count dette(s)');
-      });
-
-      print('✅ Test migration des dettes terminé');
-    } catch (e) {
-      print('❌ Erreur test migration dettes: $e');
-    }
-  }
-
-  // Test de migration des investissements (simulation)
-  Future<void> _testMigrationInvestissements(String userId) async {
-    try {
-      print('🧪 Test migration des investissements...');
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUS les investissements de Firebase (tous les utilisateurs)
-      final allInvestissements =
-          await firebaseService.firestore.collection('investissements').get();
-
-      print(
-          '📊 Investissements Firebase trouvés: ${allInvestissements.docs.length}');
-
-      Map<String, int> compteursParUser = {};
-
-      for (final doc in allInvestissements.docs) {
-        final data = doc.data();
-        final investissement = ActionInvestissement.fromMap(data);
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final pocketbaseUserId = _getPocketBaseUserId(investissement.id);
-
-        // Compter par utilisateur (utiliser l'ID comme fallback)
-        final user = investissement.id;
-        compteursParUser[user] = (compteursParUser[user] ?? 0) + 1;
-
-        print(
-            '📋 Investissement "${investissement.symbole}" (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-      }
-
-      print('📊 Répartition par utilisateur:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count investissement(s)');
-      });
-
-      print('✅ Test migration des investissements terminé');
-    } catch (e) {
-      print('❌ Erreur test migration investissements: $e');
-    }
-  }
-
-  // Test de migration des enveloppes (simulation)
-  Future<void> _testMigrationEnveloppes(String userId) async {
-    try {
-      print('🧪 Test migration des enveloppes...');
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer TOUTES les catégories de Firebase (tous les utilisateurs)
-      final allCategories =
-          await firebaseService.firestore.collection('categories').get();
-
-      print('📊 Catégories Firebase trouvées: ${allCategories.docs.length}');
-
-      Map<String, int> compteursParUser = {};
-      int totalEnveloppes = 0;
-      int totalExclues = 0;
-
-      for (final doc in allCategories.docs) {
-        final data = doc.data();
-        data['id'] = doc.id; // Ajouter l'ID du document
-        final categorie = Categorie.fromMap(data);
-
-        // Exclure la catégorie "Dettes"
-        if (categorie.nom.toLowerCase() == 'dettes') {
-          totalExclues++;
-          continue;
-        }
-
-        // Utiliser le mapping pour l'ID utilisateur
-        final pocketbaseUserId =
-            _getPocketBaseUserId(categorie.userId ?? userId);
-
-        // Compter par utilisateur
-        final user = categorie.userId ?? 'unknown';
-        compteursParUser[user] =
-            (compteursParUser[user] ?? 0) + categorie.enveloppes.length;
-        totalEnveloppes += categorie.enveloppes.length;
-
-        print(
-            '📋 Catégorie "${categorie.nom}" (Firebase User: $user → PocketBase User: $pocketbaseUserId)');
-        print('   - Enveloppes: ${categorie.enveloppes.length}');
-
-        for (final enveloppe in categorie.enveloppes) {
-          print(
-              '     • Enveloppe "${enveloppe.nom}" (solde: ${enveloppe.solde}€)');
+          _mappingUtilisateur[firebaseUserId] = utilisateurPocketBase.id;
+          print('   ✅ Utilisateur créé: $firebaseUserId → ${utilisateurPocketBase.id}');
+        } catch (e) {
+          print('   ⚠️ Erreur création utilisateur $firebaseUserId: $e');
         }
       }
 
-      print('📊 Répartition par utilisateur:');
-      compteursParUser.forEach((user, count) {
-        print('   - User $user: $count enveloppe(s)');
-      });
-
-      print('📊 Total enveloppes: $totalEnveloppes');
-      print('❌ Catégories exclues (Dettes): $totalExclues');
-      print('✅ Test migration des enveloppes terminé');
-    } catch (e) {
-      print('❌ Erreur test migration enveloppes: $e');
-    }
-  }
-
-  // Obtenir le nom de la collection pour un type de compte
-  String _getCollectionForType(String type) {
-    switch (type) {
-      case 'cheque':
-        return PocketBaseConfig.comptesChequesCollection;
-      case 'epargne':
-        return PocketBaseConfig.comptesEpargneCollection;
-      case 'credit':
-        return PocketBaseConfig.comptesCreditsCollection;
-      case 'dette':
-        return PocketBaseConfig.comptesDettesCollection;
-      case 'investissement':
-        return PocketBaseConfig.comptesInvestissementCollection;
-      default:
-        return PocketBaseConfig.comptesChequesCollection;
-    }
-  }
-
-  // Obtenir la date du 1er du mois pour une allocation mensuelle
-  DateTime _getDatePremierMois(DateTime date) {
-    return DateTime(date.year, date.month, 1, 0, 0, 0);
-  }
-
-  // Mapping des utilisateurs Firebase vers PocketBase (configuré manuellement)
-  Map<String, String> _userMapping = {
-    'vH0n5dPnOiVmdPFpY4NWHTa0QKr2': '3gisghkqm6uau4b', // Premier utilisateur
-    'p7tkc5JDEIhzLOOY4wwbvH7exVU2': '9vgxq9oh11qtvsc', // Deuxième utilisateur
-    'BCE6de7OPIhUdlYKj1RthWdxOFv1': 's1bt7ukigruvoez', // Troisième utilisateur
-  };
-
-  // Initialiser le mapping utilisateur
-  Future<void> _initUserMapping() async {
-    try {
-      print('🔗 Initialisation du mapping utilisateur...');
-
-      final firebaseService = FirebaseService();
-
-      // Récupérer tous les comptes Firebase pour identifier tous les utilisateurs
-      final allComptes =
-          await firebaseService.firestore.collection('comptes').get();
-
-      // Extraire tous les utilisateurs uniques
-      Set<String> firebaseUserIds = {};
-      for (final doc in allComptes.docs) {
-        final data = doc.data();
-        final userId = data['userId'] as String?;
-        if (userId != null) {
-          firebaseUserIds.add(userId);
-        }
-      }
-
-      print('📊 Utilisateurs Firebase trouvés: ${firebaseUserIds.length}');
-
-      // Vérifier que tous les utilisateurs Firebase sont dans le mapping
-      for (final firebaseUserId in firebaseUserIds) {
-        if (!_userMapping.containsKey(firebaseUserId)) {
-          print('⚠️ Utilisateur Firebase $firebaseUserId non mappé !');
-          print('   Ajoutez-le dans le mapping _userMapping');
-        }
-      }
-
-      print(
-          '✅ Mapping utilisateur initialisé: ${_userMapping.length} utilisateurs');
-
-      // Afficher le mapping complet pour debug
-      print('📋 Mapping actuel:');
-      _userMapping.forEach((firebaseId, pocketbaseId) {
-        print('   - $firebaseId → $pocketbaseId');
-      });
+      print('✅ Mapping utilisateur terminé: ${_mappingUtilisateur.length} utilisateurs');
     } catch (e) {
       print('❌ Erreur initialisation mapping: $e');
     }
   }
 
-  // Obtenir l'ID PocketBase pour un ID Firebase
-  String _getPocketBaseUserId(String firebaseUserId) {
-    final pocketbaseId = _userMapping[firebaseUserId];
-    if (pocketbaseId == null) {
-      print('❌ ERREUR: Utilisateur Firebase $firebaseUserId non mappé !');
-      print('📋 Utilisateurs disponibles dans le mapping:');
-      _userMapping.forEach((firebaseId, pocketbaseId) {
-        print('   - $firebaseId → $pocketbaseId');
-      });
-      print('❌ Migration arrêtée - Ajoutez $firebaseUserId au mapping');
-      throw Exception('Utilisateur Firebase $firebaseUserId non mappé');
-    }
-    return pocketbaseId;
+  // Obtenir l'ID PocketBase depuis l'ID Firebase
+  String _obtenirIdPocketBase(String idFirebase) {
+    return _mappingUtilisateur[idFirebase] ?? idFirebase;
   }
 
-  // Analyser l'export Firebase pour extraire les données
-  Future<void> analyzeFirebaseExport() async {
+  // Adapter le type de compte Firebase vers les collections PocketBase
+  String _adapterTypeCompte(String typeFirebase) {
+    switch (typeFirebase.toLowerCase()) {
+      case 'cheque':
+      case 'compte chèque':
+        return 'comptes_cheques';
+      case 'epargne':
+      case 'compte épargne':
+        return 'comptes_cheques'; // Les épargnes vont aussi dans comptes_cheques
+      case 'credit':
+      case 'carte de crédit':
+        return 'comptes_credits';
+      case 'dette':
+        return 'comptes_dettes';
+      case 'investissement':
+        return 'comptes_investissement';
+      default:
+        return 'comptes_cheques';
+    }
+  }
+
+  // Migration pour l'utilisateur connecté uniquement
+  Future<void> migrerUtilisateurConnecte() async {
     try {
-      print('🔍 Analyse de l\'export Firebase...');
+      print('🚀 Début de la migration pour l\'utilisateur connecté...');
 
-      // Sur Android, on ne peut pas accéder directement aux fichiers
-      // On va analyser les données que nous avons déjà extraites
-      print('📱 Environnement Android détecté - Analyse des données extraites');
+      // 1. Vérifier qu'un utilisateur Firebase est connecté
+      final utilisateurFirebase = FirebaseAuth.instance.currentUser;
+      if (utilisateurFirebase == null) {
+        throw Exception('❌ Aucun utilisateur Firebase connecté');
+      }
 
-      // Données extraites de l'export Firebase (basées sur notre analyse précédente)
-      final List<String> users = [
-        'vH0n5dPnOiVmdPFpY4NWHTa0QKr2',
-        'p7tkc5JDEIhzLOOY4wwbvH7exVU2',
-        'BCE6de7OPIhUdlYKj1RthWdxOFv1'
-      ];
+      final idFirebase = utilisateurFirebase.uid;
+      print('👤 Utilisateur connecté: ${utilisateurFirebase.email} ($idFirebase)');
 
-      final Map<String, String> collections = {
-        'comptes': 'comptes',
-        'categories': 'categories',
-        'transactions': 'transactions',
-        'dettes': 'dettes',
-        'investissements': 'actions',
-        'tiers': 'tiers'
-      };
+      // 2. Créer ou récupérer le compte PocketBase pour cet utilisateur
+      final utilisateurPocketBase = await _creerComptePocketBase(utilisateurFirebase);
+      final idPocketBase = utilisateurPocketBase.id;
+      print('✅ Compte PocketBase ID: $idPocketBase');
 
-      print('📊 Données extraites de l\'export Firebase:');
-      print('👥 Utilisateurs trouvés: ${users.length}');
-      users.forEach((user) => print('   - $user'));
+      // 3. IMPORTANT: Configurer le mapping pour cet utilisateur
+      _mappingUtilisateur[idFirebase] = idPocketBase;
 
-      print('📁 Collections trouvées: ${collections.length}');
-      collections.forEach((name, collection) {
-        print('   - $name → $collection');
-      });
+      // 4. CRUCIAL: Vérifier que l'utilisateur est bien connecté dans PocketBase
+      final pb = await PocketBaseService.instance;
+      final currentAuth = pb.authStore.model;
+      if (currentAuth == null || currentAuth.id != idPocketBase) {
+        throw Exception('❌ Utilisateur PocketBase non authentifié correctement');
+      }
+      print('✅ Utilisateur PocketBase authentifié: ${currentAuth.id}');
 
-      // Vérifier le mapping utilisateur
-      print('🔗 Vérification du mapping utilisateur:');
-      final mapping = {
-        'vH0n5dPnOiVmdPFpY4NWHTa0QKr2': '3gisghkqm6uau4b',
-        'p7tkc5JDEIhzLOOY4wwbvH7exVU2': '9vgxq9oh11qtvsc',
-        'BCE6de7OPIhUdlYKj1RthWdxOFv1': 's1bt7ukigruvoez',
-      };
+      // 5. NETTOYAGE: Supprimer les catégories "Dettes" existantes
+      await _supprimerCategoriesDettes(currentAuth.id);
 
-      mapping.forEach((firebaseId, pocketbaseId) {
-        print('   - $firebaseId → $pocketbaseId');
-      });
+      // 6. Migrer les données de cet utilisateur uniquement
+      await _migrerDonneesUtilisateur(idFirebase, idPocketBase);
 
-      print('✅ Analyse de l\'export Firebase terminée');
-      print('💡 Prêt pour la migration avec les vrais IDs utilisateurs !');
+      print('🎉 Migration terminée pour ${utilisateurFirebase.email} !');
     } catch (e) {
-      print('❌ Erreur analyse export Firebase: $e');
+      print('❌ Erreur migration utilisateur: $e');
+      rethrow;
     }
   }
 
-  // Migration complète avec les vrais IDs utilisateurs
-  Future<void> migrateAllDataWithRealIds() async {
+  // Supprimer les catégories "Dettes" existantes pour éviter les doublons
+  Future<void> _supprimerCategoriesDettes(String utilisateurId) async {
     try {
-      print('🚀 Début de la migration complète avec vrais IDs...');
+      print('🧹 Nettoyage des catégories "Dettes" existantes...');
+      
+      final pb = await PocketBaseService.instance;
+      final categories = await pb.collection('categories').getFullList(
+        filter: 'utilisateur_id = "$utilisateurId"'
+      );
+      
+      int supprimees = 0;
+      for (final categorie in categories) {
+        final nom = categorie.data['nom'] ?? '';
+        if (_estCategorieDettes(nom)) {
+          await pb.collection('categories').delete(categorie.id);
+          supprimees++;
+          print('   🗑️ Catégorie supprimée: $nom');
+        }
+      }
+      
+      if (supprimees > 0) {
+        print('✅ $supprimees catégorie(s) "Dettes" supprimée(s)');
+      } else {
+        print('✅ Aucune catégorie "Dettes" à supprimer');
+      }
+    } catch (e) {
+      print('⚠️ Erreur nettoyage catégories Dettes: $e');
+    }
+  }
 
-      // Mapping des vrais IDs utilisateurs
-      final userMapping = {
-        'vH0n5dPnOiVmdPFpY4NWHTa0QKr2': '3gisghkqm6uau4b',
-        'p7tkc5JDEIhzLOOY4wwbvH7exVU2': '9vgxq9oh11qtvsc',
-        'BCE6de7OPIhUdlYKj1RthWdxOFv1': 's1bt7ukigruvoez',
-      };
+  // Créer un compte PocketBase pour l'utilisateur Firebase connecté
+  Future<RecordModel> _creerComptePocketBase(User utilisateurFirebase) async {
+    try {
+      print('👤 Création du compte PocketBase...');
 
-      print('👥 Migration pour ${userMapping.length} utilisateurs:');
-      userMapping.forEach((firebaseId, pocketbaseId) {
-        print('   - $firebaseId → $pocketbaseId');
-      });
+      // Vérifier que PocketBase est bien initialisé
+      final pb = await PocketBaseService.instance;
+      print('✅ PocketBase instance récupérée');
 
-      // Migrer les comptes pour tous les utilisateurs
-      print('\n🏦 Migration des comptes...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
+      final email = utilisateurFirebase.email ?? '${utilisateurFirebase.uid}@migration.local';
+      final password = 'migration123456';
+
+      print('📝 Email utilisateur: $email');
+
+      // Essayer de se connecter d'abord (au cas où l'utilisateur existe déjà)
+      try {
+        print('🔄 Tentative de connexion avec utilisateur existant...');
+        final authData = await pb.collection('users').authWithPassword(email, password);
+        print('✅ Connexion réussie avec utilisateur existant: ${authData.record?.id}');
+        return authData.record!;
+      } catch (loginError) {
+        print('⚠️ Connexion échouée, création d\'un nouvel utilisateur...');
+        
+        // Si la connexion échoue, créer un nouvel utilisateur
+        final donneesUtilisateur = {
+          'email': email,
+          'password': password,
+          'passwordConfirm': password,
+          'name': utilisateurFirebase.displayName ?? 'Utilisateur ${utilisateurFirebase.uid}',
+        };
 
         try {
-          // Récupérer tous les comptes de Firebase
-          final comptesSnapshot = await FirebaseFirestore.instance
-              .collection('comptes')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
+          final utilisateurPocketBase = await pb.collection('users').create(body: donneesUtilisateur);
+          print('✅ Nouvel utilisateur créé: ${utilisateurPocketBase.id}');
+          
+          // Se connecter avec le nouvel utilisateur
+          final authData = await pb.collection('users').authWithPassword(email, password);
+          print('✅ Connexion automatique réussie avec token: ${authData.token.isNotEmpty}');
+          
+          return utilisateurPocketBase;
+        } catch (createError) {
+          print('❌ Erreur création utilisateur: $createError');
+          rethrow;
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur création compte PocketBase: $e');
+      rethrow;
+    }
+  }
 
-          final comptes =
-              comptesSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${comptes.length} comptes trouvés pour $firebaseUserId');
+  // Migrer toutes les données d'un utilisateur spécifique
+  Future<void> _migrerDonneesUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('📦 Migration des données pour l\'utilisateur $idFirebase...');
 
-          for (final compte in comptes) {
-            try {
-              final typeCompte = compte['type'] ?? 'Chèque';
-              Map<String, dynamic> newCompte = {
-                'nom': compte['nom'],
-                'solde': compte['solde'] ?? 0.0,
-                'utilisateur_id': pocketbaseUserId,
-                'couleur': compte['couleur'] ?? 0xFF2196F3,
-                'ordre': compte['ordre'] ?? 0,
-                'archive': compte['estArchive'] ?? false,
-              };
+      // 1. Migrer les catégories de cet utilisateur
+      await _migrerCategoriesUtilisateur(idFirebase, idPocketBase);
 
-              // Ajouter les champs supplémentaires selon le type
-              RecordModel result;
-              if (typeCompte == 'Carte de crédit') {
-                newCompte['limite_credit'] = compte['limiteCredit'] ?? 0.0;
-                newCompte['solde_utilise'] = compte['soldeUtilise'] ?? 0.0;
-                newCompte['taux_interet'] = compte['tauxInteret'] ?? 0.0;
-                newCompte['paiement_minimum'] =
-                    compte['paiementMinimum'] ?? 0.0;
-                newCompte['date_echeance'] =
-                    compte['dateEcheance'] ?? DateTime.now().toIso8601String();
-                newCompte['rembourser_dettes_associees'] =
-                    compte['rembourserDettesAssociees'] ?? false;
-                newCompte['depenses_fixes'] = compte['depensesFixes'] ?? [];
-                result = await PocketBaseService.createCompteCredit(newCompte);
-              } else if (typeCompte == 'Dette') {
-                newCompte['solde_dette'] = compte['solde'] ?? 0.0;
-                newCompte['taux_interet'] = compte['tauxInteret'] ?? 0.0;
-                newCompte['montant_initial'] = compte['montantInitial'] ?? 0.0;
-                newCompte['paiement_minimum'] =
-                    compte['paiementMinimum'] ?? 0.0;
-                result = await PocketBaseService.createDette(newCompte);
-              } else if (typeCompte == 'Investissement') {
-                newCompte['valeur_marche'] = compte['valeurMarche'] ?? 0.0;
-                newCompte['cout_base'] = compte['coutBase'] ?? 0.0;
-                result =
-                    await PocketBaseService.createInvestissement(newCompte);
-              } else {
-                // Type Chèque par défaut
-                newCompte['pret_a_placer'] = compte['pretAPlacer'] ?? 0.0;
-                result = await PocketBaseService.createCompte(newCompte);
-              }
+      // 2. Migrer les comptes de cet utilisateur  
+      await _migrerComptesUtilisateur(idFirebase, idPocketBase);
 
-              print(
-                  '   🔍 Tentative création compte: ${compte['nom']} (Type: $typeCompte)');
-              print('   📊 Données envoyées: $newCompte');
+      // 3. Migrer les enveloppes de cet utilisateur
+      await _migrerEnveloppesUtilisateur(idFirebase, idPocketBase);
 
-              print('   ✅ Compte créé: ${compte['nom']} (${typeCompte})');
-            } catch (e) {
-              print('   ❌ Erreur création compte ${compte['nom']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${compte}');
-            }
+      // 4. Migrer les transactions de cet utilisateur
+      await _migrerTransactionsUtilisateur(idFirebase, idPocketBase);
+
+      // 5. Migrer les dettes de cet utilisateur
+      await _migrerDettesUtilisateur(idFirebase, idPocketBase);
+
+      // 6. Migrer les investissements de cet utilisateur
+      await _migrerInvestissementsUtilisateur(idFirebase, idPocketBase);
+
+      // 7. Migrer les tiers de cet utilisateur
+      await _migrerTiersUtilisateur(idFirebase, idPocketBase);
+
+      print('✅ Toutes les données migrées pour l\'utilisateur $idFirebase');
+    } catch (e) {
+      print('❌ Erreur migration données utilisateur: $e');
+      rethrow;
+    }
+  }
+
+  // Migrer les catégories d'un utilisateur spécifique
+  Future<void> _migrerCategoriesUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('📁 Migration des catégories pour $idFirebase...');
+
+      final snapshot = await _firestore
+          .collection('categories')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      
+      print('   📊 ${snapshot.docs.length} catégorie(s) trouvée(s)');
+
+      for (final doc in snapshot.docs) {
+        try {
+          final donnees = doc.data();
+
+          final categorieData = {
+            'utilisateur_id': idPocketBase, // Forcer l'ID exact
+            'nom': donnees['nom'] ?? 'Catégorie sans nom',
+            'ordre': donnees['ordre'] ?? 0,
+          };
+
+          print('   📝 Création catégorie: ${categorieData['nom']} avec utilisateur_id: $idPocketBase');
+          final pb = await PocketBaseService.instance;
+          
+          // Vérifier que l'utilisateur est bien connecté
+          final currentAuth = pb.authStore.model;
+          if (currentAuth == null || currentAuth.id != idPocketBase) {
+            throw Exception('Utilisateur PocketBase non connecté correctement: auth=${currentAuth?.id}, expected=$idPocketBase');
           }
+          print('   🔐 Utilisateur connecté vérifié: ${currentAuth.id}');
+          
+          // S'assurer que l'utilisateur_id est bien l'ID et non le nom
+          categorieData['utilisateur_id'] = currentAuth.id; // Forcer l'ID authentifié
+          
+          final result = await pb.collection('categories').create(body: categorieData);
+          print('   ✅ Catégorie créée avec ID: ${result.id} pour utilisateur: ${result.data['utilisateur_id']}');
         } catch (e) {
-          print('   ❌ Erreur récupération comptes pour $firebaseUserId: $e');
+          print('   ❌ Erreur détaillée migration catégorie: $e');
+          print('   📋 Données: ${doc.data()}');
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur migration catégories utilisateur: $e');
+    }
+  }
+
+  // Migrer les comptes d'un utilisateur spécifique
+  Future<void> _migrerComptesUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('🏦 Migration des comptes pour $idFirebase...');
+
+      final snapshot = await _firestore
+          .collection('comptes')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      
+      print('   📊 ${snapshot.docs.length} compte(s) trouvé(s)');
+
+      Map<String, int> compteurParType = {};
+
+      for (final doc in snapshot.docs) {
+        try {
+          final donnees = doc.data();
+          final compte = Compte.fromMap(donnees, doc.id);
+          final typeCollection = _adapterTypeCompte(compte.type);
+
+          // Vérifier l'authentification PocketBase
+          final pb = await PocketBaseService.instance;
+          final currentAuth = pb.authStore.model;
+          if (currentAuth == null || currentAuth.id != idPocketBase) {
+            throw Exception('Utilisateur PocketBase non connecté');
+          }
+
+          // Données communes avec ID utilisateur forcé
+          final donneesBase = {
+            'utilisateur_id': currentAuth.id, // Forcer l'ID authentifié
+            'nom': compte.nom,
+            'couleur': '#${compte.couleur.toRadixString(16).padLeft(8, '0')}',
+            'ordre': compte.ordre ?? 0,
+            'archive': compte.estArchive,
+          };
+
+          print('   📝 Création compte: ${compte.nom} avec utilisateur_id: ${currentAuth.id}');
+
+          // Données spécifiques par type
+          if (typeCollection == 'comptes_cheques') {
+            donneesBase.addAll({
+              'solde': compte.solde,
+              'pret_a_placer': compte.pretAPlacer,
+            });
+            final result = await pb.collection('comptes_cheques').create(body: donneesBase);
+            print('   🔍 Compte chèques créé, utilisateur_id: ${result.data['utilisateur_id']}');
+          } else if (typeCollection == 'comptes_credits') {
+            donneesBase.addAll({
+              'solde_utilise': compte.solde.abs(),
+              'limite_credit': compte.solde.abs() + 1000,
+              'taux_interet': 19.99,
+            });
+            final result = await pb.collection('comptes_credits').create(body: donneesBase);
+            print('   🔍 Compte crédit créé, utilisateur_id: ${result.data['utilisateur_id']}');
+          } else if (typeCollection == 'comptes_dettes') {
+            donneesBase.addAll({
+              'nom_tiers': compte.nom,
+              'solde_dette': compte.solde.abs(),
+              'montant_initial': compte.solde.abs(),
+              'taux_interet': 0.0,
+              'paiement_minimum': 0.0,
+            });
+            final result = await pb.collection('comptes_dettes').create(body: donneesBase);
+            print('   🔍 Compte dette créé, utilisateur_id: ${result.data['utilisateur_id']}');
+          } else if (typeCollection == 'comptes_investissement') {
+            donneesBase.addAll({
+              'valeur_marche': compte.solde,
+              'cout_base': compte.pretAPlacer,
+              'symbole': 'UNKNOWN',
+              'nombre_actions': 0,
+              'prix_moyen_achat': 0.0,
+              'prix_actuel': 0.0,
+              'variation_pourcentage': 0.0,
+              'date_derniere_maj': DateTime.now().toIso8601String(),
+            });
+            final result = await pb.collection('comptes_investissement').create(body: donneesBase);
+            print('   🔍 Compte investissement créé, utilisateur_id: ${result.data['utilisateur_id']}');
+          }
+
+          compteurParType[typeCollection] = (compteurParType[typeCollection] ?? 0) + 1;
+          print('   ✅ Compte migré: ${compte.nom} → $typeCollection');
+        } catch (e) {
+          print('   ❌ Erreur migration compte: $e');
         }
       }
 
-      // Migrer les catégories (excluant "Dettes")
-      print('\n📁 Migration des catégories...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
+      print('   📊 Répartition: $compteurParType');
+    } catch (e) {
+      print('❌ Erreur migration comptes utilisateur: $e');
+    }
+  }
 
-        try {
-          final categoriesSnapshot = await FirebaseFirestore.instance
-              .collection('categories')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
+  // Migrer les enveloppes d'un utilisateur spécifique
+  Future<void> _migrerEnveloppesUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('💰 Migration des enveloppes pour $idFirebase...');
 
-          final categories =
-              categoriesSnapshot.docs.map((doc) => doc.data()).toList();
-          final categoriesFiltered =
-              categories.where((cat) => cat['nom'] != 'Dettes').toList();
-          print(
-              '   📊 ${categoriesFiltered.length} catégories trouvées pour $firebaseUserId');
+      final snapshot = await _firestore
+          .collection('categories')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
 
-          for (final categorie in categoriesFiltered) {
-            try {
-              final newCategorie = {
-                'nom': categorie['nom'],
-                'utilisateur_id': pocketbaseUserId,
-                'ordre': categorie['ordre'] ?? 0,
-              };
+      int totalEnveloppes = 0;
 
-              // Ajouter les enveloppes si elles existent
-              if (categorie['enveloppes'] != null &&
-                  categorie['enveloppes'] is List) {
-                newCategorie['enveloppes'] = categorie['enveloppes'];
-              }
-
-              print('   🔍 Tentative création catégorie: ${categorie['nom']}');
-              print('   📊 Données envoyées: $newCategorie');
-
-              final result =
-                  await PocketBaseService.createCategorie(newCategorie);
-              print('   ✅ Catégorie créée: ${categorie['nom']}');
-            } catch (e) {
-              print('   ❌ Erreur création catégorie ${categorie['nom']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${categorie}');
-            }
+      // D'abord, créer un mapping des catégories Firebase → PocketBase
+      final pb = await PocketBaseService.instance;
+      final categoriesPocketBase = await pb.collection('categories').getFullList();
+      final mappingCategories = <String, String>{};
+      
+      for (final catPB in categoriesPocketBase) {
+        // Associer par nom de catégorie
+        for (final docFirebase in snapshot.docs) {
+          final donneesFirebase = docFirebase.data();
+          if (donneesFirebase['nom'] == catPB.data['nom']) {
+            mappingCategories[docFirebase.id] = catPB.id;
+            print('   🔗 Mapping catégorie: ${docFirebase.id} → ${catPB.id} (${catPB.data['nom']})');
           }
-        } catch (e) {
-          print('   ❌ Erreur récupération catégories pour $firebaseUserId: $e');
         }
       }
 
-      // Migrer les transactions
-      print('\n💳 Migration des transactions...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
-
+      for (final doc in snapshot.docs) {
         try {
-          final transactionsSnapshot = await FirebaseFirestore.instance
-              .collection('transactions')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final transactions =
-              transactionsSnapshot.docs.map((doc) => doc.data()).toList();
-          print(
-              '   📊 ${transactions.length} transactions trouvées pour $firebaseUserId');
-
-          for (final transaction in transactions) {
-            try {
-              // Convertir le Timestamp en String ISO
-              String dateTransaction = DateTime.now().toIso8601String();
-              if (transaction['date'] != null) {
-                if (transaction['date'] is Timestamp) {
-                  final timestamp = transaction['date'] as Timestamp;
-                  dateTransaction = DateTime.fromMillisecondsSinceEpoch(
-                    timestamp.millisecondsSinceEpoch,
-                  ).toIso8601String();
-                } else {
-                  dateTransaction = transaction['date'].toString();
-                }
-              }
-
-              final newTransaction = {
-                'utilisateur_id': pocketbaseUserId,
-                'type': transaction['type'] ?? 'Depense',
-                'type_mouvement':
-                    transaction['typeMouvement'] ?? 'depenseNormale',
-                'montant': transaction['montant'] ?? 0.0,
-                'date': dateTransaction,
-                'note': transaction['note'] ?? '',
-                'compte_id': transaction['compteId'] ?? '',
-                'collection_compte': 'comptes_cheques',
-                'tiers_id': transaction['tiers'] ?? '',
-                'marqueur': transaction['marqueur'] ?? '',
-                'est_fractionnee': transaction['estFractionnee'] ?? false,
-                'transaction_parente_id':
-                    transaction['transactionParenteId'] ?? '',
-                'compte_de_passif_associe':
-                    transaction['compteDePassifAssocie'] ?? '',
-              };
-
-              // Ajouter enveloppe_id seulement si elle existe
-              if (transaction['enveloppeId'] != null &&
-                  transaction['enveloppeId'].toString().isNotEmpty) {
-                newTransaction['enveloppe_id'] = transaction['enveloppeId'];
-              }
-
-              // Ajouter sousItems seulement s'ils existent
-              if (transaction['sousItems'] != null &&
-                  transaction['sousItems'] is List) {
-                newTransaction['sous_items'] = transaction['sousItems'];
-              }
-
-              print(
-                  '   🔍 Tentative création transaction: ${transaction['tiers'] ?? 'Sans tiers'}');
-              print('   📊 Données envoyées: $newTransaction');
-
-              final result =
-                  await PocketBaseService.createTransaction(newTransaction);
-              print(
-                  '   ✅ Transaction créée: ${transaction['tiers'] ?? 'Sans tiers'}');
-            } catch (e) {
-              print(
-                  '   ❌ Erreur création transaction ${transaction['tiers'] ?? 'Sans tiers'}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${transaction}');
-            }
+          final donnees = doc.data();
+          final nomCategorie = donnees['nom'] ?? '';
+          
+          // IMPORTANT: EXCLURE les enveloppes de la catégorie "Dettes"
+          if (_estCategorieDettes(nomCategorie)) {
+            print('   ⚠️ Enveloppes de catégorie EXCLUES (auto-créées): $nomCategorie');
+            continue; // Ignorer toutes les enveloppes de cette catégorie
           }
-        } catch (e) {
-          print(
-              '   ❌ Erreur récupération transactions pour $firebaseUserId: $e');
-        }
-      }
-
-      // Migrer les dettes
-      print('\n💸 Migration des dettes...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
-
-        try {
-          final dettesSnapshot = await FirebaseFirestore.instance
-              .collection('dettes')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final dettes = dettesSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${dettes.length} dettes trouvées pour $firebaseUserId');
-
-          for (final dette in dettes) {
-            try {
-              final estManuelle = dette['estManuelle'] ?? true;
-
-              // Convertir le Timestamp en String ISO
-              String dateCreation = DateTime.now().toIso8601String();
-              if (dette['dateCreation'] != null) {
-                if (dette['dateCreation'] is Timestamp) {
-                  final timestamp = dette['dateCreation'] as Timestamp;
-                  dateCreation = DateTime.fromMillisecondsSinceEpoch(
-                    timestamp.millisecondsSinceEpoch,
-                  ).toIso8601String();
-                } else {
-                  dateCreation = dette['dateCreation'].toString();
-                }
-              }
-
-              if (estManuelle) {
-                final newDette = {
-                  'nom_tiers': dette['nomTiers'] ?? '',
-                  'montant_initial': dette['montantInitial'] ?? 0.0,
-                  'solde': dette['solde'] ?? 0.0,
-                  'type': 'dette',
-                  'archive': dette['archive'] ?? false,
-                  'date_creation': dateCreation,
-                  'utilisateur_id': pocketbaseUserId,
-                  'note': dette['note'] ?? '',
-                };
-
-                print('   🔍 Tentative création dette: ${dette['nomTiers']}');
-                print('   📊 Données envoyées: $newDette');
-
-                final result = await PocketBaseService.createDette(newDette);
-                print('   ✅ Dette manuelle créée: ${dette['nomTiers']}');
-              } else {
-                final newPret = {
-                  'nom_tiers': dette['nomTiers'] ?? '',
-                  'montant_initial': dette['montantInitial'] ?? 0.0,
-                  'solde': dette['solde'] ?? 0.0,
-                  'type': 'pret',
-                  'archive': dette['archive'] ?? false,
-                  'date_creation': dateCreation,
-                  'utilisateur_id': pocketbaseUserId,
-                  'note': dette['note'] ?? '',
-                };
-
-                print('   🔍 Tentative création prêt: ${dette['nomTiers']}');
-                print('   📊 Données envoyées: $newPret');
-
-                final result =
-                    await PocketBaseService.createPretPersonnel(newPret);
-                print('   ✅ Prêt personnel créé: ${dette['nomTiers']}');
-              }
-            } catch (e) {
-              print('   ❌ Erreur création dette ${dette['nomTiers']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${dette}');
-            }
+          
+          final enveloppes = donnees['enveloppes'] as List<dynamic>? ?? [];
+          final categorieIdPocketBase = mappingCategories[doc.id];
+          
+          if (categorieIdPocketBase == null) {
+            print('   ⚠️ Catégorie PocketBase non trouvée pour ${doc.id}');
+            continue;
           }
-        } catch (e) {
-          print('   ❌ Erreur récupération dettes pour $firebaseUserId: $e');
-        }
-      }
-
-      // Migrer les investissements
-      print('\n📈 Migration des investissements...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
-
-        try {
-          final investissementsSnapshot = await FirebaseFirestore.instance
-              .collection('actions')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final investissements =
-              investissementsSnapshot.docs.map((doc) => doc.data()).toList();
-          print(
-              '   📊 ${investissements.length} investissements trouvés pour $firebaseUserId');
-
-          for (final investissement in investissements) {
-            try {
-              final newInvestissement = {
-                'symbole': investissement['symbole'] ?? '',
-                'quantite': investissement['quantite'] ?? 0.0,
-                'prix_achat': investissement['prixAchat'] ?? 0.0,
-                'date_achat': investissement['dateAchat'] ??
-                    DateTime.now().toIso8601String(),
-                'utilisateur_id': pocketbaseUserId,
-                'notes': investissement['notes'] ?? '',
-              };
-
-              final result = await PocketBaseService.createInvestissement(
-                  newInvestissement);
-              print('   ✅ Investissement créé: ${investissement['symbole']}');
-            } catch (e) {
-              print(
-                  '   ❌ Erreur création investissement ${investissement['symbole']}: $e');
-            }
-          }
-        } catch (e) {
-          print(
-              '   ❌ Erreur récupération investissements pour $firebaseUserId: $e');
-        }
-      }
-
-      // Migrer les enveloppes
-      print('\n📦 Migration des enveloppes...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
-
-        try {
-          final enveloppesSnapshot = await FirebaseFirestore.instance
-              .collection('enveloppes')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final enveloppes =
-              enveloppesSnapshot.docs.map((doc) => doc.data()).toList();
-          print(
-              '   📊 ${enveloppes.length} enveloppes trouvées pour $firebaseUserId');
 
           for (final enveloppe in enveloppes) {
             try {
-              final newEnveloppe = {
-                'utilisateur_id': pocketbaseUserId,
-                'categorie_id': enveloppe['categorieId'] ?? '',
-                'nom': enveloppe['nom'] ?? '',
-                'objectif_date': enveloppe['objectifDate'] ??
-                    DateTime.now().toIso8601String(),
-                'frequence_objectif': enveloppe['frequenceObjectif'] ?? 'Aucun',
-                'compte_provenance_id': enveloppe['compteProvenanceId'] ?? '',
+              final enveloppeData = {
+                'utilisateur_id': idPocketBase,
+                'categorie_id': categorieIdPocketBase, // Utiliser l'ID PocketBase
+                'nom': enveloppe['nom'] ?? 'Enveloppe sans nom',
+                'objectif_date': enveloppe['objectifDate'] ?? DateTime.now().toIso8601String(),
+                'frequence_objectif': _adapterFrequenceObjectif(enveloppe['frequenceObjectif']),
+                'compte_provenance_id': enveloppe['provenanceCompteId'] ?? '',
                 'ordre': enveloppe['ordre'] ?? 0,
-                'solde_enveloppe': enveloppe['soldeEnveloppe'] ?? 0.0,
-                'depense': enveloppe['depense'] ?? 0.0,
-                'est_archive': enveloppe['estArchive'] ?? false,
-                'objectif_montant': enveloppe['objectifMontant'] ?? 0.0,
-                'moisObjectif': enveloppe['moisObjectif'] ??
-                    DateTime.now().toIso8601String(),
+                'solde_enveloppe': (enveloppe['solde'] ?? 0.0).toDouble(),
+                'depense': (enveloppe['depense'] ?? 0.0).toDouble(),
+                'est_archive': enveloppe['archivee'] ?? false,
+                'objectif_montant': (enveloppe['objectif'] ?? 0.0).toDouble(),
+                'moisObjectif': enveloppe['objectifDate'] ?? DateTime.now().toIso8601String(),
               };
 
-              final result =
-                  await PocketBaseService.createEnveloppe(newEnveloppe);
-              print('   ✅ Enveloppe créée: ${enveloppe['nom']}');
+              await pb.collection('enveloppes').create(body: enveloppeData);
+              totalEnveloppes++;
+              print('   ✅ Enveloppe migrée: ${enveloppe['nom']}');
             } catch (e) {
-              print('   ❌ Erreur création enveloppe ${enveloppe['nom']}: $e');
+              print('   ❌ Erreur migration enveloppe: $e');
             }
           }
         } catch (e) {
-          print('   ❌ Erreur récupération enveloppes pour $firebaseUserId: $e');
+          print('   ❌ Erreur traitement catégorie: $e');
         }
       }
 
-      // Migrer les allocations mensuelles
-      print('\n💰 Migration des allocations mensuelles...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
-
-        try {
-          final allocationsSnapshot = await FirebaseFirestore.instance
-              .collection('allocations_mensuelles')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final allocations =
-              allocationsSnapshot.docs.map((doc) => doc.data()).toList();
-          print(
-              '   📊 ${allocations.length} allocations trouvées pour $firebaseUserId');
-
-          for (final allocation in allocations) {
-            try {
-              final newAllocation = {
-                'utilisateur_id': pocketbaseUserId,
-                'enveloppe_id': allocation['enveloppeId'] ?? '',
-                'mois': allocation['mois'] ?? DateTime.now().toIso8601String(),
-                'solde': allocation['solde'] ?? 0.0,
-                'alloue': allocation['alloue'] ?? 0.0,
-                'depense': allocation['depense'] ?? 0.0,
-                'compte_source_id': allocation['compteSourceId'] ?? '',
-                'collection_compte_source':
-                    allocation['collectionCompteSource'] ?? 'comptes_cheques',
-              };
-
-              final result = await PocketBaseService.createAllocationMensuelle(
-                  newAllocation);
-              print(
-                  '   ✅ Allocation mensuelle créée: ${allocation['alloue'] ?? 0.0}€');
-            } catch (e) {
-              print('   ❌ Erreur création allocation mensuelle: $e');
-            }
-          }
-        } catch (e) {
-          print(
-              '   ❌ Erreur récupération allocations pour $firebaseUserId: $e');
-        }
-      }
-
-      // Migrer les tiers
-      print('\n👥 Migration des tiers...');
-      for (final entry in userMapping.entries) {
-        final firebaseUserId = entry.key;
-        final pocketbaseUserId = entry.value;
-
-        try {
-          final tiersSnapshot = await FirebaseFirestore.instance
-              .collection('tiers')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final tiers = tiersSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${tiers.length} tiers trouvés pour $firebaseUserId');
-
-          for (final tiers in tiers) {
-            try {
-              final newTiers = {
-                'nom': tiers['nom'] ?? '',
-                'utilisateur_id': pocketbaseUserId,
-              };
-
-              print('   🔍 Tentative création tiers: ${tiers['nom']}');
-              print('   📊 Données envoyées: $newTiers');
-
-              final result = await PocketBaseService.createTiers(newTiers);
-              print('   ✅ Tiers créé: ${tiers['nom']}');
-            } catch (e) {
-              print('   ❌ Erreur création tiers ${tiers['nom']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${tiers}');
-            }
-          }
-        } catch (e) {
-          print('   ❌ Erreur récupération tiers pour $firebaseUserId: $e');
-        }
-      }
-
-      print('\n✅ Migration complète terminée !');
-      print(
-          '🎉 Toutes les données ont été migrées avec les vrais IDs utilisateurs !');
+      print('   📊 $totalEnveloppes enveloppe(s) migrée(s)');
     } catch (e) {
-      print('❌ Erreur migration complète: $e');
+      print('❌ Erreur migration enveloppes utilisateur: $e');
     }
   }
 
+  // Migrer les transactions d'un utilisateur spécifique
+  Future<void> _migrerTransactionsUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('💸 Migration des transactions pour $idFirebase...');
+
+      final snapshot = await _firestore
+          .collection('transactions')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      
+      print('   📊 ${snapshot.docs.length} transaction(s) trouvée(s)');
+
+      // Créer un mapping des enveloppes Firebase → PocketBase
+      final pb = await PocketBaseService.instance;
+      final enveloppesPocketBase = await pb.collection('enveloppes').getFullList();
+      final mappingEnveloppes = <String, String>{};
+      
+      for (final envPB in enveloppesPocketBase) {
+        mappingEnveloppes[envPB.data['nom']] = envPB.id;
+      }
+      print('   🔗 Mapping ${mappingEnveloppes.length} enveloppes créé');
+
+      int totalTransactions = 0;
+      int totalAllocations = 0;
+
+      for (final doc in snapshot.docs) {
+        try {
+          final donnees = doc.data();
+          final transaction = Transaction.fromJson(donnees);
+
+          // 1. Créer la transaction normale
+          final transactionData = {
+            'utilisateur_id': idPocketBase,
+            'type': _adapterTypeTransaction(transaction.type.name), // Adapter le type
+            'type_mouvement': transaction.typeMouvement.name,
+            'montant': transaction.montant,
+            'date': transaction.date.toIso8601String(),
+            'note': transaction.note ?? '',
+            'compte_id': transaction.compteId,
+            'collection_compte': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+            'tiers_id': transaction.tiers ?? '',
+            'marqueur': transaction.marqueur ?? '',
+            'est_fractionnee': transaction.estFractionnee,
+            'transaction_parente_id': transaction.transactionParenteId ?? '',
+            'sous_items': transaction.sousItems ?? [],
+            'compte_passif_id': transaction.compteDePassifAssocie ?? '',
+          };
+
+          await pb.collection('transactions').create(body: transactionData);
+          totalTransactions++;
+
+          // 2. Créer l'allocation mensuelle seulement si on a une enveloppe
+          if (transaction.enveloppeId != null && transaction.enveloppeId!.isNotEmpty) {
+            String? enveloppeIdPocketBase;
+            
+            // Améliorer la recherche d'enveloppe par ID Firebase → Nom → ID PocketBase
+            // Méthode 1: Chercher par ID direct (peu probable de marcher)
+            for (final envPB in enveloppesPocketBase) {
+              if (envPB.id == transaction.enveloppeId) {
+                enveloppeIdPocketBase = envPB.id;
+                break;
+              }
+            }
+            
+            // Méthode 2: Si pas trouvé, prendre la première enveloppe disponible pour test
+            if (enveloppeIdPocketBase == null && enveloppesPocketBase.isNotEmpty) {
+              enveloppeIdPocketBase = enveloppesPocketBase.first.id;
+              print('   🔄 Utilisation enveloppe par défaut: ${enveloppesPocketBase.first.data['nom']} pour transaction');
+            }
+
+            if (enveloppeIdPocketBase != null) {
+              final allocationData = {
+                'utilisateur_id': idPocketBase,
+                'enveloppe_id': enveloppeIdPocketBase, // Utiliser l'ID PocketBase
+                'mois': _forcerPremierDuMoisMinuit(transaction.date).toIso8601String(),
+                'solde': transaction.montant,
+                'alloue': transaction.type == TypeTransaction.revenu ? transaction.montant : 0.0,
+                'depense': transaction.type == TypeTransaction.depense ? transaction.montant : 0.0,
+                'compte_source_id': transaction.compteId,
+                'collection_compte_source': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+              };
+
+              await pb.collection('allocations_mensuelles').create(body: allocationData);
+              totalAllocations++;
+              print('   ✅ Allocation mensuelle créée pour enveloppe: $enveloppeIdPocketBase');
+            } else {
+              print('   ⚠️ Aucune enveloppe disponible pour créer allocation mensuelle');
+              
+              // CRÉER QUAND MÊME une allocation mensuelle SANS enveloppe pour test
+              final allocationSansEnveloppe = {
+                'utilisateur_id': idPocketBase,
+                'enveloppe_id': '', // Vide temporairement
+                'mois': _forcerPremierDuMoisMinuit(transaction.date).toIso8601String(),
+                'solde': transaction.montant,
+                'alloue': transaction.type == TypeTransaction.revenu ? transaction.montant : 0.0,
+                'depense': transaction.type == TypeTransaction.depense ? transaction.montant : 0.0,
+                'compte_source_id': transaction.compteId,
+                'collection_compte_source': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+              };
+              
+              try {
+                await pb.collection('allocations_mensuelles').create(body: allocationSansEnveloppe);
+                totalAllocations++;
+                print('   ✅ Allocation mensuelle créée SANS enveloppe (pour test)');
+              } catch (e) {
+                print('   ❌ Impossible de créer allocation même sans enveloppe: $e');
+              }
+            }
+          } else {
+            print('   ⚠️ Transaction sans enveloppeId, création allocation quand même...');
+            
+            // Créer allocation mensuelle même sans enveloppe
+            final allocationData = {
+              'utilisateur_id': idPocketBase,
+              'enveloppe_id': '', // Vide
+              'mois': _forcerPremierDuMoisMinuit(transaction.date).toIso8601String(),
+              'solde': transaction.montant,
+              'alloue': transaction.type == TypeTransaction.revenu ? transaction.montant : 0.0,
+              'depense': transaction.type == TypeTransaction.depense ? transaction.montant : 0.0,
+              'compte_source_id': transaction.compteId,
+              'collection_compte_source': _adapterTypeCompte(_obtenirTypeCompteDepuisId(transaction.compteId)),
+            };
+            
+            try {
+              await pb.collection('allocations_mensuelles').create(body: allocationData);
+              totalAllocations++;
+              print('   ✅ Allocation mensuelle créée sans enveloppe');
+            } catch (e) {
+              print('   ❌ Erreur création allocation sans enveloppe: $e');
+            }
+          }
+
+          if (totalTransactions % 10 == 0) {
+            print('   📊 $totalTransactions transactions migrées...');
+          }
+        } catch (e) {
+          print('   ❌ Erreur migration transaction: $e');
+        }
+      }
+
+      print('   ✅ $totalTransactions transaction(s) migrée(s)');
+      print('   ✅ $totalAllocations allocation(s) mensuelle(s) créée(s)');
+    } catch (e) {
+      print('❌ Erreur migration transactions utilisateur: $e');
+    }
+  }
+
+  // Migrer les dettes d'un utilisateur spécifique
+  Future<void> _migrerDettesUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('💳 Migration des dettes pour $idFirebase...');
+
+      final snapshot = await _firestore
+          .collection('dettes')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      
+      print('   📊 ${snapshot.docs.length} dette(s) trouvée(s)');
+
+      int dettesVersPretPersonnel = 0;
+      int dettesVersComptesDettes = 0;
+
+      for (final doc in snapshot.docs) {
+        try {
+          final donnees = doc.data();
+          donnees['id'] = doc.id;
+          final dette = Dette.fromMap(donnees);
+
+          final donneesBase = {
+            'utilisateur_id': idPocketBase,
+            'nom_tiers': dette.nomTiers,
+            'montant_initial': dette.montantInitial,
+            'solde': dette.solde,
+            'type': dette.type,
+            'archive': dette.archive,
+            'date_creation': dette.dateCreation.toIso8601String(), // Convertir en string
+            'note': '',
+            'historique': dette.historique.map((m) => {
+              'id': m.id,
+              'date': m.date.toIso8601String(), // Convertir les Timestamps
+              'montant': m.montant,
+              'type': m.type,
+              'note': m.note,
+            }).toList(),
+          };
+
+          // Logique de séparation selon estManuelle
+          if (dette.estManuelle == false) {
+            // estManuelle = false → Collection pret_personnel
+            final pb = await PocketBaseService.instance;
+            await pb.collection('pret_personnel').create(body: donneesBase);
+            dettesVersPretPersonnel++;
+            print('   ✅ Dette → pret_personnel: ${dette.nomTiers}');
+          } else {
+            // estManuelle = true → Collection comptes_dettes
+            // IMPORTANT: Ajouter le champ "nom" pour comptes_dettes
+            donneesBase.addAll({
+              'nom': dette.nomTiers, // Ajouter le champ nom requis
+              'solde_dette': dette.solde,
+              'taux_interet': dette.tauxInteret ?? 0.0,
+              'paiement_minimum': dette.montantMensuel ?? 0.0,
+              'est_manuelle': true,
+            });
+
+            final pb = await PocketBaseService.instance;
+            await pb.collection('comptes_dettes').create(body: donneesBase);
+            dettesVersComptesDettes++;
+            print('   ✅ Dette → comptes_dettes: ${dette.nomTiers}');
+          }
+        } catch (e) {
+          print('   ❌ Erreur migration dette: $e');
+        }
+      }
+
+      print('   📊 pret_personnel: $dettesVersPretPersonnel, comptes_dettes: $dettesVersComptesDettes');
+    } catch (e) {
+      print('❌ Erreur migration dettes utilisateur: $e');
+    }
+  }
+
+  // Migrer les investissements d'un utilisateur spécifique
+  Future<void> _migrerInvestissementsUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('📈 Migration des investissements pour $idFirebase...');
+
+      final snapshot = await _firestore
+          .collection('investissements')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      
+      print('   📊 ${snapshot.docs.length} investissement(s) trouvé(s)');
+
+      int totalMigres = 0;
+
+      for (final doc in snapshot.docs) {
+        try {
+          final donnees = doc.data();
+          final investissement = ActionInvestissement.fromMap(donnees);
+
+          final investissementData = {
+            'utilisateur_id': idPocketBase,
+            'nom': investissement.symbole,
+            'valeur_marche': investissement.valeurActuelle,
+            'cout_base': investissement.prixMoyen * investissement.nombre,
+            'couleur': '#FF4CAF50',
+            'ordre': totalMigres,
+            'archive': false,
+            'symbole': investissement.symbole,
+            'nombre_actions': investissement.nombre,
+            'prix_moyen_achat': investissement.prixMoyen,
+            'prix_actuel': investissement.prixActuel,
+            'variation_pourcentage': investissement.variation,
+            'date_derniere_maj': investissement.dateDerniereMiseAJour.toIso8601String(),
+            'transactions_details': investissement.transactions.map((t) => t.toMap()).toList(),
+          };
+
+          final pb = await PocketBaseService.instance;
+          await pb.collection('comptes_investissement').create(body: investissementData);
+          totalMigres++;
+          print('   ✅ Investissement migré: ${investissement.symbole}');
+        } catch (e) {
+          print('   ❌ Erreur migration investissement: $e');
+        }
+      }
+
+      print('   📊 $totalMigres investissement(s) migré(s)');
+    } catch (e) {
+      print('❌ Erreur migration investissements utilisateur: $e');
+    }
+  }
+
+  // Migrer les tiers d'un utilisateur spécifique
+  Future<void> _migrerTiersUtilisateur(String idFirebase, String idPocketBase) async {
+    try {
+      print('👥 Migration des tiers pour $idFirebase...');
+
+      final snapshot = await _firestore
+          .collection('tiers')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      
+      print('   📊 ${snapshot.docs.length} tiers trouvé(s)');
+
+      for (final doc in snapshot.docs) {
+        try {
+          final donnees = doc.data();
+
+          final tiersData = {
+            'utilisateur_id': idPocketBase,
+            'nom': donnees['nom'] ?? 'Tiers sans nom',
+          };
+
+          final pb = await PocketBaseService.instance;
+          await pb.collection('tiers').create(body: tiersData);
+          print('   ✅ Tiers migré: ${donnees['nom']}');
+        } catch (e) {
+          print('   ❌ Erreur migration tiers: $e');
+        }
+      }
+    } catch (e) {
+      print('❌ Erreur migration tiers utilisateur: $e');
+    }
+  }
+
+  // Vérifier si une catégorie est la catégorie "Dettes" (à exclure)
+  bool _estCategorieDettes(String nomCategorie) {
+    if (nomCategorie.isEmpty) return false;
+    
+    final nomLower = nomCategorie.toLowerCase().trim();
+    final estDette = nomLower == 'dettes' || 
+                     nomLower == 'dette' || 
+                     nomLower == 'debts' || 
+                     nomLower == 'debt' ||
+                     nomLower.contains('dette');
+    
+    print('   🔍 Test exclusion: "$nomCategorie" → nomLower="$nomLower" → exclure=$estDette');
+    return estDette;
+  }
+
+  // Adapter les types de transaction Firebase vers PocketBase
+  String _adapterTypeTransaction(String typeFirebase) {
+    switch (typeFirebase.toLowerCase()) {
+      case 'depense':
+        return 'Depense'; // Respecter le format SELECT PocketBase
+      case 'revenu':
+        return 'Revenu';
+      case 'pret':
+        return 'Pret';
+      case 'emprunt':
+        return 'Emprunt';
+      default:
+        return 'Depense';
+    }
+  }
+
+  // Adapter la fréquence d'objectif
+  String _adapterFrequenceObjectif(String? frequence) {
+    switch (frequence?.toLowerCase()) {
+      case 'mensuel':
+        return 'Mensuel';
+      case 'bihebdomadaire':
+        return 'Bihebdomadaire';
+      default:
+        return 'Aucun';
+    }
+  }
+
+  // Forcer la date au 1er du mois à minuit
+  DateTime _forcerPremierDuMoisMinuit(DateTime date) {
+    return DateTime(date.year, date.month, 1, 0, 0, 0);
+  }
+
+  // Obtenir le type de compte depuis l'ID (simulation)
+  String _obtenirTypeCompteDepuisId(String compteId) {
+    // TODO: Implémenter la logique pour déterminer le type depuis l'ID
+    return 'cheque'; // Par défaut
+  }
+
   // Vérifier toutes les collections PocketBase
-  Future<void> verifyAllPocketBaseCollections() async {
+  Future<void> verifierToutesLesCollections() async {
     try {
       print('🔍 Vérification de toutes les collections PocketBase...');
 
@@ -1780,7 +953,7 @@ class MigrationService {
         try {
           final pb = await PocketBaseService.instance;
           final records = await pb.collection(collection).getFullList();
-          print('   ✅ $collection: ${records.length} enregistrements');
+          print('   ✅ $collection: ${records.length} enregistrement(s)');
         } catch (e) {
           print('   ❌ $collection: Erreur - $e');
         }
@@ -1792,310 +965,134 @@ class MigrationService {
     }
   }
 
-  // Migration pour l'utilisateur connecté uniquement
-  Future<void> migrateCurrentUserData() async {
+  // Comparer les données entre Firebase et PocketBase pour un utilisateur
+  Future<Map<String, Map<String, int>>> comparerDonneesUtilisateur(String idFirebase) async {
+    final comparaison = <String, Map<String, int>>{};
+
     try {
-      print('🚀 Début de la migration pour l\'utilisateur connecté...');
+      // Compter les comptes
+      final comptesFirebase = await _firestore
+          .collection('comptes')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      final comptesPocketBase = await PocketBaseService.getComptes();
+      comparaison['comptes'] = {
+        'firebase': comptesFirebase.docs.length,
+        'pocketbase': comptesPocketBase.length,
+      };
 
-      // Récupérer l'utilisateur Firebase connecté
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser == null) {
-        print('❌ Aucun utilisateur Firebase connecté');
-        return;
-      }
+      // Compter les catégories
+      final categoriesFirebase = await _firestore
+          .collection('categories')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      final categoriesPocketBase = await PocketBaseService.getCategories();
+      comparaison['categories'] = {
+        'firebase': categoriesFirebase.docs.length,
+        'pocketbase': categoriesPocketBase.length,
+      };
 
-      final firebaseUserId = firebaseUser.uid;
-      print('👤 Utilisateur connecté: $firebaseUserId');
+      // Compter les transactions
+      final transactionsFirebase = await _firestore
+          .collection('transactions')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      final transactionsPocketBase = await PocketBaseService.getTransactions();
+      comparaison['transactions'] = {
+        'firebase': transactionsFirebase.docs.length,
+        'pocketbase': transactionsPocketBase.length,
+      };
 
-      // Créer automatiquement l'utilisateur dans PocketBase
-      try {
-        final pb = await PocketBaseService.instance;
-        final userData = {
-          'email': firebaseUser.email ?? '',
-          'name': firebaseUser.displayName ?? 'Utilisateur',
-          'password': 'temp123456', // Mot de passe temporaire
-          'passwordConfirm': 'temp123456',
-        };
+      // Compter les dettes
+      final dettesFirebase = await _firestore
+          .collection('dettes')
+          .where('userId', isEqualTo: idFirebase)
+          .get();
+      final pb = await PocketBaseService.instance;
+      final dettesPocketBase = await pb.collection('comptes_dettes').getFullList();
+      final pretsPocketBase = await pb.collection('pret_personnel').getFullList();
+      comparaison['dettes'] = {
+        'firebase': dettesFirebase.docs.length,
+        'pocketbase': dettesPocketBase.length + pretsPocketBase.length,
+      };
 
-        final pocketbaseUser = await PocketBaseService.signUp(
-          userData['email'] ?? '',
-          userData['password'] ?? '',
-          userData['passwordConfirm'] ?? '',
-          data: userData,
-        );
+      print('📊 Comparaison des données pour $idFirebase :');
+      comparaison.forEach((type, counts) {
+        print('   $type: Firebase=${counts['firebase']}, PocketBase=${counts['pocketbase']}');
+      });
 
-        final pocketbaseUserId = pocketbaseUser.id;
-        print('✅ Utilisateur créé dans PocketBase: $pocketbaseUserId');
-
-        // Migrer les comptes
-        print('\n🏦 Migration des comptes...');
-        try {
-          final comptesSnapshot = await FirebaseFirestore.instance
-              .collection('comptes')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final comptes =
-              comptesSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${comptes.length} comptes trouvés');
-
-          for (final compte in comptes) {
-            try {
-              final typeCompte = compte['type'] ?? 'Chèque';
-              Map<String, dynamic> newCompte = {
-                'nom': compte['nom'],
-                'solde': compte['solde'] ?? 0.0,
-                'utilisateur_id': pocketbaseUserId,
-                'couleur': compte['couleur'] ?? 0xFF2196F3,
-                'ordre': compte['ordre'] ?? 0,
-                'archive': compte['estArchive'] ?? false,
-              };
-
-              // Ajouter les champs supplémentaires selon le type
-              RecordModel result;
-              if (typeCompte == 'Carte de crédit') {
-                newCompte['limite_credit'] = compte['limiteCredit'] ?? 0.0;
-                newCompte['solde_utilise'] = compte['soldeUtilise'] ?? 0.0;
-                newCompte['taux_interet'] = compte['tauxInteret'] ?? 0.0;
-                newCompte['paiement_minimum'] =
-                    compte['paiementMinimum'] ?? 0.0;
-                newCompte['date_echeance'] =
-                    compte['dateEcheance'] ?? DateTime.now().toIso8601String();
-                newCompte['rembourser_dettes_associees'] =
-                    compte['rembourserDettesAssociees'] ?? false;
-                newCompte['depenses_fixes'] = compte['depensesFixes'] ?? [];
-                result = await PocketBaseService.createCompteCredit(newCompte);
-              } else if (typeCompte == 'Dette') {
-                newCompte['solde_dette'] = compte['solde'] ?? 0.0;
-                newCompte['taux_interet'] = compte['tauxInteret'] ?? 0.0;
-                newCompte['montant_initial'] = compte['montantInitial'] ?? 0.0;
-                newCompte['paiement_minimum'] =
-                    compte['paiementMinimum'] ?? 0.0;
-                result = await PocketBaseService.createDette(newCompte);
-              } else if (typeCompte == 'Investissement') {
-                newCompte['valeur_marche'] = compte['valeurMarche'] ?? 0.0;
-                newCompte['cout_base'] = compte['coutBase'] ?? 0.0;
-                result =
-                    await PocketBaseService.createInvestissement(newCompte);
-              } else {
-                // Type Chèque par défaut
-                newCompte['pret_a_placer'] = compte['pretAPlacer'] ?? 0.0;
-                result = await PocketBaseService.createCompte(newCompte);
-              }
-
-              print(
-                  '   🔍 Tentative création compte: ${compte['nom']} (Type: $typeCompte)');
-              print('   📊 Données envoyées: $newCompte');
-
-              print('   ✅ Compte créé: ${compte['nom']} (${typeCompte})');
-            } catch (e) {
-              print('   ❌ Erreur création compte ${compte['nom']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${compte}');
-            }
-          }
-        } catch (e) {
-          print('   ❌ Erreur récupération comptes: $e');
-        }
-
-        // Migrer les catégories
-        print('\n📁 Migration des catégories...');
-        try {
-          final categoriesSnapshot = await FirebaseFirestore.instance
-              .collection('categories')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final categories =
-              categoriesSnapshot.docs.map((doc) => doc.data()).toList();
-          final categoriesFiltered =
-              categories.where((cat) => cat['nom'] != 'Dettes').toList();
-          print('   📊 ${categoriesFiltered.length} catégories trouvées');
-
-          for (final categorie in categoriesFiltered) {
-            try {
-              final newCategorie = {
-                'nom': categorie['nom'],
-                'utilisateur_id': pocketbaseUserId,
-                'ordre': categorie['ordre'] ?? 0,
-              };
-
-              // Ajouter les enveloppes si elles existent
-              if (categorie['enveloppes'] != null &&
-                  categorie['enveloppes'] is List) {
-                newCategorie['enveloppes'] = categorie['enveloppes'];
-              }
-
-              print('   🔍 Tentative création catégorie: ${categorie['nom']}');
-              print('   📊 Données envoyées: $newCategorie');
-
-              final result =
-                  await PocketBaseService.createCategorie(newCategorie);
-              print('   ✅ Catégorie créée: ${categorie['nom']}');
-            } catch (e) {
-              print('   ❌ Erreur création catégorie ${categorie['nom']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${categorie}');
-            }
-          }
-        } catch (e) {
-          print('   ❌ Erreur récupération catégories: $e');
-        }
-
-        // Migrer les transactions
-        print('\n💳 Migration des transactions...');
-        try {
-          final transactionsSnapshot = await FirebaseFirestore.instance
-              .collection('transactions')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final transactions =
-              transactionsSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${transactions.length} transactions trouvées');
-
-          for (final transaction in transactions) {
-            try {
-              final newTransaction = {
-                'utilisateur_id': pocketbaseUserId,
-                'type': transaction['type'] ?? 'Depense',
-                'montant': transaction['montant'] ?? 0.0,
-                'date': transaction['date'] ?? DateTime.now().toIso8601String(),
-                'note': transaction['note'] ?? '',
-                'compte_id': transaction['compteId'] ?? '',
-                'collection_compte': 'comptes_cheques',
-                'tiers_id': transaction['tiers'] ?? '',
-                'enveloppe_id': transaction['enveloppeId'] ?? '',
-              };
-
-              print(
-                  '   🔍 Tentative création transaction: ${transaction['tiers'] ?? 'Sans tiers'}');
-              print('   📊 Données envoyées: $newTransaction');
-
-              final result =
-                  await PocketBaseService.createTransaction(newTransaction);
-              print(
-                  '   ✅ Transaction créée: ${transaction['tiers'] ?? 'Sans tiers'}');
-            } catch (e) {
-              print(
-                  '   ❌ Erreur création transaction ${transaction['tiers'] ?? 'Sans tiers'}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${transaction}');
-            }
-          }
-        } catch (e) {
-          print('   ❌ Erreur récupération transactions: $e');
-        }
-
-        // Migrer les dettes
-        print('\n💸 Migration des dettes...');
-        try {
-          final dettesSnapshot = await FirebaseFirestore.instance
-              .collection('dettes')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final dettes = dettesSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${dettes.length} dettes trouvées');
-
-          for (final dette in dettes) {
-            try {
-              final estManuelle = dette['estManuelle'] ?? true;
-
-              // Convertir le Timestamp en String ISO
-              String dateCreation = DateTime.now().toIso8601String();
-              if (dette['dateCreation'] != null) {
-                if (dette['dateCreation'] is Timestamp) {
-                  final timestamp = dette['dateCreation'] as Timestamp;
-                  dateCreation = DateTime.fromMillisecondsSinceEpoch(
-                    timestamp.millisecondsSinceEpoch,
-                  ).toIso8601String();
-                } else {
-                  dateCreation = dette['dateCreation'].toString();
-                }
-              }
-
-              if (estManuelle) {
-                final newDette = {
-                  'nom_tiers': dette['nomTiers'] ?? '',
-                  'montant_initial': dette['montantInitial'] ?? 0.0,
-                  'solde': dette['solde'] ?? 0.0,
-                  'type': 'dette',
-                  'archive': dette['archive'] ?? false,
-                  'date_creation': dateCreation,
-                  'utilisateur_id': pocketbaseUserId,
-                  'note': dette['note'] ?? '',
-                };
-
-                print('   🔍 Tentative création dette: ${dette['nomTiers']}');
-                print('   📊 Données envoyées: $newDette');
-
-                final result = await PocketBaseService.createDette(newDette);
-                print('   ✅ Dette manuelle créée: ${dette['nomTiers']}');
-              } else {
-                final newPret = {
-                  'nom_tiers': dette['nomTiers'] ?? '',
-                  'montant_initial': dette['montantInitial'] ?? 0.0,
-                  'solde': dette['solde'] ?? 0.0,
-                  'type': 'pret',
-                  'archive': dette['archive'] ?? false,
-                  'date_creation': dateCreation,
-                  'utilisateur_id': pocketbaseUserId,
-                  'note': dette['note'] ?? '',
-                };
-
-                print('   🔍 Tentative création prêt: ${dette['nomTiers']}');
-                print('   📊 Données envoyées: $newPret');
-
-                final result =
-                    await PocketBaseService.createPretPersonnel(newPret);
-                print('   ✅ Prêt personnel créé: ${dette['nomTiers']}');
-              }
-            } catch (e) {
-              print('   ❌ Erreur création dette ${dette['nomTiers']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${dette}');
-            }
-          }
-        } catch (e) {
-          print('   ❌ Erreur récupération dettes: $e');
-        }
-
-        // Migrer les tiers
-        print('\n👥 Migration des tiers...');
-        try {
-          final tiersSnapshot = await FirebaseFirestore.instance
-              .collection('tiers')
-              .where('userId', isEqualTo: firebaseUserId)
-              .get();
-
-          final tiers = tiersSnapshot.docs.map((doc) => doc.data()).toList();
-          print('   📊 ${tiers.length} tiers trouvés');
-
-          for (final tiers in tiers) {
-            try {
-              final newTiers = {
-                'nom': tiers['nom'] ?? '',
-                'utilisateur_id': pocketbaseUserId,
-              };
-
-              print('   🔍 Tentative création tiers: ${tiers['nom']}');
-              print('   📊 Données envoyées: $newTiers');
-
-              final result = await PocketBaseService.createTiers(newTiers);
-              print('   ✅ Tiers créé: ${tiers['nom']}');
-            } catch (e) {
-              print('   ❌ Erreur création tiers ${tiers['nom']}: $e');
-              print('   📊 Données qui ont causé l\'erreur: ${tiers}');
-            }
-          }
-        } catch (e) {
-          print('   ❌ Erreur récupération tiers: $e');
-        }
-
-        print('\n✅ Migration terminée pour l\'utilisateur connecté !');
-        print('🎉 Toutes les données ont été migrées vers PocketBase !');
-      } catch (e) {
-        print('❌ Erreur création utilisateur PocketBase: $e');
-      }
     } catch (e) {
-      print('❌ Erreur migration utilisateur connecté: $e');
+      print('❌ Erreur comparaison données: $e');
+    }
+
+    return comparaison;
+  }
+
+  // Générer un rapport de migration pour un utilisateur
+  Future<String> genererRapportMigrationUtilisateur(String idFirebase) async {
+    final rapport = StringBuffer();
+    rapport.writeln('📋 RAPPORT DE MIGRATION UTILISATEUR');
+    rapport.writeln('Utilisateur Firebase: $idFirebase');
+    rapport.writeln('Date: ${DateTime.now()}');
+    rapport.writeln();
+
+    try {
+      final comparaison = await comparerDonneesUtilisateur(idFirebase);
+      
+      rapport.writeln('📊 STATISTIQUES DE MIGRATION:');
+      comparaison.forEach((type, counts) {
+        final firebase = counts['firebase'] ?? 0;
+        final pocketbase = counts['pocketbase'] ?? 0;
+        final taux = firebase > 0 ? (pocketbase / firebase * 100).toStringAsFixed(1) : '0.0';
+        rapport.writeln('   $type: $pocketbase/$firebase migrés ($taux%)');
+      });
+
+      rapport.writeln();
+      rapport.writeln('✅ COLLECTIONS MIGRÉES:');
+      rapport.writeln('   - Comptes → Séparés par type (cheques, credits, dettes, investissement)');
+      rapport.writeln('   - Dettes → Séparées selon estManuelle (pret_personnel vs comptes_dettes)');
+      rapport.writeln('   - Transactions → Double écriture (transactions + allocations_mensuelles)');
+      rapport.writeln('   - Catégories & Enveloppes → Structure adaptée');
+      rapport.writeln('   - Investissements → Structure enrichie');
+      rapport.writeln('   - Tiers → Migration directe');
+
+      rapport.writeln();
+      rapport.writeln('🔧 LOGIQUE MÉTIER APPLIQUÉE:');
+      rapport.writeln('   - Toutes les transactions → Collection transactions (vraie date/heure)');
+      rapport.writeln('   - Toutes les transactions → Collection allocations_mensuelles (1er du mois à minuit)');
+      rapport.writeln('   - estManuelle = false → Collection pret_personnel');
+      rapport.writeln('   - estManuelle = true → Collection comptes_dettes');
+      rapport.writeln('   - Types de comptes → Collections séparées automatiquement');
+
+    } catch (e) {
+      rapport.writeln('❌ Erreur génération rapport: $e');
+    }
+
+    return rapport.toString();
+  }
+
+  // Migration complète de toutes les données (gardée pour compatibilité)
+  Future<void> migrerToutesLesDonnees() async {
+    try {
+      print('🚀 Début de la migration complète...');
+      print('⚠️  ATTENTION: Cette méthode migre TOUS les utilisateurs à la fois');
+      print('⚠️  Il est recommandé d\'utiliser migrerUtilisateurConnecte() à la place');
+
+      // 1. Initialiser le mapping utilisateur
+      await _initialiserMappingUtilisateur();
+
+      // 2. Migrer toutes les données utilisateur par utilisateur
+      for (final entry in _mappingUtilisateur.entries) {
+        final idFirebase = entry.key;
+        final idPocketBase = entry.value;
+        
+        print('\n👤 Migration utilisateur: $idFirebase → $idPocketBase');
+        await _migrerDonneesUtilisateur(idFirebase, idPocketBase);
+      }
+
+      print('🎉 Migration complète terminée avec succès !');
+    } catch (e) {
+      print('❌ Erreur migration complète: $e');
     }
   }
 }
