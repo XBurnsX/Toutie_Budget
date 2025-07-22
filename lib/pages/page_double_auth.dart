@@ -1,4 +1,4 @@
-// 📁 Chemin : lib/pages/page_double_auth.dart
+/*// 📁 Chemin : lib/pages/page_double_auth.dart
 // 🔗 Dépendances : auth_service.dart, auth_service_firebase.dart
 // 📋 Description : Page de double authentification (Firebase + PocketBase)
 
@@ -267,3 +267,4 @@ class _PageDoubleAuthState extends State<PageDoubleAuth> {
     );
   }
 }
+*/
