@@ -1,4 +1,4 @@
-// 📁 Chemin : lib/pages/page_test_auth_pocketbase.dart
+/*// 📁 Chemin : lib/pages/page_test_auth_pocketbase.dart
 // 🔗 Dépendances : auth_service.dart
 // 📋 Description : Page de test pour l'authentification PocketBase
 
@@ -241,3 +241,4 @@ class _PageTestAuthPocketBaseState extends State<PageTestAuthPocketBase> {
     );
   }
 }
+*/

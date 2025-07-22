@@ -55,6 +55,8 @@ dependencies:
   # Graphiques
   fl_chart: ^0.68.0
   http: ^1.1.0
+  # URL Launcher pour OAuth PocketBase (requis)
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -82,9 +84,29 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # Déclaration des assets pour la splash screen
+  # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/login.png
-    - assets/images/app_icon.png
-    - assets/images/toutie.png
-    - assets/icons/
+    - assets/images/
+
+  # An image asset can refer to one or more resolution-specific "variants",
+  # see https://flutter.dev/assets-and-images/#resolution-aware
+
+  # For details regarding adding assets from package dependencies, please see
+  # https://flutter.dev/assets-and-images/#from-packages
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this format:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/custom-fonts/#from-packages
