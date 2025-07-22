@@ -66,12 +66,29 @@ class AuthService {
       final pb = await _getPocketBaseInstance();
 
       // Utiliser l'OAuth Google intégré de PocketBase !
-      final authData = await pb.collection('users').authWithOAuth2('google', (url) async {
-        print('🔗 URL OAuth Google: $url');
-        
+      print('🔐 Début OAuth Google PocketBase...');
+      print('🔐 PocketBase URL: ${pb.baseUrl}');
+      print('🔐 Collection: users');
+      print('🔐 Provider: google');
+
+      final authData =
+          await pb.collection('users').authWithOAuth2('google', (url) async {
+        print('🔗 URL OAuth Google reçue: $url');
+        print('🔗 URL string: ${url.toString()}');
+        print('🔗 URL contient google: ${url.toString().contains('google')}');
+        print('🔗 URL contient oauth: ${url.toString().contains('oauth')}');
+
         // PocketBase va gérer l'OAuth Google automatiquement !
         // L'utilisateur sera redirigé vers Google puis de retour vers l'app
+        print('🔐 Attente de la redirection Google...');
       });
+
+      print('🔐 OAuth Google terminé !');
+      print('🔐 AuthData reçu: ${authData != null}');
+      if (authData != null) {
+        print('🔐 Record ID: ${authData.record.id}');
+        print('🔐 Record data: ${authData.record.data}');
+      }
 
       print('✅ Authentification Google PocketBase réussie !');
       print('🔐 Utilisateur: ${authData.record.data['email']}');
