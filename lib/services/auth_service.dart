@@ -1,6 +1,6 @@
 // 📁 Chemin : lib/services/auth_service.dart
 // 🔗 Dépendances : pocketbase_service.dart, pocketbase_config.dart
-// 📋 Description : Service d'authentification PocketBase avec fallback intelligent
+// 📋 Description : Service d'authentification PocketBase avec instance partagée
 
 import 'package:pocketbase/pocketbase.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -26,6 +26,9 @@ class AuthService {
     'http://10.0.2.2:8090', // Émulateur Android
     'https://toutiebudget.duckdns.org', // Production
   ];
+
+  // ✅ NOUVELLE MÉTHODE : Partager l'instance PocketBase avec autres services
+  static PocketBase? get pocketBaseInstance => _pocketBase;
 
   // Obtenir l'instance PocketBase avec fallback intelligent
   static Future<PocketBase> _getPocketBaseInstance() async {
@@ -55,51 +58,28 @@ class AuthService {
     throw Exception('❌ Aucune connexion PocketBase disponible');
   }
 
-  // Connexion avec Google (version temporaire sans Google Sign-In)
+  // Utiliser l'authentification Google NATIVE de PocketBase
   static Future<RecordModel?> signInWithGoogle() async {
     try {
-      print('🔐 Début authentification Google...');
+      print('🔐 Connexion Google NATIVE PocketBase...');
 
-      // Version temporaire : connexion directe avec email de test
-      final testEmail = 'xburnsx287@gmail.com';
-      final testPassword = 'test_password_123';
-
-      print('⚠️ Mode test - utilisation d\'email de test: $testEmail');
-
-      // Connexion PocketBase avec email de test
       final pb = await _getPocketBaseInstance();
 
-      try {
-        // Essayer de se connecter avec un utilisateur existant
-        final authData = await pb.collection('users').authWithPassword(
-              testEmail,
-              testPassword,
-            );
+      // Utiliser l'OAuth Google intégré de PocketBase !
+      final authData = await pb.collection('users').authWithOAuth2('google', (url) async {
+        print('🔗 URL OAuth Google: $url');
+        
+        // PocketBase va gérer l'OAuth Google automatiquement !
+        // L'utilisateur sera redirigé vers Google puis de retour vers l'app
+      });
 
-        print('✅ Connexion PocketBase réussie avec utilisateur existant');
-        return authData.record;
-      } catch (e) {
-        print('⚠️ Utilisateur non trouvé, création d\'un nouveau compte...');
+      print('✅ Authentification Google PocketBase réussie !');
+      print('🔐 Utilisateur: ${authData.record.data['email']}');
+      print('🔐 Nom: ${authData.record.data['name']}');
 
-        // Créer un nouvel utilisateur
-        final record = await pb.collection('users').create(body: {
-          'email': testEmail,
-          'name': 'Utilisateur Test',
-          'password': testPassword,
-          'passwordConfirm': testPassword,
-        });
-
-        // Se connecter avec le nouvel utilisateur
-        final authData = await pb.collection('users').authWithPassword(
-              testEmail,
-              testPassword,
-            );
-
-        print('✅ Nouvel utilisateur créé et connecté');
-        return authData.record;
-      }
+      return authData.record;
     } catch (e) {
-      print('❌ Erreur authentification: $e');
+      print('❌ Erreur Google OAuth PocketBase: $e');
       rethrow;
     }
   }

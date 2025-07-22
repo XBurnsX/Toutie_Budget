@@ -116,9 +116,16 @@ class _PageBudgetState extends State<PageBudget> {
             final comptesChequesPretAPlacer = comptesNonArchives
                 .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
                 .toList();
+            print('🔄 PageBudget - AVANT appel lireCategories()');
             return StreamBuilder<List<Categorie>>(
-              stream: FirebaseService().lireCategories(),
+              stream: PocketBaseService.lireCategories(),
               builder: (context, catSnapshot) {
+                print(
+                    '🔄 PageBudget - DANS StreamBuilder catégories - ConnectionState: ${catSnapshot.connectionState}');
+                print(
+                    '🔄 PageBudget - DANS StreamBuilder catégories - hasData: ${catSnapshot.hasData}');
+                print(
+                    '🔄 PageBudget - DANS StreamBuilder catégories - hasError: ${catSnapshot.hasError}');
                 if (!mounted) {
                   return const Center(child: CircularProgressIndicator());
                 }

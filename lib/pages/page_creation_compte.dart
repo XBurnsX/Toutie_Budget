@@ -9,6 +9,7 @@ import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
+import '../services/pocketbase_service.dart';
 
 /// Page de création d'un nouveau compte bancaire, carte de crédit ou investissement
 class PageCreationCompte extends StatefulWidget {
@@ -227,7 +228,7 @@ class _PageCreationCompteState extends State<PageCreationCompte> {
                       dateCreation: DateTime.now(),
                       estArchive: false,
                     );
-                    await FirebaseService().ajouterCompte(compte);
+                    await PocketBaseService.ajouterCompte(compte);
                   }
                   Navigator.of(context).pop();
                 },

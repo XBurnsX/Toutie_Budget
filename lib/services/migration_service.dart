@@ -1,4 +1,4 @@
-// 📁 Chemin : lib/services/migration_service.dart
+/*// 📁 Chemin : lib/services/migration_service.dart
 // 🔗 Dépendances : firebase_service.dart, pocketbase_service.dart, pocketbase_config.dart
 // 📋 Description : Service de migration complet Firebase → PocketBase avec logique métier
 
@@ -1272,3 +1272,4 @@ class MigrationService {
     }
   }
 }
+*/

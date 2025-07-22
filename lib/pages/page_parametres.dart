@@ -12,7 +12,6 @@ import 'page_archivage.dart';
 import 'page_import_csv.dart';
 import 'page_debug_cache.dart';
 import 'page_firebase_monitor.dart';
-import 'page_test_pocketbase.dart';
 
 import '../themes/dropdown_theme_extension.dart';
 
@@ -222,19 +221,6 @@ class _PageParametresState extends State<PageParametres> {
                   if (!mounted) return;
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 }
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.science),
-              title: const Text('Test PocketBase'),
-              subtitle: const Text('Tester la migration vers PocketBase'),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const PageTestPocketBase(),
-                  ),
-                );
               },
             ),
             const Divider(),

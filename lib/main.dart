@@ -207,7 +207,7 @@ class _MyHomePageState extends State<MyHomePage> {
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         print('🔄 MyHomePage - Mise à jour dettes existantes');
-        DetteService().mettreAJourDettesExistantes();
+        //DetteService().mettreAJourDettesExistantes();
         print('✅ MyHomePage - Mise à jour dettes terminée');
       }
     });
