@@ -100,50 +100,63 @@ class Enveloppe {
 
 class Categorie {
   final String id;
-  final String? userId; // Rendu optionnel
+  final String utilisateurId;
   final String nom;
-  final List<Enveloppe> enveloppes;
   final int? ordre;
 
   Categorie({
     required this.id,
-    this.userId, // Rendu optionnel
+    required this.utilisateurId,
     required this.nom,
-    required this.enveloppes,
     this.ordre,
   });
 
   Categorie copyWith({
     String? id,
-    String? userId,
+    String? utilisateurId,
     String? nom,
-    List<Enveloppe>? enveloppes,
     int? ordre,
   }) {
     return Categorie(
       id: id ?? this.id,
-      userId: userId ?? this.userId,
+      utilisateurId: utilisateurId ?? this.utilisateurId,
       nom: nom ?? this.nom,
-      enveloppes: enveloppes ?? this.enveloppes,
       ordre: ordre ?? this.ordre,
     );
   }
 
-  Map<String, dynamic> toMap() => {
-        'id': id,
-        'userId': userId,
-        'nom': nom,
-        'enveloppes': enveloppes.map((e) => e.toMap()).toList(),
-        'ordre': ordre,
-      };
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'utilisateur_id': utilisateurId,
+      'nom': nom,
+      'ordre': ordre,
+    };
+  }
 
-  factory Categorie.fromMap(Map<String, dynamic> map) => Categorie(
-        id: map['id'] ?? '',
-        userId: map['userId'], // Lecture du champ optionnel
-        nom: map['nom'] ?? '',
-        enveloppes: (map['enveloppes'] as List<dynamic>? ?? [])
-            .map((e) => Enveloppe.fromMap(e as Map<String, dynamic>))
-            .toList(),
-        ordre: map['ordre'],
-      );
+  factory Categorie.fromMap(Map<String, dynamic> map) {
+    return Categorie(
+      id: map['id'] ?? '',
+      utilisateurId: map['utilisateur_id'] ?? '',
+      nom: map['nom'] ?? '',
+      ordre: map['ordre'],
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Categorie{id: $id, nom: $nom, utilisateurId: $utilisateurId, ordre: $ordre}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Categorie && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
+  // Getter de compatibilité pour l'ancien code
+  String? get userId => utilisateurId;
 }
