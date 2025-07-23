@@ -3,7 +3,7 @@ class Enveloppe {
   final String utilisateurId;
   final String categorieId;
   final String nom;
-  final DateTime? objectifDate;
+  final int? objectifDate; // Jour du mois (ex: 22 = chaque 22 du mois)
   final String frequenceObjectif;
   final String compteProvenanceId;
   final int? ordre;
@@ -31,19 +31,21 @@ class Enveloppe {
 
   factory Enveloppe.fromMap(Map<String, dynamic> map) {
     return Enveloppe(
-      id: map['id'] ?? '',
-      utilisateurId: map['utilisateur_id'] ?? '',
-      categorieId: map['categorie_id'] ?? '',
-      nom: map['nom'] ?? '',
-      objectifDate: map['objectif_date'] != null ? DateTime.parse(map['objectif_date']) : null,
-      frequenceObjectif: map['frequence_objectif'] ?? 'mensuel',
-      compteProvenanceId: map['compte_provenance_id'] ?? '',
+      id: (map['id'] ?? '').toString(),
+      utilisateurId: (map['utilisateur_id'] ?? '').toString(),
+      categorieId: (map['categorie_id'] ?? '').toString(),
+      nom: (map['nom'] ?? '').toString(),
+      objectifDate: map['objectif_date'],
+      frequenceObjectif: (map['frequence_objectif'] ?? 'mensuel').toString(),
+      compteProvenanceId: (map['compte_provenance_id'] ?? '').toString(),
       ordre: map['ordre'],
       soldeEnveloppe: (map['solde_enveloppe'] ?? 0).toDouble(),
       depense: (map['depense'] ?? 0).toDouble(),
       estArchive: map['est_archive'] ?? false,
       objectifMontant: (map['objectif_montant'] ?? 0).toDouble(),
-      moisObjectif: map['moisObjectif'] != null ? DateTime.parse(map['moisObjectif']) : null,
+      moisObjectif: map['moisObjectif'] != null && map['moisObjectif'] is String 
+          ? DateTime.parse(map['moisObjectif']) 
+          : null,
     );
   }
 
@@ -53,7 +55,7 @@ class Enveloppe {
       'utilisateur_id': utilisateurId,
       'categorie_id': categorieId,
       'nom': nom,
-      'objectif_date': objectifDate?.toIso8601String(),
+      'objectif_date': objectifDate,
       'frequence_objectif': frequenceObjectif,
       'compte_provenance_id': compteProvenanceId,
       'ordre': ordre,
@@ -70,7 +72,7 @@ class Enveloppe {
     String? utilisateurId,
     String? categorieId,
     String? nom,
-    DateTime? objectifDate,
+    int? objectifDate,
     String? frequenceObjectif,
     String? compteProvenanceId,
     int? ordre,

@@ -59,16 +59,16 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
           break;
         case 'annuel':
           _objectifType = 'annee';
-          // Pour les objectifs annuels, charger la date de l'objectif
+          // Pour les objectifs annuels, charger le jour du mois de l'objectif
           if (widget.enveloppe.objectifDate != null) {
-            _selectedDate = widget.enveloppe.objectifDate!.toIso8601String();
+            _selectedDate = widget.enveloppe.objectifDate.toString();
           }
           break;
         default:
           _objectifType = 'date';
-          // Pour les objectifs avec date fixe, charger la date de l'objectif
+          // Pour les objectifs avec date fixe, charger le jour du mois de l'objectif
           if (widget.enveloppe.objectifDate != null) {
-            _selectedDate = widget.enveloppe.objectifDate!.toIso8601String();
+            _selectedDate = widget.enveloppe.objectifDate.toString();
           }
       }
     }
@@ -130,7 +130,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       objectifMontant: value,
       objectifDate: (_objectifType == 'date' || _objectifType == 'annee') &&
               _selectedDate != null
-          ? DateTime.parse(_selectedDate!)
+          ? int.parse(_selectedDate!)
           : null,
       frequenceObjectif: _objectifType == 'mois'
           ? 'mensuel'
