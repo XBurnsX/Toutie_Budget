@@ -6,13 +6,13 @@ import 'package:toutie_budget/pages/page_reconciliation.dart';
 import 'package:toutie_budget/pages/page_pret_personnel.dart';
 import 'package:toutie_budget/pages/page_parametres_dettes.dart';
 import 'package:toutie_budget/pages/page_investissement.dart';
-import 'package:toutie_budget/services/firebase_service.dart';
+import 'package:toutie_budget/services/pocketbase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
 import 'package:toutie_budget/models/dette.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/compte.dart';
-import '../services/firebase_monitor_service.dart';
+import '../services/pocketbase_service.dart';
 
 /// Page d'affichage des comptes bancaires et d'investissement
 class PageComptes extends StatelessWidget {
@@ -44,214 +44,141 @@ class PageComptes extends StatelessWidget {
   }
 
   Widget _buildComptesContent(BuildContext context) {
+    return Column(
+      children: [
+        if (!kIsWeb) SizedBox(height: 45),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (!kIsWeb)
+                Text(
+                  'Mes comptes',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PageCreationCompte(),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.add),
+                label: Text('Ajouter'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            children: [
+              // Section Comptes Chèques
+              _buildSectionComptes(
+                context,
+                'Comptes chèques',
+                PocketBaseService.lireComptesChecques(),
+                Colors.blue,
+              ),
+              
+              // Section Cartes de Crédit
+              _buildSectionComptes(
+                context,
+                'Cartes de crédit',
+                PocketBaseService.lireComptesCredits(),
+                Colors.orange,
+              ),
+              
+              // Section Investissements
+              _buildSectionComptes(
+                context,
+                'Investissements',
+                PocketBaseService.lireComptesInvestissement(),
+                Colors.green,
+              ),
+              
+              // Section Dettes (incluant prêts personnels)
+              _buildSectionComptes(
+                context,
+                'Dettes et prêts',
+                PocketBaseService.lireComptesDettes(),
+                Colors.red,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Widget pour construire une section de comptes avec son propre StreamBuilder
+  Widget _buildSectionComptes(
+    BuildContext context,
+    String titre,
+    Stream<List<Compte>> stream,
+    Color couleur,
+  ) {
     return StreamBuilder<List<Compte>>(
-      stream: FirebaseService().lireComptes(),
+      stream: stream,
       builder: (context, snapshot) {
-        print('=== STREAMBUILDER COMPTES ===');
+        print('=== STREAMBUILDER $titre ===');
         print('HasData: ${snapshot.hasData}');
         print('HasError: ${snapshot.hasError}');
         print('Error: ${snapshot.error}');
         print('Data length: ${snapshot.data?.length ?? 0}');
 
-        final comptes =
-            (snapshot.data ?? []).where((c) => c.estArchive == false).toList();
+        final comptes = (snapshot.data ?? [])
+            .where((c) => c.estArchive == false)
+            .toList();
 
-        print('Comptes non archivés: ${comptes.length}');
+        print('$titre non archivés: ${comptes.length}');
         for (var compte in comptes) {
-          print(
-              '- ${compte.nom} (${compte.type}) - Archivé: ${compte.estArchive}');
+          print('- ${compte.nom} (${compte.type}) - Archivé: ${compte.estArchive}');
         }
 
-        // Séparation par type
-        final cheques = comptes.where((c) => c.type == 'Chèque').toList();
-        final credits =
-            comptes.where((c) => c.type == 'Carte de crédit').toList();
-        final dettesManuelles =
-            comptes.where((c) => c.type == 'Dette').toList();
-        final investissements =
-            comptes.where((c) => c.type == 'Investissement').toList();
+        if (comptes.isEmpty) {
+          return SizedBox.shrink(); // Ne rien afficher si pas de comptes
+        }
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!kIsWeb) SizedBox(height: 45),
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (!kIsWeb)
-                    Text(
-                      'Mes comptes',
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const PageCreationCompte(),
-                        ),
-                      );
-                    },
-                    icon: Icon(Icons.add),
-                    label: Text('Ajouter'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: Text(
+                titre,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70,
+                ),
               ),
             ),
-            Expanded(
-              child: ListView(
-                children: [
-                  if (cheques.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Text(
-                        'Comptes chèques',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ),
-                    ...cheques.map(
-                      (compte) =>
-                          _buildCompteCard(compte, Colors.blue, context, true),
-                    ),
-                    SizedBox(height: 24),
-                  ],
-                  if (credits.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Text(
-                        'Cartes de crédit',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ),
-                    ...credits.map(
-                      (compte) => _buildCompteCard(
-                        compte,
-                        Colors.purple,
-                        context,
-                        false,
-                      ),
-                    ),
-                    SizedBox(height: 24),
-                  ],
-                  // Section Dettes - combine les dettes manuelles et les dettes de la collection dettes
-                  StreamBuilder<List<Dette>>(
-                    stream: DetteService().dettesActives(),
-                    builder: (context, dettesSnapshot) {
-                      final dettesActives = dettesSnapshot.data ?? [];
-                      // On récupère les IDs des dettes qui sont déjà gérées comme des comptes manuels
-                      final idsDettesManuelles =
-                          dettesManuelles.map((c) => c.id).toSet();
-
-                      // Filtrer pour n'afficher que les dettes contractées qui ne sont PAS déjà des comptes manuels
-                      final dettesAutomatiques = dettesActives
-                          .where(
-                            (d) =>
-                                d.type == 'dette' &&
-                                !idsDettesManuelles.contains(d.id),
-                          )
-                          .toList();
-
-                      final dettesAfficher = [
-                        ...dettesManuelles,
-                        ...dettesAutomatiques,
-                      ];
-
-                      if (dettesAfficher.isNotEmpty) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
-                              ),
-                              child: Text(
-                                'Dettes',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ),
-                            ...dettesAfficher.map((item) {
-                              if (item is Compte) {
-                                // Dette manuelle (compte)
-                                return _buildCompteCard(
-                                  item,
-                                  Colors.red,
-                                  context,
-                                  false,
-                                );
-                              } else if (item is Dette) {
-                                // Dette de la collection dettes
-                                return _buildDetteCard(item, context);
-                              }
-                              return SizedBox.shrink();
-                            }),
-                            SizedBox(height: 24),
-                          ],
-                        );
-                      }
-                      return SizedBox.shrink();
-                    },
+            ...comptes.map((compte) => CompteCardWidget(
+              compte: compte,
+              defaultColor: couleur,
+              contextParent: context,
+              isCheque: compte.type == 'Chèque',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PageTransactionsCompte(compte: compte),
                   ),
-                  if (investissements.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Text(
-                        'Comptes d\'investissement',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ),
-                    ...investissements.map(
-                      (compte) => _buildCompteCard(
-                        compte,
-                        Colors.green,
-                        context,
-                        false,
-                      ),
-                    ),
-                  ],
-                  if (comptes.isEmpty && (snapshot.data ?? []).isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Center(
-                        child: Text(
-                          'Aucun compte pour le moment.',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                );
+              },
+              onLongPress: () {
+                _afficherMenuCompte(context, compte, compte.type == 'Chèque');
+              },
+            )),
+            SizedBox(height: 16),
           ],
         );
       },
@@ -325,7 +252,7 @@ class PageComptes extends StatelessWidget {
               );
             }
           },
-          onLongPress: () => _showCompteMenu(context, compte, isCheque),
+          onLongPress: () => _afficherMenuCompte(context, compte, isCheque),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -403,7 +330,7 @@ class PageComptes extends StatelessWidget {
     );
   }
 
-  void _showCompteMenu(BuildContext context, Compte compte, bool isCheque) {
+  void _afficherMenuCompte(BuildContext context, Compte compte, bool isCheque) {
     print('=== MENU COMPTE OUVERT ===');
     print('Compte: ${compte.nom}');
     print('Type: ${compte.type}');
@@ -454,7 +381,7 @@ class PageComptes extends StatelessWidget {
                   print('=== BOUTON SUPPRIMER CLIQUÉ ===');
                   print('Compte: ${compte.nom}');
                   Navigator.pop(context);
-                  _confirmDelete(context, compte);
+                  _confirmerSuppression(context, compte);
                 },
               ),
             ],
@@ -464,7 +391,7 @@ class PageComptes extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, Compte compte) {
+  void _confirmerSuppression(BuildContext context, Compte compte) {
     print('=== CONFIRMATION SUPPRESSION ===');
     print('Compte à supprimer: ${compte.nom}');
     print('Type: ${compte.type}');
@@ -494,23 +421,17 @@ class PageComptes extends StatelessWidget {
                   print('Est archivé actuellement: ${compte.estArchive}');
 
                   // Logger la suppression
-                  final user = FirebaseService().auth.currentUser;
-                  final userId = user?.uid ?? 'anonymous';
+                  final pb = await PocketBaseService.instance;
+                  final userId = pb.authStore.model?.id ?? 'anonymous';
                   print('Utilisateur connecté: $userId');
 
-                  FirebaseMonitorService.logWrite(
-                    collection: 'comptes',
-                    document: compte.id,
-                    count: 1,
-                    userId: userId,
-                    details:
-                        'Suppression/archivage du compte: ${compte.nom} (Type: ${compte.type})',
-                  );
+                  // Log de l'archivage (remplace FirebaseMonitorService)
+                  print('🔄 Archivage du compte: ${compte.nom} (Type: ${compte.type})');
 
                   print('Tentative d\'archivage...');
 
                   // Utiliser la même logique d'archivage pour tous les types de comptes
-                  await FirebaseService().updateCompte(compte.id, {
+                  await PocketBaseService.updateCompte(compte.id, {
                     'estArchive': true,
                     'dateSuppression': DateTime.now().toIso8601String(),
                   });

@@ -495,7 +495,7 @@ class _PageBudgetState extends State<PageBudget> {
         ],
       ),
       body: StreamBuilder<List<Compte>>(
-        stream: PocketBaseService.lireComptes(),
+        stream: PocketBaseService.lireTousLesComptes(),
         builder: (context, snapshot) {
           print(
               '🔄 PageBudget - StreamBuilder comptes - ConnectionState: ${snapshot.connectionState}');
