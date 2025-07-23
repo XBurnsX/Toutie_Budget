@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/dette.dart';
 import '../models/categorie.dart';
 import 'firebase_service.dart';
+import 'pocketbase_service.dart';
 
 class DetteService {
   final CollectionReference dettesRef = FirebaseFirestore.instance.collection(
@@ -626,43 +627,28 @@ class DetteService {
                 : 'Dettes';
         categorieDettes = Categorie(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          utilisateurId: user.uid,
           nom: nomCategorie,
-          enveloppes: [],
-          userId: user.uid,
+          ordre: 0,
         );
         await firebaseService.ajouterCategorie(categorieDettes);
       }
 
-      // 3. Créer l'enveloppe pour cette dette
-      final enveloppeId = DateTime.now().millisecondsSinceEpoch.toString();
-
-      // Déterminer l'objectif selon les règles spécifiées
-      Map<String, dynamic> enveloppeData = {
-        'id': enveloppeId,
+      // 4. Ajouter l'enveloppe directement via PocketBase au lieu de passer par la catégorie
+      await PocketBaseService.ajouterEnveloppe({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'nom': dette.nomTiers,
         'solde': 0.0,
         'depense': 0.0,
         'historique': <String, dynamic>{},
         'provenances': <dynamic>[],
-      };
-
-      // À la création initiale, pas d'objectif configuré (sera mis à jour lors de la sauvegarde des paramètres)
-      enveloppeData['objectif'] = 0.0;
-      enveloppeData['frequence_objectif'] = null;
-      enveloppeData['objectif_jour'] = null;
-
-      // 4. Ajouter l'enveloppe à la catégorie
-      final nouvellesEnveloppes = [
-        ...categorieDettes.enveloppes.map((e) => e.toMap()),
-        enveloppeData,
-      ];
+      });
 
       final categorieModifiee = Categorie(
         id: categorieDettes.id,
+        utilisateurId: categorieDettes.utilisateurId,
         nom: categorieDettes.nom,
-        enveloppes:
-            nouvellesEnveloppes.map((e) => Enveloppe.fromMap(e)).toList(),
-        userId: user.uid,
+        ordre: categorieDettes.ordre,
       );
 
       await firebaseService.ajouterCategorie(categorieModifiee);
@@ -691,21 +677,28 @@ class DetteService {
 
       if (categorieDettes == null) return;
 
-      // 2. Trouver et supprimer l'enveloppe correspondante
-      final enveloppesRestantes = categorieDettes.enveloppes
-          .where((env) => env.nom != nomTiersDette)
-          .toList();
+      // 2. Supprimer l'enveloppe correspondante directement via PocketBase
+      final enveloppesData = await PocketBaseService.lireEnveloppesParCategorie(categorieDettes.id);
+      final enveloppeASupprimer = enveloppesData.firstWhere(
+        (env) => env['nom'] == nomTiersDette,
+        orElse: () => <String, dynamic>{},
+      );
+      
+      if (enveloppeASupprimer.isNotEmpty) {
+        await PocketBaseService.supprimerEnveloppe(enveloppeASupprimer['id']);
+      }
 
-      // 3. Si plus d'enveloppes dans la catégorie "Dettes", supprimer la catégorie entière
-      if (enveloppesRestantes.isEmpty) {
+      // 3. Vérifier s'il reste des enveloppes dans la catégorie "Dettes"
+      final enveloppesRestantesData = await PocketBaseService.lireEnveloppesParCategorie(categorieDettes.id);
+      if (enveloppesRestantesData.isEmpty) {
         await firebaseService.supprimerCategorie(categorieDettes.id);
       } else {
         // 4. Sinon, mettre à jour la catégorie avec les enveloppes restantes
         final categorieModifiee = Categorie(
           id: categorieDettes.id,
+          utilisateurId: categorieDettes.utilisateurId,
           nom: categorieDettes.nom,
-          enveloppes: enveloppesRestantes,
-          userId: user.uid,
+          ordre: categorieDettes.ordre,
         );
 
         await firebaseService.ajouterCategorie(categorieModifiee);
@@ -744,13 +737,13 @@ class DetteService {
       }
 
       // 2. Trouver l'enveloppe correspondante
-      final enveloppes =
-          categorieDettes.enveloppes.map((e) => e.toMap()).toList();
-      final indexEnveloppe = enveloppes.indexWhere(
+      final enveloppesData = await PocketBaseService.lireEnveloppesParCategorie(categorieDettes.id);
+      final enveloppe = enveloppesData.firstWhere(
         (env) => env['nom'] == dette.nomTiers,
+        orElse: () => <String, dynamic>{},
       );
 
-      if (indexEnveloppe == -1) {
+      if (enveloppe.isEmpty) {
         throw Exception(
           "Enveloppe '${dette.nomTiers}' non trouvée dans la catégorie 'Dettes'.",
         );
@@ -760,9 +753,12 @@ class DetteService {
           dette.coutTotal != null &&
           dette.dateDebut != null) {
         // Dette manuelle avec coût total → objectif mensuel au jour du début
-        enveloppes[indexEnveloppe]['objectif'] = dette.montantMensuel ?? 0.0;
-        enveloppes[indexEnveloppe]['frequence_objectif'] = 'mensuel';
-        enveloppes[indexEnveloppe]['objectif_jour'] = dette.dateDebut!.day;
+        await PocketBaseService.modifierEnveloppe({
+          'id': enveloppe['id'],
+          'objectif': dette.montantMensuel ?? 0.0,
+          'typeObjectif': 'mensuel',
+          'jourObjectif': dette.dateDebut!.day,
+        });
       } else {
         // Auparavant, cette condition échouait silencieusement. Maintenant, elle lèvera une erreur.
         throw Exception(
@@ -775,9 +771,9 @@ class DetteService {
       // 4. Sauvegarder la catégorie modifiée
       final categorieModifiee = Categorie(
         id: categorieDettes.id,
+        utilisateurId: categorieDettes.utilisateurId,
         nom: categorieDettes.nom,
-        enveloppes: enveloppes.map((e) => Enveloppe.fromMap(e)).toList(),
-        userId: user.uid,
+        ordre: categorieDettes.ordre,
       );
 
       await firebaseService.ajouterCategorie(categorieModifiee);

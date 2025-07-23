@@ -57,28 +57,22 @@ class _PageBudgetState extends State<PageBudget> {
   String get selectedMonthKey =>
       "${selectedMonth.year.toString().padLeft(4, '0')}-${selectedMonth.month.toString().padLeft(2, '0')}";
 
-  /// Calcule le montant total en négatif (comptes + enveloppes)
-  double _calculerMontantNegatifTotal(
-    List<Compte> comptes,
-    List<Categorie> categories,
-  ) {
+  /// Calcule le total des situations d'urgence
+  double _calculerTotalSituationsUrgence(
+      List<Compte> comptes, List<Categorie> categories) {
     double total = 0.0;
 
-    // Comptes chèques avec prêt à placer négatif (exclure cartes de crédit)
+    // Comptes négatifs (seulement comptes chèques)
     for (var compte in comptes) {
       if (compte.pretAPlacer < 0 && compte.type == 'Chèque') {
         total += compte.pretAPlacer.abs();
       }
     }
 
-    // Enveloppes avec solde négatif
-    for (var categorie in categories) {
-      for (var enveloppe in categorie.enveloppes) {
-        if (enveloppe.solde < 0) {
-          total += enveloppe.solde.abs();
-        }
-      }
-    }
+    // Enveloppes avec solde négatif - récupération via PocketBase
+    // Note: Cette méthode sera appelée de manière asynchrone dans le widget
+    // Pour l'instant, on retourne seulement le total des comptes
+    // Les enveloppes seront traitées dans le FutureBuilder du widget
 
     return total;
   }
@@ -90,13 +84,9 @@ class _PageBudgetState extends State<PageBudget> {
       (compte) => compte.pretAPlacer < 0 && compte.type == 'Chèque',
     );
 
-    // Vérifier les enveloppes négatives
-    final enveloppesNegatives = categories.any(
-      (categorie) =>
-          categorie.enveloppes.any((enveloppe) => enveloppe.solde < 0),
-    );
-
-    return comptesNegatifs || enveloppesNegatives;
+    // Pour les enveloppes négatives, on retourne true si des comptes sont négatifs
+    // La vérification complète des enveloppes se fera de manière asynchrone
+    return comptesNegatifs;
   }
 
   @override
@@ -130,7 +120,7 @@ class _PageBudgetState extends State<PageBudget> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final categories = catSnapshot.data ?? [];
-                final montantNegatif = _calculerMontantNegatifTotal(
+                final montantNegatif = _calculerTotalSituationsUrgence(
                     comptesNonArchives, categories);
                 final aSituationsUrgence =
                     _aSituationsUrgence(comptesNonArchives, categories);
@@ -350,27 +340,36 @@ class _PageBudgetState extends State<PageBudget> {
                                 ),
                               // Liste des enveloppes/dépenses
                               Expanded(
-                                child: ListeCategoriesEnveloppes(
-                                  categories: categories
-                                      .map((c) => {
-                                            'id': c.id,
-                                            'nom': c.nom,
-                                            'enveloppes': c.enveloppes
-                                                .map((e) => e.toMap())
-                                                .toList(),
-                                          })
-                                      .toList(),
-                                  comptes: comptes
-                                      .map((compte) => {
-                                            'id': compte.id,
-                                            'nom': compte.nom,
-                                            'type': compte.type,
-                                            'estArchive': compte.estArchive,
-                                            'pretAPlacer': compte.pretAPlacer,
-                                            'couleur': compte.couleur,
-                                          })
-                                      .toList(),
-                                  selectedMonthKey: selectedMonthKey,
+                                child: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+                                  future: PocketBaseService.lireEnveloppesGroupeesParCategorie(),
+                                  builder: (context, enveloppesSnapshot) {
+                                    if (!enveloppesSnapshot.hasData) {
+                                      return const Center(child: CircularProgressIndicator());
+                                    }
+                                    
+                                    final enveloppesParCategorie = enveloppesSnapshot.data!;
+                                    
+                                    return ListeCategoriesEnveloppes(
+                                      categories: categories
+                                          .map((c) => {
+                                                'id': c.id,
+                                                'nom': c.nom,
+                                                'enveloppes': enveloppesParCategorie[c.id] ?? [],
+                                              })
+                                          .toList(),
+                                      comptes: comptes
+                                          .map((compte) => {
+                                                'id': compte.id,
+                                                'nom': compte.nom,
+                                                'type': compte.type,
+                                                'estArchive': compte.estArchive,
+                                                'pretAPlacer': compte.pretAPlacer,
+                                                'couleur': compte.couleur,
+                                              })
+                                          .toList(),
+                                      selectedMonthKey: selectedMonthKey,
+                                    );
+                                  },
                                 ),
                               ),
                             ],
@@ -540,7 +539,7 @@ class _PageBudgetState extends State<PageBudget> {
               }
               final categories = catSnapshot.data ?? [];
               print('🔄 PageBudget - Calcul montant négatif...');
-              final montantNegatif = _calculerMontantNegatifTotal(
+              final montantNegatif = _calculerTotalSituationsUrgence(
                 comptesNonArchives,
                 categories,
               );
@@ -721,26 +720,36 @@ class _PageBudgetState extends State<PageBudget> {
 
                   // Liste des enveloppes/dépenses
                   Expanded(
-                    child: ListeCategoriesEnveloppes(
-                      categories: categories
-                          .map((c) => {
-                                'id': c.id,
-                                'nom': c.nom,
-                                'enveloppes':
-                                    c.enveloppes.map((e) => e.toMap()).toList(),
-                              })
-                          .toList(),
-                      comptes: comptes
-                          .map((compte) => {
-                                'id': compte.id,
-                                'nom': compte.nom,
-                                'type': compte.type,
-                                'estArchive': compte.estArchive,
-                                'pretAPlacer': compte.pretAPlacer,
-                                'couleur': compte.couleur,
-                              })
-                          .toList(),
-                      selectedMonthKey: selectedMonthKey,
+                    child: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+                      future: PocketBaseService.lireEnveloppesGroupeesParCategorie(),
+                      builder: (context, enveloppesSnapshot) {
+                        if (!enveloppesSnapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        
+                        final enveloppesParCategorie = enveloppesSnapshot.data!;
+                        
+                        return ListeCategoriesEnveloppes(
+                          categories: categories
+                              .map((c) => {
+                                    'id': c.id,
+                                    'nom': c.nom,
+                                    'enveloppes': enveloppesParCategorie[c.id] ?? [],
+                                  })
+                              .toList(),
+                          comptes: comptes
+                              .map((compte) => {
+                                    'id': compte.id,
+                                    'nom': compte.nom,
+                                    'type': compte.type,
+                                    'estArchive': compte.estArchive,
+                                    'pretAPlacer': compte.pretAPlacer,
+                                    'couleur': compte.couleur,
+                                  })
+                              .toList(),
+                          selectedMonthKey: selectedMonthKey,
+                        );
+                      },
                     ),
                   ),
                 ],

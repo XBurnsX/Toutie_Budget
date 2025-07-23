@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
+import '../models/enveloppe.dart';
 import '../services/argent_service.dart';
 import '../services/firebase_service.dart';
 import '../services/color_service.dart';
 import '../services/cache_service.dart';
+import '../services/persistent_cache_service.dart';
+import '../services/pocketbase_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../services/persistent_cache_service.dart';
 
 class PageVirerArgent extends StatefulWidget {
   const PageVirerArgent({
@@ -434,156 +436,161 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                 return const Center(child: CircularProgressIndicator());
               }
               final comptes = comptesSnapshot.data!;
-              final enveloppes =
-                  catSnapshot.data!.expand((cat) => cat.enveloppes).toList();
+              return FutureBuilder<List<Map<String, dynamic>>>(
+                future: PocketBaseService.lireToutesEnveloppes(),
+                builder: (context, enveloppesSnapshot) {
+                  if (!enveloppesSnapshot.hasData) return Container();
+                  final enveloppes = enveloppesSnapshot.data!.map((data) => Enveloppe.fromMap(data)).toList();
 
-              // Vérification des données
-              if (catSnapshot.data!.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'Aucune catégorie trouvée. Vérifiez votre connexion.',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                );
-              }
-
-              // Filtrer les comptes pour exclure les types 'Dette' et 'Investissement'
-              final comptesFilters = comptes
-                  .where(
-                    (compte) =>
-                        !compte.estArchive &&
-                        compte.type != 'Dette' &&
-                        compte.type != 'Investissement',
-                  )
-                  .toList()
-                ..sort(
-                    (a, b) => (a.ordre ?? 999999).compareTo(b.ordre ?? 999999));
-
-              final tout = [...comptesFilters, ...enveloppes];
-              if (tout.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'Aucun compte ou enveloppe disponible',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                );
-              }
-
-              // Mettre à jour les objets source et destination
-              _updateObjectsFromSelection(tout);
-
-              return Column(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Text(
-                          _montantController.text.isEmpty
-                              ? '0,00 \$'
-                              : '${_montantController.text} \$',
-                          style: const TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                          ),
-                        ),
+                  // Vérification des données
+                  if (catSnapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Aucune catégorie trouvée. Vérifiez votre connexion.',
+                        style: TextStyle(color: Colors.red),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 0,
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: sourceId,
-                              hint: const Text('Sélectionner une source'),
-                              items: _buildDropdownItems(tout, destinationId,
-                                  catSnapshot.data!, comptes),
-                              onChanged: (val) => setState(() {
-                                sourceId = val;
-                                source = getSelectedById(val, tout);
-                              }),
+                    );
+                  }
+
+                  // Filtrer les comptes pour exclure les types 'Dette' et 'Investissement'
+                  final comptesFilters = comptes
+                      .where(
+                        (compte) =>
+                            !compte.estArchive &&
+                            compte.type != 'Dette' &&
+                            compte.type != 'Investissement',
+                      )
+                      .toList()
+                    ..sort(
+                        (a, b) => (a.ordre ?? 999999).compareTo(b.ordre ?? 999999));
+
+                  final tout = [...comptesFilters, ...enveloppes];
+                  if (tout.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Aucun compte ou enveloppe disponible',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  // Mettre à jour les objets source et destination
+                  _updateObjectsFromSelection(tout);
+
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Text(
+                              _montantController.text.isEmpty
+                                  ? '0,00 \$'
+                                  : '${_montantController.text} \$',
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
                             ),
                           ),
                         ),
-                        if (sourceId != null) const SizedBox.shrink(),
-                        const SizedBox(height: 12),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(4),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 0,
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: sourceId,
+                                  hint: const Text('Sélectionner une source'),
+                                  items: _buildDropdownItems(tout, destinationId,
+                                      catSnapshot.data!, comptes),
+                                  onChanged: (val) => setState(() {
+                                    sourceId = val;
+                                    source = getSelectedById(val, tout);
+                                  }),
+                                ),
+                              ),
+                            ),
+                            if (sourceId != null) const SizedBox.shrink(),
+                            const SizedBox(height: 12),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: destinationId,
+                                  hint: const Text('Sélectionner une destination'),
+                                  items: _buildDropdownItems(
+                                      tout, sourceId, catSnapshot.data!, comptes),
+                                  onChanged: (val) => setState(() {
+                                    destinationId = val;
+                                    destination = getSelectedById(val, tout);
+                                  }),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: NumericKeyboard(
+                          controller: _montantController,
+                          onValueChanged: (value) {
+                            setState(() {
+                              _montantController.text =
+                                  value.replaceAll('\$', '').replaceAll(' ', '');
+                            });
+                          },
+                          showDecimal: true,
+                          showDone: false,
+                        ),
+                      ),
+                      // Bouton Virer ajouté
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        child: ElevatedButton(
+                          onPressed: _peutVirer() ? _effectuerVirement : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: destinationId,
-                              hint: const Text('Sélectionner une destination'),
-                              items: _buildDropdownItems(
-                                  tout, sourceId, catSnapshot.data!, comptes),
-                              onChanged: (val) => setState(() {
-                                destinationId = val;
-                                destination = getSelectedById(val, tout);
-                              }),
+                          child: const Text(
+                            'Virer',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: NumericKeyboard(
-                      controller: _montantController,
-                      onValueChanged: (value) {
-                        setState(() {
-                          _montantController.text =
-                              value.replaceAll('\$', '').replaceAll(' ', '');
-                        });
-                      },
-                      showDecimal: true,
-                      showDone: false,
-                    ),
-                  ),
-                  // Bouton Virer ajouté
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    child: ElevatedButton(
-                      onPressed: _peutVirer() ? _effectuerVirement : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
-                      child: const Text(
-                        'Virer',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               );
             } catch (e, stack) {
               return Center(
@@ -696,12 +703,12 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   // Fonction pour obtenir le nom de la catégorie d'une enveloppe
   String _getNomCategorieEnveloppe(
       Enveloppe enveloppe, List<Categorie> categories) {
-    for (var categorie in categories) {
-      if (categorie.enveloppes.any((e) => e.id == enveloppe.id)) {
-        return categorie.nom;
-      }
-    }
-    return 'Catégorie inconnue';
+    // Utiliser le categorieId de l'enveloppe pour trouver la catégorie
+    final categorie = categories.firstWhere(
+      (cat) => cat.id == enveloppe.categorieId,
+      orElse: () => Categorie(id: '', utilisateurId: '', nom: 'Catégorie inconnue', ordre: 0),
+    );
+    return categorie.nom;
   }
 
   // Fonctions utilitaires pour l'affichage

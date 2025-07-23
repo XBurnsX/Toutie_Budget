@@ -9,7 +9,6 @@ import 'package:toutie_budget/services/theme_service.dart';
 
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
-import 'page_import_csv.dart';
 import 'page_debug_cache.dart';
 import 'page_firebase_monitor.dart';
 
@@ -165,21 +164,6 @@ class _PageParametresState extends State<PageParametres> {
                   },
                 ),
               ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.upload_file),
-              title: const Text('Importer des transactions'),
-              subtitle: const Text(
-                'Importer des transactions depuis un fichier CSV',
-              ),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const PageImportCsv(),
-                  ),
-                );
-              },
             ),
             const Divider(),
             ListTile(

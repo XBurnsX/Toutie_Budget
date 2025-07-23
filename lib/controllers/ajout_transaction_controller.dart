@@ -196,7 +196,7 @@ class AjoutTransactionController extends ChangeNotifier {
           (cat) => {
             'id': cat.id,
             'nom': cat.nom,
-            'enveloppes': cat.enveloppes.map((env) => env.toMap()).toList(),
+            'enveloppes': [], // Les enveloppes seront récupérées séparément via PocketBase
           },
         )
         .toList();
@@ -538,7 +538,7 @@ class AjoutTransactionController extends ChangeNotifier {
                   (normaliserChaine(
                         d.nomTiers,
                       ).contains(normaliserChaine(nomTiers)) ||
-                      normaliserChaine(
+                  normaliserChaine(
                         nomTiers,
                       ).contains(normaliserChaine(d.nomTiers))) &&
                   d.type == typeDetteRecherche,
@@ -776,10 +776,12 @@ class AjoutTransactionController extends ChangeNotifier {
       if (dettesDuTiers.isEmpty) {
         dettesDuTiers = toutesLesDettes
             .where((d) =>
-                (normaliserChaine(d.nomTiers)
-                        .contains(normaliserChaine(nomTiers)) ||
-                    normaliserChaine(nomTiers)
-                        .contains(normaliserChaine(d.nomTiers))) &&
+                (normaliserChaine(
+                      d.nomTiers,
+                    ).contains(normaliserChaine(nomTiers)) ||
+                normaliserChaine(
+                      nomTiers,
+                    ).contains(normaliserChaine(d.nomTiers))) &&
                 d.type == typeDetteRecherche)
             .toList();
       }

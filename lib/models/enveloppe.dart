@@ -19,13 +19,13 @@ class Enveloppe {
     required this.categorieId,
     required this.nom,
     this.objectifDate,
-    required this.frequenceObjectif,
-    required this.compteProvenanceId,
+    this.frequenceObjectif = 'mensuel',
+    this.compteProvenanceId = '',
     this.ordre,
     required this.soldeEnveloppe,
-    required this.depense,
-    required this.estArchive,
-    required this.objectifMontant,
+    this.depense = 0.0,
+    this.estArchive = false,
+    this.objectifMontant = 0.0,
     this.moisObjectif,
   });
 

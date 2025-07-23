@@ -14,6 +14,7 @@ import 'package:toutie_budget/services/dette_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'models/categorie.dart';
+import 'models/enveloppe.dart';
 import 'pages/page_budget.dart';
 import 'pages/page_statistiques.dart';
 import 'pages/page_set_objectif.dart';

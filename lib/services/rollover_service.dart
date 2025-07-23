@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'firebase_service.dart';
+import 'pocketbase_service.dart';
+import '../models/enveloppe.dart';
 
 class RolloverService {
   final FirebaseService _firebaseService = FirebaseService();
@@ -34,7 +36,11 @@ class RolloverService {
       bool categoryUpdated = false;
       final List<Map<String, dynamic>> updatedEnveloppes = [];
 
-      for (var enveloppe in categorie.enveloppes) {
+      // Récupérer les enveloppes de cette catégorie via PocketBase
+      final enveloppesData = await PocketBaseService.lireEnveloppesParCategorie(categorie.id);
+      final enveloppes = enveloppesData.map((data) => Enveloppe.fromMap(data)).toList();
+
+      for (var enveloppe in enveloppes) {
         final Map<String, dynamic> envMap = enveloppe.toMap();
 
         double soldeToRollover = (envMap['solde'] as num?)?.toDouble() ?? 0.0;
@@ -87,7 +93,11 @@ class RolloverService {
       bool categoryUpdated = false;
       final List<Map<String, dynamic>> updatedEnveloppes = [];
 
-      for (var enveloppe in categorie.enveloppes) {
+      // Récupérer les enveloppes de cette catégorie via PocketBase
+      final enveloppesData = await PocketBaseService.lireEnveloppesParCategorie(categorie.id);
+      final enveloppes = enveloppesData.map((data) => Enveloppe.fromMap(data)).toList();
+
+      for (var enveloppe in enveloppes) {
         if (enveloppe.frequenceObjectif.toLowerCase() != 'bihebdo') {
           updatedEnveloppes.add(enveloppe.toMap());
           continue;
@@ -154,7 +164,11 @@ class RolloverService {
       bool catUpdated = false;
       final List<Map<String, dynamic>> updatedEnveloppes = [];
 
-      for (var enveloppe in categorie.enveloppes) {
+      // Récupérer les enveloppes de cette catégorie via PocketBase
+      final enveloppesData = await PocketBaseService.lireEnveloppesParCategorie(categorie.id);
+      final enveloppes = enveloppesData.map((data) => Enveloppe.fromMap(data)).toList();
+
+      for (var enveloppe in enveloppes) {
         if (enveloppe.frequenceObjectif.toLowerCase() != 'annuel') {
           updatedEnveloppes.add(enveloppe.toMap());
           continue;

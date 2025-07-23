@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/categorie.dart';
-import '../services/firebase_service.dart';
+import '../models/enveloppe.dart';
+import '../services/pocketbase_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
 
@@ -21,9 +22,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
   late TextEditingController _controller;
   String? _errorText;
   String _objectifType = 'mois'; // Ajout de la variable d'état
-  DateTime? _selectedDate;
+  String? _selectedDate;
   int? _objectifJour;
-  DateTime? _bihebdoStartDate; // Date de départ pour le cycle bi-hebdo
+  String? _bihebdoStartDate; // Date de départ pour le cycle bi-hebdo
   // Liste fixe des jours de la semaine (1 = lundi, 7 = dimanche)
   static const List<String> _joursSemaine = [
     'Lundi',
@@ -45,8 +46,6 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     _controller = TextEditingController(
       text: _currentObjectif > 0 ? _currentObjectif.toStringAsFixed(2) : '',
     );
-    _objectifJour = widget.enveloppe.objectifJour;
-    _bihebdoStartDate = widget.enveloppe.dateDernierAjout;
 
     // Définir le type d'objectif basé sur l'enveloppe existante
     if (_currentObjectif > 0) {
@@ -56,20 +55,20 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
           break;
         case 'bihebdo':
           _objectifType = '2sem';
-          _bihebdoStartDate ??= DateTime.now();
+          _bihebdoStartDate ??= DateTime.now().toString();
           break;
         case 'annuel':
           _objectifType = 'annee';
           // Pour les objectifs annuels, charger la date de l'objectif
           if (widget.enveloppe.objectifDate != null) {
-            _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
+            _selectedDate = widget.enveloppe.objectifDate!.toIso8601String();
           }
           break;
         default:
           _objectifType = 'date';
           // Pour les objectifs avec date fixe, charger la date de l'objectif
           if (widget.enveloppe.objectifDate != null) {
-            _selectedDate = DateTime.tryParse(widget.enveloppe.objectifDate!);
+            _selectedDate = widget.enveloppe.objectifDate!.toIso8601String();
           }
       }
     }
@@ -127,18 +126,12 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
       });
       return;
     }
-    final updatedEnv = Enveloppe(
-      id: widget.enveloppe.id,
-      nom: widget.enveloppe.nom,
-      solde: widget.enveloppe.solde,
-      objectif: value,
+    final updatedEnv = widget.enveloppe.copyWith(
+      objectifMontant: value,
       objectifDate: (_objectifType == 'date' || _objectifType == 'annee') &&
               _selectedDate != null
-          ? _selectedDate!.toIso8601String()
+          ? DateTime.parse(_selectedDate!)
           : null,
-      depense: widget.enveloppe.depense,
-      archivee: widget.enveloppe.archivee,
-      provenanceCompteId: widget.enveloppe.provenanceCompteId,
       frequenceObjectif: _objectifType == 'mois'
           ? 'mensuel'
           : _objectifType == '2sem'
@@ -146,19 +139,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
               : _objectifType == 'annee'
                   ? 'annuel'
                   : 'date',
-      dateDernierAjout: _objectifType == '2sem'
-          ? _bihebdoStartDate ?? widget.enveloppe.dateDernierAjout
-          : widget.enveloppe.dateDernierAjout,
-      objectifJour: _objectifJour,
     );
-    // Mise à jour de la liste d'enveloppes dans la catégorie
-    final updatedEnvs = widget.categorie.enveloppes
-        .map((e) => e.id == updatedEnv.id ? updatedEnv : e)
-        .toList();
-    await FirebaseService()
-        .categoriesRef
-        .doc(widget.categorie.id)
-        .update({'enveloppes': updatedEnvs.map((e) => e.toMap()).toList()});
+    // Mettre à jour l'enveloppe directement dans PocketBase au lieu de passer par la catégorie
+    await PocketBaseService.mettreAJourEnveloppe(updatedEnv.id, updatedEnv.toMap());
 
     // Mettre à jour l'objectif local pour que l'affichage change
     setState(() {
@@ -194,29 +177,14 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
     if (shouldDelete != true) return;
 
     // Créer une enveloppe sans objectif
-    final updatedEnv = Enveloppe(
-      id: widget.enveloppe.id,
-      nom: widget.enveloppe.nom,
-      solde: widget.enveloppe.solde,
-      objectif: 0.0, // Objectif remis à 0
+    final updatedEnv = widget.enveloppe.copyWith(
+      objectifMontant: 0.0, // Objectif remis à 0
       objectifDate: null, // Pas de date d'objectif
-      depense: widget.enveloppe.depense,
-      archivee: widget.enveloppe.archivee,
-      provenanceCompteId: widget.enveloppe.provenanceCompteId,
       frequenceObjectif: 'mensuel', // Retour à la valeur par défaut
-      dateDernierAjout: widget.enveloppe.dateDernierAjout,
-      objectifJour: null, // Pas de jour d'objectif
     );
 
-    // Mise à jour de la liste d'enveloppes dans la catégorie
-    final updatedEnvs = widget.categorie.enveloppes
-        .map((e) => e.id == updatedEnv.id ? updatedEnv : e)
-        .toList();
-
-    await FirebaseService()
-        .categoriesRef
-        .doc(widget.categorie.id)
-        .update({'enveloppes': updatedEnvs.map((e) => e.toMap()).toList()});
+    // Mettre à jour l'enveloppe directement dans PocketBase au lieu de passer par la catégorie
+    await PocketBaseService.mettreAJourEnveloppe(updatedEnv.id, updatedEnv.toMap());
 
     // Mettre à jour l'état local
     setState(() {
@@ -309,7 +277,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                         onPressed: () {
                           setState(() {
                             _objectifType = 'date';
-                            _selectedDate ??= DateTime.now();
+                            _selectedDate ??= DateTime.now().toString();
                           });
                         },
                         style: ElevatedButton.styleFrom(
@@ -329,7 +297,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                         onPressed: () {
                           setState(() {
                             _objectifType = 'annee';
-                            _selectedDate ??= DateTime.now();
+                            _selectedDate ??= DateTime.now().toString();
                           });
                         },
                         style: ElevatedButton.styleFrom(
@@ -353,7 +321,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
-                    initialDate: _selectedDate ?? DateTime.now(),
+                    initialDate: _selectedDate != null
+                        ? DateTime.parse(_selectedDate!)
+                        : DateTime.now(),
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(
                       const Duration(days: 365 * 10),
@@ -362,7 +332,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                   );
                   if (picked != null) {
                     setState(() {
-                      _selectedDate = picked;
+                      _selectedDate = picked.toString();
                     });
                   }
                 },
@@ -389,7 +359,7 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       const SizedBox(width: 10),
                       Text(
                         _selectedDate != null
-                            ? '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}'
+                            ? _selectedDate!
                             : 'Choisir une date',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.secondary,
@@ -453,7 +423,9 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                     onPressed: () async {
                       final picked = await showDatePicker(
                         context: context,
-                        initialDate: _bihebdoStartDate ?? DateTime.now(),
+                        initialDate: _bihebdoStartDate != null
+                            ? DateTime.parse(_bihebdoStartDate!)
+                            : DateTime.now(),
                         firstDate:
                             DateTime.now().subtract(const Duration(days: 365)),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
@@ -461,13 +433,13 @@ class _PageSetObjectifState extends State<PageSetObjectif> {
                       );
                       if (picked != null) {
                         setState(() {
-                          _bihebdoStartDate = picked;
+                          _bihebdoStartDate = picked.toString();
                         });
                       }
                     },
                     child: Text(
                       _bihebdoStartDate != null
-                          ? '${_bihebdoStartDate!.day.toString().padLeft(2, '0')}/${_bihebdoStartDate!.month.toString().padLeft(2, '0')}/${_bihebdoStartDate!.year}'
+                          ? _bihebdoStartDate!
                           : 'Choisir la date',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.secondary,

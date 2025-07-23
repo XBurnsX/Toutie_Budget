@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:toutie_budget/services/firebase_service.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
+import '../models/enveloppe.dart';
+import '../services/pocketbase_service.dart';
 
 class PageArchivage extends StatefulWidget {
   const PageArchivage({super.key});
@@ -54,7 +55,7 @@ class _PageArchivageState extends State<PageArchivage>
 
   Widget _buildComptesArchives() {
     return StreamBuilder<List<Compte>>(
-      stream: FirebaseService().lireComptes(),
+      stream: PocketBaseService.lireComptes(),
       builder: (context, snapshot) {
         final archives =
             (snapshot.data ?? []).where((c) => c.estArchive == true).toList();
@@ -89,7 +90,7 @@ class _PageArchivageState extends State<PageArchivage>
                       icon: const Icon(Icons.restore, color: Colors.green),
                       tooltip: 'Restaurer',
                       onPressed: () async {
-                        await FirebaseService().updateCompte(compte.id, {
+                        await PocketBaseService.updateCompte(compte.id, {
                           'estArchive': false,
                           'dateSuppression': null,
                         });
@@ -108,7 +109,7 @@ class _PageArchivageState extends State<PageArchivage>
                                   title: const Text('Restaurer'),
                                   onTap: () async {
                                     Navigator.pop(context);
-                                    await FirebaseService().updateCompte(
+                                    await PocketBaseService.updateCompte(
                                       compte.id,
                                       {
                                         'estArchive': false,
@@ -134,7 +135,7 @@ class _PageArchivageState extends State<PageArchivage>
 
   Widget _buildEnveloppesArchives() {
     return StreamBuilder<List<Categorie>>(
-      stream: FirebaseService().lireCategories(),
+      stream: PocketBaseService.lireCategories(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -148,50 +149,76 @@ class _PageArchivageState extends State<PageArchivage>
           );
         }
 
-        final enveloppesArchivees = <Map<String, dynamic>>[];
-        for (final cat in snapshot.data!) {
-          for (final env in cat.enveloppes) {
-            if (env.archivee == true) {
-              enveloppesArchivees.add({
-                'categorie': cat.nom,
-                'enveloppe': env,
-                'categorieId': cat.id,
-              });
+        // Utiliser FutureBuilder pour gérer l'appel asynchrone
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: PocketBaseService.lireToutesEnveloppes(),
+          builder: (context, enveloppesSnapshot) {
+            if (enveloppesSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
             }
-          }
-        }
-
-        if (enveloppesArchivees.isEmpty) {
-          return const Center(
-            child: Text(
-              'Aucune enveloppe archivée',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
-        }
-
-        return ListView(
-          children: enveloppesArchivees.map((item) {
-            final Enveloppe enveloppe = item['enveloppe'];
-            return Card(
-              color: const Color(0xFF232526),
-              child: ListTile(
-                leading: const Icon(Icons.archive, color: Colors.grey),
-                title: Text(enveloppe.nom),
-                subtitle: Text('Catégorie : ${item['categorie']}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.restore, color: Colors.green),
-                  tooltip: 'Restaurer',
-                  onPressed: () async {
-                    await FirebaseService().restaurerEnveloppe(
-                      item['categorieId'],
-                      enveloppe.id,
-                    );
-                  },
+            
+            if (!enveloppesSnapshot.hasData) {
+              return const Center(
+                child: Text(
+                  'Erreur lors du chargement des enveloppes',
+                  style: TextStyle(color: Colors.white54),
                 ),
-              ),
+              );
+            }
+
+            final enveloppesArchivees = <Map<String, dynamic>>[];
+            final toutesEnveloppes = enveloppesSnapshot.data!;
+            
+            for (final cat in snapshot.data!) {
+              // Filtrer les enveloppes de cette catégorie
+              final enveloppesDeCetteCategorie = toutesEnveloppes
+                  .where((env) => env['categorie_id'] == cat.id)
+                  .toList();
+                  
+              for (final envData in enveloppesDeCetteCategorie) {
+                if (envData['est_archive'] == true) {
+                  enveloppesArchivees.add({
+                    'categorie': cat.nom,
+                    'enveloppe': envData,
+                    'categorieId': cat.id,
+                  });
+                }
+              }
+            }
+
+            if (enveloppesArchivees.isEmpty) {
+              return const Center(
+                child: Text(
+                  'Aucune enveloppe archivée',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              );
+            }
+
+            return ListView(
+              children: enveloppesArchivees.map((item) {
+                final enveloppeData = item['enveloppe'] as Map<String, dynamic>;
+                final enveloppe = Enveloppe.fromMap(enveloppeData);
+                return Card(
+                  color: const Color(0xFF232526),
+                  child: ListTile(
+                    leading: const Icon(Icons.archive, color: Colors.grey),
+                    title: Text(enveloppe.nom),
+                    subtitle: Text('Catégorie : ${item['categorie']}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.restore, color: Colors.green),
+                      tooltip: 'Restaurer',
+                      onPressed: () async {
+                        await PocketBaseService.restaurerEnveloppe(
+                          enveloppe.id,
+                        );
+                      },
+                    ),
+                  ),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         );
       },
     );

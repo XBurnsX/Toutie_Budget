@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/categorie.dart';
+import '../models/enveloppe.dart';
+import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/cache_service.dart';
+import '../services/pocketbase_service.dart';
 import 'page_set_objectif.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -179,47 +182,39 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       newIndex -= 1;
     }
 
-    // Trouver l'index de la catégorie dans la liste principale
-    final categorieIndex = _categories.indexWhere((c) => c.id == categorie.id);
-    if (categorieIndex == -1) return;
+    // Pour réorganiser les enveloppes, on doit d'abord les récupérer via PocketBase
+    final enveloppesData = await PocketBaseService.lireEnveloppesParCategorie(categorie.id);
+    final enveloppes = enveloppesData.map((data) => Enveloppe.fromMap(data)).toList();
 
     // Créer une nouvelle liste d'enveloppes avec le nouvel ordre
-    final newEnveloppes = List<Enveloppe>.from(categorie.enveloppes);
+    final newEnveloppes = List<Enveloppe>.from(enveloppes);
     final item = newEnveloppes.removeAt(oldIndex);
     newEnveloppes.insert(newIndex, item);
 
     // Mettre à jour l'ordre des enveloppes
     final updatedEnveloppes = newEnveloppes.asMap().entries.map((entry) {
       final enveloppe = entry.value;
-      return Enveloppe(
-        id: enveloppe.id,
-        nom: enveloppe.nom,
-        objectif: enveloppe.objectif,
-        solde: enveloppe.solde,
-        objectifDate: enveloppe.objectifDate,
-        depense: enveloppe.depense,
-        archivee: enveloppe.archivee,
-        provenanceCompteId: enveloppe.provenanceCompteId,
-        frequenceObjectif: enveloppe.frequenceObjectif,
-        dateDernierAjout: enveloppe.dateDernierAjout,
-        objectifJour: enveloppe.objectifJour,
-        historique: enveloppe.historique,
+      return enveloppe.copyWith(
         ordre: entry.key,
       );
     }).toList();
 
     // Mettre à jour la catégorie localement
+    final updatedCategorie = Categorie(
+      id: categorie.id,
+      utilisateurId: categorie.utilisateurId,
+      nom: categorie.nom,
+      ordre: categorie.ordre,
+    );
     setState(() {
-      _categories[categorieIndex] = Categorie(
-        id: categorie.id,
-        nom: categorie.nom,
-        enveloppes: updatedEnveloppes,
-        ordre: categorie.ordre,
-      );
+      final index = _categories.indexWhere((cat) => cat.id == categorie.id);
+      if (index != -1) {
+        _categories[index] = updatedCategorie;
+      }
     });
 
-    // Sauvegarder dans Firebase
-    await FirebaseService().ajouterCategorie(_categories[categorieIndex]);
+    // Sauvegarder dans PocketBase au lieu de Firebase
+    await PocketBaseService.ajouterCategorie(updatedCategorie);
   }
 
   void _ajouterCategorie(List<Categorie> categories) async {
@@ -247,13 +242,13 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     if (result != null && result.isNotEmpty) {
       final newCat = Categorie(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        utilisateurId: AuthService.currentUser?.id ?? '',
         nom: result,
-        enveloppes: [],
         ordre: _categories.length, // Ajouter à la fin
       );
       setState(() => _isLoading = true);
       try {
-        await FirebaseService().ajouterCategorie(newCat);
+        await PocketBaseService.ajouterCategorie(newCat);
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -294,14 +289,16 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     if (result != null && result.isNotEmpty) {
       final newEnv = Enveloppe(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        utilisateurId: categorie.utilisateurId,
+        categorieId: categorie.id,
         nom: result,
+        soldeEnveloppe: 0.0,
       );
       final updatedCat = Categorie(
         id: categorie.id,
+        utilisateurId: categorie.utilisateurId,
         nom: categorie.nom,
-        enveloppes: [...categorie.enveloppes, newEnv],
         ordre: categorie.ordre,
-        userId: categorie.userId,
       );
 
       // Sauvegarder dans Firebase
@@ -346,10 +343,9 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
     if (result != null && result.isNotEmpty && result != categorie.nom) {
       final updatedCat = Categorie(
         id: categorie.id,
+        utilisateurId: categorie.utilisateurId,
         nom: result,
-        enveloppes: categorie.enveloppes,
         ordre: categorie.ordre,
-        userId: categorie.userId,
       );
 
       // Sauvegarder dans Firebase
@@ -422,17 +418,18 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       ),
     );
     if (result != null && result.isNotEmpty && result != enveloppe.nom) {
-      final newEnveloppes = categorie.enveloppes
-          .map(
-            (e) => e.id == enveloppe.id ? Enveloppe(id: e.id, nom: result) : e,
-          )
-          .toList();
+      // Pour modifier une enveloppe, on doit d'abord récupérer les enveloppes via PocketBase
+      // puis mettre à jour l'enveloppe spécifique directement dans PocketBase
+      // au lieu de passer par la catégorie
+      
+      // Mettre à jour l'enveloppe directement dans PocketBase
+      await PocketBaseService.mettreAJourEnveloppe(enveloppe.id, {'nom': result});
+      
       final updatedCat = Categorie(
         id: categorie.id,
+        utilisateurId: categorie.utilisateurId,
         nom: categorie.nom,
-        enveloppes: newEnveloppes,
         ordre: categorie.ordre,
-        userId: categorie.userId,
       );
 
       // Sauvegarder dans Firebase
@@ -692,98 +689,112 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   }
 
   Widget _buildCategorieItem(Categorie categorie, {Key? key, int? index}) {
-    final enveloppes =
-        categorie.enveloppes.where((env) => env.archivee != true).toList();
-    if (_editionMode) {
-      enveloppes.sort((a, b) => (a.ordre ?? 0).compareTo(b.ordre ?? 0));
-    }
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: PocketBaseService.lireEnveloppesParCategorie(categorie.id),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const CircularProgressIndicator();
+        }
+        
+        // Récupérer les enveloppes de cette catégorie via PocketBase
+        final enveloppesData = snapshot.data!;
+        final enveloppes = enveloppesData
+            .map((data) => Enveloppe.fromMap(data))
+            .where((env) => !env.estArchive)  // Corriger l'accès à la propriété
+            .toList();
+            
+        if (_editionMode) {
+          enveloppes.sort((a, b) => (a.ordre ?? 0).compareTo(b.ordre ?? 0));
+        }
 
-    final isDette = categorie.nom.toLowerCase() == 'dette' ||
-        categorie.nom.toLowerCase() == 'dettes';
+        final isDette = categorie.nom.toLowerCase() == 'dette' ||
+            categorie.nom.toLowerCase() == 'dettes';
 
-    // Widget qui affiche la liste des enveloppes (reordonnable ou non)
-    final Widget enveloppesWidget = _editionMode
-        ? ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: enveloppes.length,
-            itemBuilder: (context, idx) => _buildEnveloppeItem(
-              categorie,
-              enveloppes[idx],
-              index: idx,
-              key: ValueKey(enveloppes[idx].id),
-            ),
-            onReorder: (oldIndex, newIndex) =>
-                _reorderEnveloppes(categorie, oldIndex, newIndex),
-          )
-        : Column(
-            children: enveloppes
-                .map((enveloppe) => _buildEnveloppeItem(categorie, enveloppe))
-                .toList(),
-          );
+        // Widget qui affiche la liste des enveloppes (reordonnable ou non)
+        final Widget enveloppesWidget = _editionMode
+            ? ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: enveloppes.length,
+                itemBuilder: (context, idx) => _buildEnveloppeItem(
+                  categorie,
+                  enveloppes[idx],
+                  index: idx,
+                  key: ValueKey(enveloppes[idx].id),
+                ),
+                onReorder: (oldIndex, newIndex) =>
+                    _reorderEnveloppes(categorie, oldIndex, newIndex),
+              )
+            : Column(
+                children: enveloppes
+                    .map((enveloppe) => _buildEnveloppeItem(categorie, enveloppe))
+                    .toList(),
+              );
 
-    return Container(
-      key: key,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: Card(
-        color: const Color(0xFF232526),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        return Container(
+          key: key,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: Card(
+            color: const Color(0xFF232526),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      categorie.nom,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          categorie.nom,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (_editionMode) ...[
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.white70),
+                          tooltip: 'Renommer la catégorie',
+                          onPressed:
+                              isDette ? null : () => _renommerCategorie(categorie),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.redAccent),
+                          tooltip: 'Supprimer la catégorie',
+                          onPressed:
+                              isDette ? null : () => _supprimerCategorie(categorie),
+                        ),
+                        ReorderableDragStartListener(
+                          index: index!,
+                          child: Icon(
+                            isDette ? Icons.lock : Icons.drag_handle,
+                            color: isDette ? Colors.grey : Colors.white54,
+                          ),
+                        ),
+                      ] else ...[
+                        if (!isDette)
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline,
+                                color: Colors.white70),
+                            tooltip: 'Ajouter une enveloppe',
+                            onPressed: () => _ajouterEnveloppe(categorie),
+                          ),
+                      ],
+                    ],
                   ),
-                  if (_editionMode) ...[
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.white70),
-                      tooltip: 'Renommer la catégorie',
-                      onPressed:
-                          isDette ? null : () => _renommerCategorie(categorie),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          color: Colors.redAccent),
-                      tooltip: 'Supprimer la catégorie',
-                      onPressed:
-                          isDette ? null : () => _supprimerCategorie(categorie),
-                    ),
-                    ReorderableDragStartListener(
-                      index: index!,
-                      child: Icon(
-                        isDette ? Icons.lock : Icons.drag_handle,
-                        color: isDette ? Colors.grey : Colors.white54,
-                      ),
-                    ),
-                  ] else ...[
-                    if (!isDette)
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline,
-                            color: Colors.white70),
-                        tooltip: 'Ajouter une enveloppe',
-                        onPressed: () => _ajouterEnveloppe(categorie),
-                      ),
-                  ],
+                  const SizedBox(height: 8),
+                  enveloppesWidget,
                 ],
               ),
-              const SizedBox(height: 8),
-              enveloppesWidget,
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -864,24 +875,15 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                         );
 
                         if (nouveauObjectif != null && mounted) {
-                          setState(() {
-                            final categorieIndex = _categories.indexWhere(
-                              (c) => c.id == categorie.id,
-                            );
-                            if (categorieIndex != -1) {
-                              final enveloppeIndex = _categories[categorieIndex]
-                                  .enveloppes
-                                  .indexWhere((e) => e.id == enveloppe.id);
-                              if (enveloppeIndex != -1) {
-                                // Mettre à jour l'enveloppe
-                                _categories[categorieIndex]
-                                        .enveloppes[enveloppeIndex] =
-                                    _categories[categorieIndex]
-                                        .enveloppes[enveloppeIndex]
-                                        .copyWith(objectif: nouveauObjectif);
-                              }
-                            }
-                          });
+                          // Mettre à jour l'enveloppe directement via PocketBase
+                          // au lieu de passer par la catégorie
+                          await PocketBaseService.mettreAJourEnveloppe(
+                            enveloppe.id, 
+                            {'objectif_montant': nouveauObjectif}
+                          );
+                          
+                          // Rafraîchir l'affichage
+                          setState(() {});
                         }
                       },
                       child: Text(

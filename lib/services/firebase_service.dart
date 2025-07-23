@@ -8,6 +8,7 @@ import '../models/dette.dart';
 import 'dette_service.dart';
 import 'firebase_monitor_service.dart';
 import 'cache_service.dart';
+import 'pocketbase_service.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -93,9 +94,8 @@ class FirebaseService {
     // Assure que la catégorie est bien associée à l'utilisateur actuel
     final categorieAvecUser = Categorie(
       id: categorie.id,
-      userId: user.uid, // On force l'ID de l'utilisateur connecté
+      utilisateurId: user.uid, // On force l'ID de l'utilisateur connecté
       nom: categorie.nom,
-      enveloppes: categorie.enveloppes,
       ordre: categorie.ordre,
     );
     await categoriesRef.doc(categorie.id).set(categorieAvecUser.toMap());
@@ -118,14 +118,19 @@ class FirebaseService {
 
     return categoriesRef
         .where(
-          'userId',
+          'utilisateurId',
           isEqualTo: user.uid,
         ) // Ne lit que les catégories de l'utilisateur
         .snapshots()
         .map((snapshot) {
       final categories = snapshot.docs
           .map(
-            (doc) => Categorie.fromMap(doc.data() as Map<String, dynamic>),
+            (doc) => Categorie(
+              id: doc['id'] ?? '',
+              utilisateurId: doc['utilisateurId'] ?? '',
+              nom: doc['nom'] ?? '',
+              ordre: doc['ordre'],
+            ),
           )
           .toList();
 
@@ -393,7 +398,7 @@ class FirebaseService {
     });
   }
 
-  // Nouvelle méthode pour mettre à jour le compte de passif associé (prêts/dettes)
+  // Méthode helper pour mettre à jour le compte de passif associé (prêts/dettes)
   Future<void> _mettreAJourComptePassifAssocie(
     String comptePassifId,
     double montant,
@@ -459,7 +464,7 @@ class FirebaseService {
   ) async {
     // Trouver la catégorie contenant cette enveloppe
     final categoriesSnapshot = await categoriesRef
-        .where('userId', isEqualTo: _auth.currentUser?.uid)
+        .where('utilisateurId', isEqualTo: _auth.currentUser?.uid)
         .get();
 
     for (var catDoc in categoriesSnapshot.docs) {
@@ -581,39 +586,8 @@ class FirebaseService {
       throw Exception("Catégorie non trouvée");
     }
 
-    final categorie = Categorie.fromMap(
-      categorieDoc.data() as Map<String, dynamic>,
-    );
-    final enveloppesMisesAJour = categorie.enveloppes.map((env) {
-      if (env.id == enveloppeId) {
-        return Enveloppe(
-          id: env.id,
-          nom: env.nom,
-          solde: env.solde,
-          objectif: env.objectif,
-          objectifDate: env.objectifDate,
-          depense: env.depense,
-          archivee: true, // On archive l'enveloppe
-          provenanceCompteId: env.provenanceCompteId,
-          frequenceObjectif: env.frequenceObjectif,
-          dateDernierAjout: env.dateDernierAjout,
-          objectifJour: env.objectifJour,
-          historique: env.historique,
-          ordre: env.ordre,
-        );
-      }
-      return env;
-    }).toList();
-
-    final categorieMiseAJour = Categorie(
-      id: categorie.id,
-      userId: categorie.userId,
-      nom: categorie.nom,
-      enveloppes: enveloppesMisesAJour,
-      ordre: categorie.ordre,
-    );
-
-    await ajouterCategorie(categorieMiseAJour);
+    // Archiver l'enveloppe directement via PocketBase au lieu de passer par la catégorie
+    await PocketBaseService.archiverEnveloppe(enveloppeId);
   }
 
   Future<void> restaurerEnveloppe(
@@ -628,39 +602,15 @@ class FirebaseService {
       throw Exception("Catégorie non trouvée");
     }
 
-    final categorie = Categorie.fromMap(
-      categorieDoc.data() as Map<String, dynamic>,
+    final categorie = Categorie(
+      id: categorieDoc['id'] ?? '',
+      utilisateurId: categorieDoc['utilisateurId'] ?? '',
+      nom: categorieDoc['nom'] ?? '',
+      ordre: categorieDoc['ordre'],
     );
-    final enveloppesMisesAJour = categorie.enveloppes.map((env) {
-      if (env.id == enveloppeId) {
-        return Enveloppe(
-          id: env.id,
-          nom: env.nom,
-          solde: env.solde,
-          objectif: env.objectif,
-          objectifDate: env.objectifDate,
-          depense: env.depense,
-          archivee: false, // On restaure l'enveloppe
-          provenanceCompteId: env.provenanceCompteId,
-          frequenceObjectif: env.frequenceObjectif,
-          dateDernierAjout: env.dateDernierAjout,
-          objectifJour: env.objectifJour,
-          historique: env.historique,
-          ordre: env.ordre,
-        );
-      }
-      return env;
-    }).toList();
-
-    final categorieMiseAJour = Categorie(
-      id: categorie.id,
-      userId: categorie.userId,
-      nom: categorie.nom,
-      enveloppes: enveloppesMisesAJour,
-      ordre: categorie.ordre,
-    );
-
-    await ajouterCategorie(categorieMiseAJour);
+    
+    // Restaurer l'enveloppe directement via PocketBase au lieu de passer par la catégorie
+    await PocketBaseService.restaurerEnveloppe(enveloppeId);
   }
 
   Future<void> updateCompte(String compteId, Map<String, dynamic> data) async {
@@ -886,7 +836,7 @@ class FirebaseService {
   ) async {
     // Trouver la catégorie contenant cette enveloppe
     final categoriesSnapshot = await categoriesRef
-        .where('userId', isEqualTo: _auth.currentUser?.uid)
+        .where('utilisateurId', isEqualTo: _auth.currentUser?.uid)
         .get();
 
     for (var catDoc in categoriesSnapshot.docs) {

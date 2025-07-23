@@ -3,7 +3,9 @@ import 'package:toutie_budget/pages/page_ajout_transaction.dart';
 import '../models/compte.dart';
 import '../models/transaction_model.dart' as app_model;
 import '../models/categorie.dart';
+import '../models/enveloppe.dart';
 import '../services/firebase_service.dart';
+import '../services/pocketbase_service.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/cache_service.dart';
@@ -322,153 +324,164 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
         if (catSnapshot.hasData) {
           print('DEBUG: ${catSnapshot.data!.length} catégories chargées');
           for (final cat in catSnapshot.data!) {
-            print(
-                'DEBUG: Catégorie "${cat.nom}" avec ${cat.enveloppes.length} enveloppes');
-            for (final env in cat.enveloppes) {
-              enveloppeIdToNom[env.id] = env.nom;
-              print('DEBUG: Ajouté au mapping: "${env.id}" -> "${env.nom}"');
-            }
-          }
-          print(
-              'DEBUG: Mapping final contient ${enveloppeIdToNom.length} enveloppes');
-        } else {
-          print('DEBUG: Aucune catégorie chargée');
-        }
-        if (_searchQuery.isNotEmpty) {
-          // Recherche pro : résultats filtrés Firestore (max 10 à la fois)
-          if (_searchLoading && _searchResults.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (_searchResults.isEmpty) {
-            return Center(
-              child: Text(
-                'Aucun résultat pour "$_searchQuery"',
-                style: TextStyle(fontSize: 18, color: Colors.white70),
-                textAlign: TextAlign.center,
-              ),
-            );
-          }
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    labelText: 'Rechercher',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  key: ValueKey('transactions_$_refreshKey'),
-                  itemCount: _searchResults.length + (_hasMoreSearch ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _searchResults.length) {
-                      if (_searchLoading) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: ElevatedButton(
-                          onPressed: _fetchSearchPage,
-                          child: const Text('Charger plus'),
-                        ),
-                      );
-                    }
-                    final t = _searchResults[index];
-                    return _buildTransactionTile(t, enveloppeIdToNom);
-                  },
-                ),
-              ),
-            ],
-          );
-        }
-        // Sinon, pagination classique par date (25 par 25)
-        final transactionsFiltrees = filtrerTransactions(
-          _transactions,
-          enveloppeIdToNom,
-        );
-        if (!_firstLoadDone && _isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (transactionsFiltrees.isEmpty) {
-          return Center(
-            child: Text(
-              'Aucune transaction pour ce compte',
-              style: TextStyle(fontSize: 18, color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-          );
-        }
-        // Regrouper les transactions par date (formatée)
-        final Map<String, List<app_model.Transaction>> transactionsParDate = {};
-        final Map<String, DateTime> dateStringToDateTime = {};
-        for (final t in transactionsFiltrees) {
-          final dateStr =
-              '${t.date.day.toString().padLeft(2, '0')}/${t.date.month.toString().padLeft(2, '0')}/${t.date.year}';
-          transactionsParDate.putIfAbsent(dateStr, () => []).add(t);
-          dateStringToDateTime[dateStr] = t.date;
-        }
-        final datesTriees = transactionsParDate.keys.toList()
-          ..sort((a, b) =>
-              dateStringToDateTime[b]!.compareTo(dateStringToDateTime[a]!));
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Rechercher',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                key: ValueKey('transactions_$_refreshKey'),
-                controller: _scrollController,
-                itemCount: datesTriees.length + (_isLoading ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == datesTriees.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
+            // Utiliser FutureBuilder au lieu de await dans une fonction non-async
+            return FutureBuilder<List<Map<String, dynamic>>>(
+              future: PocketBaseService.lireEnveloppesParCategorie(cat.id),
+              builder: (context, enveloppesSnapshot) {
+                if (!enveloppesSnapshot.hasData) return Container();
+                final enveloppes = enveloppesSnapshot.data!.map((data) => Enveloppe.fromMap(data)).toList();
+                print('DEBUG: Catégorie "${cat.nom}" avec ${enveloppes.length} enveloppes');
+                for (final env in enveloppes) {
+                  enveloppeIdToNom[env.id] = env.nom;
+                  print('DEBUG: Ajouté au mapping: "${env.id}" -> "${env.nom}"');
+                }
+                print(
+                    'DEBUG: Mapping final contient ${enveloppeIdToNom.length} enveloppes');
+                if (_searchQuery.isNotEmpty) {
+                  // Recherche pro : résultats filtrés Firestore (max 10 à la fois)
+                  if (_searchLoading && _searchResults.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (_searchResults.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'Aucun résultat pour "$_searchQuery"',
+                        style: TextStyle(fontSize: 18, color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
                     );
                   }
-                  final dateStr = datesTriees[index];
-                  final transactions = transactionsParDate[dateStr]!;
                   return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8.0, horizontal: 16.0),
-                        child: Text(
-                          dateStr,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Colors.white70,
+                        padding: const EdgeInsets.all(8.0),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            labelText: 'Rechercher',
+                            prefixIcon: Icon(Icons.search),
+                            border: OutlineInputBorder(),
                           ),
                         ),
                       ),
-                      ...transactions.map(
-                          (t) => _buildTransactionTile(t, enveloppeIdToNom)),
+                      Expanded(
+                        child: ListView.builder(
+                          key: ValueKey('transactions_$_refreshKey'),
+                          itemCount: _searchResults.length + (_hasMoreSearch ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _searchResults.length) {
+                              if (_searchLoading) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: ElevatedButton(
+                                  onPressed: _fetchSearchPage,
+                                  child: const Text('Charger plus'),
+                                ),
+                              );
+                            }
+                            final t = _searchResults[index];
+                            return _buildTransactionTile(t, enveloppeIdToNom);
+                          },
+                        ),
+                      ),
                     ],
                   );
-                },
-              ),
-            ),
-          ],
-        );
+                }
+                // Sinon, pagination classique par date (25 par 25)
+                final transactionsFiltrees = filtrerTransactions(
+                  _transactions,
+                  enveloppeIdToNom,
+                );
+                if (!_firstLoadDone && _isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (transactionsFiltrees.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Aucune transaction pour ce compte',
+                      style: TextStyle(fontSize: 18, color: Colors.white70),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                // Regrouper les transactions par date (formatée)
+                final Map<String, List<app_model.Transaction>> transactionsParDate = {};
+                final Map<String, DateTime> dateStringToDateTime = {};
+                for (final t in transactionsFiltrees) {
+                  final dateStr =
+                      '${t.date.day.toString().padLeft(2, '0')}/${t.date.month.toString().padLeft(2, '0')}/${t.date.year}';
+                  transactionsParDate.putIfAbsent(dateStr, () => []).add(t);
+                  dateStringToDateTime[dateStr] = t.date;
+                }
+                final datesTriees = transactionsParDate.keys.toList()
+                  ..sort((a, b) =>
+                      dateStringToDateTime[b]!.compareTo(dateStringToDateTime[a]!));
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Rechercher',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        key: ValueKey('transactions_$_refreshKey'),
+                        controller: _scrollController,
+                        itemCount: datesTriees.length + (_isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == datesTriees.length) {
+                            return const Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
+                          final dateStr = datesTriees[index];
+                          final transactions = transactionsParDate[dateStr]!;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8.0, horizontal: 16.0),
+                                child: Text(
+                                  dateStr,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                              ...transactions.map(
+                                  (t) => _buildTransactionTile(t, enveloppeIdToNom)),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+        } else {
+          print('DEBUG: Aucune catégorie chargée');
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        // Return par défaut si aucune condition n'est remplie
+        return const Center(child: CircularProgressIndicator());
       },
     );
   }

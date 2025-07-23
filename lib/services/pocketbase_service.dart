@@ -4,6 +4,7 @@
 
 import 'package:pocketbase/pocketbase.dart';
 import 'package:pocketbase/pocketbase.dart' show RecordModel;
+import '../models/enveloppe.dart';
 import 'auth_service.dart';
 import '../models/categorie.dart';
 import '../models/compte.dart';
@@ -95,21 +96,17 @@ class PocketBaseService {
         // Convertir les enveloppes
         final enveloppes = enveloppesRecords.map((envRecord) => Enveloppe(
           id: envRecord.id,
+          utilisateurId: envRecord.data['utilisateur_id'] ?? '',
+          categorieId: envRecord.data['categorie_id'] ?? '',
           nom: envRecord.data['nom'] ?? '',
-          solde: (envRecord.data['solde_enveloppe'] ?? 0).toDouble(),
-          objectif: (envRecord.data['objectif'] ?? 0).toDouble(),
-          archivee: envRecord.data['archivee'] ?? false,
-          provenanceCompteId: envRecord.data['provenance_compte_id'] ?? '',
-          frequenceObjectif: envRecord.data['frequence_objectif'] ?? 'mensuel',
-          ordre: envRecord.data['ordre'],
+          soldeEnveloppe: (envRecord.data['solde_enveloppe'] ?? 0).toDouble(),
         )).toList();
         
         // Créer la catégorie avec ses enveloppes
         final categorie = Categorie(
           id: record.id,
-          userId: record.data['utilisateur_id'],
+          utilisateurId: record.data['utilisateur_id'],
           nom: record.data['nom'] ?? '',
-          enveloppes: enveloppes,
           ordre: record.data['ordre'] ?? 0,
         );
         
@@ -325,6 +322,211 @@ class PocketBaseService {
     }
   }
 
+  // Méthode lireComptes pour compatibilité avec page_archivage
+  static Stream<List<Compte>> lireComptes() async* {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      
+      if (userId == null) {
+        print('❌ Utilisateur non connecté pour lireComptes');
+        yield [];
+        return;
+      }
+
+      // Récupérer tous les comptes de l'utilisateur
+      final records = await pb.collection('comptes').getList(
+        filter: 'utilisateur_id = "$userId"',
+        sort: 'ordre,nom',
+      );
+
+      final comptes = records.items.map((record) {
+        return Compte(
+          id: record.id,
+          nom: record.data['nom'] ?? '',
+          solde: (record.data['solde'] ?? 0.0).toDouble(),
+          type: record.data['type'] ?? 'cheque',
+          couleur: int.tryParse(record.data['couleur']?.toString() ?? '0') ?? 0x2196F3,
+          pretAPlacer: (record.data['pret_a_placer'] ?? 0.0).toDouble(),
+          dateCreation: DateTime.tryParse(record.data['created'] ?? '') ?? DateTime.now(),
+          estArchive: record.data['archive'] ?? false,
+          ordre: record.data['ordre'] ?? 0,
+          userId: record.data['utilisateur_id'] ?? userId,
+        );
+      }).toList();
+
+      yield comptes;
+    } catch (e) {
+      print('❌ Erreur lireComptes: $e');
+      yield [];
+    }
+  }
+
+  // Méthode pour récupérer les enveloppes d'une catégorie spécifique
+  static Future<List<Map<String, dynamic>>> lireEnveloppesParCategorie(String categorieId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final records = await pb.collection('enveloppes').getList(
+        filter: 'categorie_id = "$categorieId"',
+        sort: 'nom',
+      );
+      
+      return records.items.map((record) => record.toJson()).toList();
+    } catch (e) {
+      print('❌ Erreur récupération enveloppes par catégorie: $e');
+      return [];
+    }
+  }
+
+  // Méthode pour récupérer toutes les enveloppes avec leur catégorie
+  static Future<Map<String, List<Map<String, dynamic>>>> lireEnveloppesGroupeesParCategorie() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final records = await pb.collection('enveloppes').getList(
+        expand: 'categorie_id',
+        sort: 'categorie_id.nom,nom',
+      );
+      
+      final Map<String, List<Map<String, dynamic>>> enveloppesParCategorie = {};
+      
+      for (final record in records.items) {
+        final categorieId = record.data['categorie_id'] as String;
+        final enveloppeData = record.toJson();
+        
+        if (!enveloppesParCategorie.containsKey(categorieId)) {
+          enveloppesParCategorie[categorieId] = [];
+        }
+        enveloppesParCategorie[categorieId]!.add(enveloppeData);
+      }
+      
+      return enveloppesParCategorie;
+    } catch (e) {
+      print('❌ Erreur récupération enveloppes groupées: $e');
+      return {};
+    }
+  }
+
+  // Méthode pour récupérer toutes les enveloppes d'un utilisateur
+  static Future<List<Map<String, dynamic>>> lireToutesEnveloppes() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      if (userId == null) throw Exception('Utilisateur non connecté');
+      
+      final records = await pb.collection('enveloppes').getList(
+        filter: 'utilisateur_id = "$userId"',
+        expand: 'categorie_id',
+        sort: 'categorie_id.nom,nom',
+      );
+      
+      return records.items.map((record) => record.toJson()).toList();
+    } catch (e) {
+      print('❌ Erreur récupération toutes enveloppes: $e');
+      return [];
+    }
+  }
+
+  // ============================================================================
+  // MÉTHODES POUR GÉRER LES ENVELOPPES
+  // ============================================================================
+
+  // Méthode pour ajouter une nouvelle enveloppe
+  static Future<String> ajouterEnveloppe(Map<String, dynamic> enveloppeData) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      if (userId == null) throw Exception('Utilisateur non connecté');
+      
+      // Ajouter l'ID utilisateur si pas déjà présent
+      enveloppeData['utilisateur_id'] = userId;
+      
+      final record = await pb.collection('enveloppes').create(body: enveloppeData);
+      print('✅ Enveloppe ajoutée avec succès: ${record.id}');
+      return record.id;
+    } catch (e) {
+      print('❌ Erreur ajout enveloppe: $e');
+      throw Exception('Erreur lors de l\'ajout de l\'enveloppe: $e');
+    }
+  }
+
+  // Méthode pour mettre à jour une enveloppe
+  static Future<void> mettreAJourEnveloppe(String enveloppeId, Map<String, dynamic> donnees) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('enveloppes').update(enveloppeId, body: donnees);
+      print('✅ Enveloppe mise à jour avec succès: $enveloppeId');
+    } catch (e) {
+      print('❌ Erreur mise à jour enveloppe: $e');
+      throw Exception('Erreur lors de la mise à jour de l\'enveloppe: $e');
+    }
+  }
+
+  // Méthode pour supprimer une enveloppe
+  static Future<void> supprimerEnveloppe(String enveloppeId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('enveloppes').delete(enveloppeId);
+      print('✅ Enveloppe supprimée avec succès: $enveloppeId');
+    } catch (e) {
+      print('❌ Erreur suppression enveloppe: $e');
+      throw Exception('Erreur lors de la suppression de l\'enveloppe: $e');
+    }
+  }
+
+  // Méthode pour archiver une enveloppe
+  static Future<void> archiverEnveloppe(String enveloppeId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('enveloppes').update(enveloppeId, body: {
+        'est_archive': true,
+      });
+      print('✅ Enveloppe archivée avec succès: $enveloppeId');
+    } catch (e) {
+      print('❌ Erreur archivage enveloppe: $e');
+      throw Exception('Erreur lors de l\'archivage de l\'enveloppe: $e');
+    }
+  }
+
+  // Méthode pour restaurer une enveloppe archivée
+  static Future<void> restaurerEnveloppe(String enveloppeId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('enveloppes').update(enveloppeId, body: {
+        'est_archive': false,
+      });
+      print('✅ Enveloppe restaurée avec succès: $enveloppeId');
+    } catch (e) {
+      print('❌ Erreur restauration enveloppe: $e');
+      throw Exception('Erreur lors de la restauration de l\'enveloppe: $e');
+    }
+  }
+
+  // Méthode pour modifier une enveloppe (alias pour mettreAJourEnveloppe)
+  static Future<void> modifierEnveloppe(Map<String, dynamic> donnees) async {
+    final enveloppeId = donnees['id'];
+    if (enveloppeId == null) {
+      throw Exception('ID de l\'enveloppe manquant pour la modification');
+    }
+    
+    // Retirer l'ID des données à envoyer
+    final donneesModification = Map<String, dynamic>.from(donnees);
+    donneesModification.remove('id');
+    
+    await mettreAJourEnveloppe(enveloppeId, donneesModification);
+  }
+
+  // Méthode pour ajouter une catégorie
+  static Future<void> ajouterCategorie(Categorie categorie) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('categories').create(body: categorie.toMap());
+      print('✅ Catégorie ajoutée avec succès: ${categorie.nom}');
+    } catch (e) {
+      print('❌ Erreur ajout catégorie: $e');
+      throw Exception('Erreur lors de l\'ajout de la catégorie: $e');
+    }
+  }
+
   // Méthodes pour compatibilité migration_service
   static Future<List<Compte>> getComptes() async {
     final comptes = <Compte>[];
@@ -400,7 +602,7 @@ class PocketBaseService {
         case 'Dette':
           nomCollection = 'comptes_dettes';
           donneesCompte = {
-            'utilisateur_id': utilisateurId, // Utiliser l'ID au lieu du nom
+            'utilisateur_id': utilisateurId, // Utiliser le bon champ selon le guide
             'nom': compte.nom,
             'nom_tiers': compte.nom, // Nom du tiers
             'solde_dette': compte.solde.abs(), // Montant de la dette (positif)
@@ -415,7 +617,7 @@ class PocketBaseService {
         case 'Investissement':
           nomCollection = 'comptes_investissement';
           donneesCompte = {
-            'utilisateur_id': utilisateurId, // Utiliser l'ID au lieu du nom
+            'utilisateur_id': utilisateurId, // Utiliser le bon champ selon le guide
             'nom': compte.nom,
             'valeur_marche': compte.solde,
             'cout_base': compte.pretAPlacer,

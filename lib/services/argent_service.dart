@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/categorie.dart';
 import '../models/compte.dart';
+import '../models/enveloppe.dart';
 import 'firebase_service.dart';
 import 'cache_service.dart';
+import 'pocketbase_service.dart';
 
 class ArgentService {
   final FirebaseService _firebaseService = FirebaseService();
@@ -529,7 +531,10 @@ class ArgentService {
     // Récupérer tous les comptes et enveloppes
     final comptes = await _firebaseService.lireComptes().first;
     final categories = await _firebaseService.lireCategories().first;
-    final enveloppes = categories.expand((cat) => cat.enveloppes).toList();
+    
+    // Récupérer toutes les enveloppes via PocketBase
+    final toutesEnveloppes = await PocketBaseService.lireToutesEnveloppes();
+    final enveloppes = toutesEnveloppes.map((data) => Enveloppe.fromMap(data)).toList();
 
     // Identifier la source et la destination
     final source = [...comptes, ...enveloppes].firstWhere(

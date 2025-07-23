@@ -5,6 +5,7 @@ import '../models/transaction_model.dart' as app_model;
 import '../services/cache_service.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
+import '../services/pocketbase_service.dart';
 
 class PageStatistiques extends StatefulWidget {
   const PageStatistiques({super.key});
@@ -182,20 +183,17 @@ class _PageStatistiquesState extends State<PageStatistiques> {
           if (transaction.type == app_model.TypeTransaction.depense) {
             depenses += transaction.montant;
 
-            // Trouver le nom de l'enveloppe pour les statistiques
-            String enveloppeNom = 'Enveloppe inconnue';
-            for (var categorie in categories) {
-              for (var enveloppe in categorie.enveloppes) {
-                if (enveloppe.id == transaction.enveloppeId) {
-                  enveloppeNom = enveloppe.nom;
-                  break;
-                }
+            // Récupérer toutes les enveloppes via PocketBase pour trouver le nom
+            final toutesEnveloppes = await PocketBaseService.lireToutesEnveloppes();
+            for (var enveloppeData in toutesEnveloppes) {
+              if (enveloppeData['id'] == transaction.enveloppeId) {
+                String enveloppeNom = enveloppeData['nom'] ?? 'Enveloppe inconnue';
+                enveloppesUtilisation[enveloppeNom] =
+                    (enveloppesUtilisation[enveloppeNom] ?? 0) +
+                        transaction.montant;
+                break;
               }
             }
-
-            enveloppesUtilisation[enveloppeNom] =
-                (enveloppesUtilisation[enveloppeNom] ?? 0) +
-                    transaction.montant;
 
             // Statistiques des tiers
             if (transaction.tiers != null && transaction.tiers!.isNotEmpty) {
@@ -685,12 +683,13 @@ class _PageStatistiquesWebState extends State<PageStatistiquesWeb> {
 
             // Trouver le nom de l'enveloppe pour les statistiques
             String enveloppeNom = 'Enveloppe inconnue';
-            for (var categorie in categories) {
-              for (var enveloppe in categorie.enveloppes) {
-                if (enveloppe.id == transaction.enveloppeId) {
-                  enveloppeNom = enveloppe.nom;
-                  break;
-                }
+            
+            // Récupérer toutes les enveloppes via PocketBase pour trouver le nom
+            final toutesEnveloppes = await PocketBaseService.lireToutesEnveloppes();
+            for (var enveloppeData in toutesEnveloppes) {
+              if (enveloppeData['id'] == transaction.enveloppeId) {
+                enveloppeNom = enveloppeData['nom'] ?? 'Enveloppe inconnue';
+                break;
               }
             }
 
