@@ -119,25 +119,13 @@ class AuthService {
         
         // Chercher l'utilisateur qui correspond à l'email Google
         for (final user in allUsers.items) {
-          print('🔍 DEBUG - Structure complète utilisateur ${user.id}:');
-          print('🔍 DEBUG - user.data: ${user.data}');
-          print('🔍 DEBUG - user.toJson(): ${user.toJson()}');
-          
           // Essayer différentes façons d'accéder à l'email
           final userEmail1 = user.data['email']?.toString() ?? '';
           final userEmail2 = user.getStringValue('email');
           final userEmailFromJson = user.toJson()['email']?.toString() ?? '';
           
-          print('🔍 user.data[\'email\']: "$userEmail1"');
-          print('🔍 user.getStringValue(\'email\'): "$userEmail2"');
-          print('🔍 user.toJson()[\'email\']: "$userEmailFromJson"');
-          
           final userEmail = userEmail2.isNotEmpty ? userEmail2 : (userEmailFromJson.isNotEmpty ? userEmailFromJson : userEmail1);
           
-          print('🔍 Vérification utilisateur: ${user.id} - Email final: "$userEmail"');
-          print('🔍 Email Google recherché: "${googleUser.email}"');
-          print('🔍 Comparaison: "${userEmail.toLowerCase()}" == "${googleUser.email.toLowerCase()}" = ${userEmail.toLowerCase() == googleUser.email.toLowerCase()}');
-
           // Matcher avec l'email Google exact
           if (userEmail.toLowerCase() == googleUser.email.toLowerCase()) {
             matchedUser = user;

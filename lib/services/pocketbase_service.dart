@@ -82,15 +82,39 @@ class PocketBaseService {
       print('✅ PocketBaseService - ${records.length} catégories trouvées');
 
       print('🔄 PocketBaseService - Conversion des catégories...');
-      final categories = records
-          .map((record) => Categorie(
-                id: record.id,
-                userId: record.data['utilisateur_id'],
-                nom: record.data['nom'] ?? '',
-                enveloppes: [], // Pour l'instant, on met une liste vide
-                ordre: record.data['ordre'] ?? 0,
-              ))
-          .toList();
+      final List<Categorie> categories = [];
+      
+      for (final record in records) {
+        // Récupérer les enveloppes pour cette catégorie
+        print('🔄 Récupération enveloppes pour catégorie: ${record.data['nom']}');
+        final enveloppesRecords = await pb.collection('enveloppes').getFullList(
+          filter: 'categorie_id = "${record.id}" && utilisateur_id = "$utilisateurId"',
+        );
+        print('✅ ${enveloppesRecords.length} enveloppes trouvées pour ${record.data['nom']}');
+        
+        // Convertir les enveloppes
+        final enveloppes = enveloppesRecords.map((envRecord) => Enveloppe(
+          id: envRecord.id,
+          nom: envRecord.data['nom'] ?? '',
+          solde: (envRecord.data['solde_enveloppe'] ?? 0).toDouble(),
+          objectif: (envRecord.data['objectif'] ?? 0).toDouble(),
+          archivee: envRecord.data['archivee'] ?? false,
+          provenanceCompteId: envRecord.data['provenance_compte_id'] ?? '',
+          frequenceObjectif: envRecord.data['frequence_objectif'] ?? 'mensuel',
+          ordre: envRecord.data['ordre'],
+        )).toList();
+        
+        // Créer la catégorie avec ses enveloppes
+        final categorie = Categorie(
+          id: record.id,
+          userId: record.data['utilisateur_id'],
+          nom: record.data['nom'] ?? '',
+          enveloppes: enveloppes,
+          ordre: record.data['ordre'] ?? 0,
+        );
+        
+        categories.add(categorie);
+      }
 
       print('✅ PocketBaseService - Catégories converties: ${categories.length}');
       yield categories;
@@ -117,58 +141,15 @@ class PocketBaseService {
         return;
       }
       
-      print('🔐 DEBUG - Utilisateur ID actuel: $utilisateurId');
-      print('🔐 DEBUG - Utilisateur nom actuel: $utilisateurNom');
-      print('🔐 DEBUG - AuthStore valide: ${pb.authStore.isValid}');
-      
-      // DEBUG : Afficher TOUTES les propriétés de l'utilisateur
-      if (pb.authStore.model != null) {
-        print('🔐 DEBUG - Toutes les propriétés utilisateur:');
-        final userData = pb.authStore.model!.data;
-        for (final key in userData.keys) {
-          print('   - $key: ${userData[key]}');
-        }
-      }
-
-      // DIAGNOSTIC : D'abord récupérer TOUS les comptes chèques pour diagnostic
-      print('🔍 DEBUG - Récupération de TOUS les comptes chèques pour diagnostic...');
-      final tousLesRecords = await pb.collection('comptes_cheques').getFullList();
-      print('📊 DEBUG - Total comptes chèques dans la base: ${tousLesRecords.length}');
-      
-      if (tousLesRecords.isNotEmpty) {
-        for (var record in tousLesRecords) {
-          print('📊 DEBUG - Compte ${record.id}:');
-          print('   - utilisateur_id: ${record.data['utilisateur_id']}');
-          print('   - nom: ${record.data['nom']}');
-        }
-      } else {
-        print('❌ DEBUG - AUCUN COMPTE TROUVÉ DANS LA BASE !');
-        print('❌ DEBUG - Soit les règles d\'accès bloquent, soit la collection est vide');
-        
-        // Test ultime : essayer de récupérer sans filtre ET sans authentification
-        print('🔍 DEBUG - Test accès collection sans authentification...');
-        try {
-          final testRecords = await pb.collection('comptes_cheques').getFullList();
-          print('✅ DEBUG - Accès collection réussi: ${testRecords.length} records');
-        } catch (e) {
-          print('❌ DEBUG - Accès collection échoué: $e');
-        }
-      }
-
-      // Maintenant, lire avec le filtre ID utilisateur
       final filtre = 'utilisateur_id = "$utilisateurId"';
-      print('🔍 DEBUG - Filtre utilisé: $filtre');
+      print('🔍 Filtre utilisé: $filtre');
       
       final records = await pb.collection('comptes_cheques').getFullList(
         filter: filtre,
       );
-
-      print('📊 DEBUG - Nombre de records trouvés avec filtre: ${records.length}');
-      for (var record in records) {
-        print('📊 DEBUG - Record filtré: ${record.id} - Data: ${record.data}');
-        print('📊 DEBUG - utilisateur_id dans ce record: ${record.data['utilisateur_id']}');
-      }
-
+      
+      print('📊 Nombre de records trouvés avec filtre: ${records.length}');
+      
       final comptes = records
           .map((record) => Compte.fromPocketBase(record.data, record.id, 'Chèque'))
           .toList();
@@ -260,19 +241,6 @@ class PocketBaseService {
         return;
       }
       
-      print('🔐 DEBUG - Utilisateur ID actuel: $utilisateurId');
-      print('🔐 DEBUG - Utilisateur nom actuel: $utilisateurNom');
-      print('🔐 DEBUG - AuthStore valide: ${pb.authStore.isValid}');
-      
-      // DEBUG : Afficher TOUTES les propriétés de l'utilisateur
-      if (pb.authStore.model != null) {
-        print('🔐 DEBUG - Toutes les propriétés utilisateur:');
-        final userData = pb.authStore.model!.data;
-        for (final key in userData.keys) {
-          print('   - $key: ${userData[key]}');
-        }
-      }
-
       List<Compte> toutesLesDettes = [];
 
       // 1. Récupérer les dettes de la collection comptes_dettes
@@ -317,6 +285,7 @@ class PocketBaseService {
 
   // Combiner tous les types de comptes en un seul stream
   static Stream<List<Compte>> lireTousLesComptes() async* {
+    print('🔄 Appel de lireTousLesComptes');
     try {
       print('🔄 PocketBaseService - Lecture de tous les comptes (4 collections)...');
       
@@ -461,12 +430,6 @@ class PocketBaseService {
       }
 
       print('🔄 Création dans collection: $nomCollection');
-      print('📊 DEBUG - Données à envoyer:');
-      donneesCompte.forEach((key, value) {
-        print('   - $key: $value (${value.runtimeType})');
-      });
-      print('🔐 DEBUG - AuthStore valide: ${pb.authStore.isValid}');
-      print('🔐 DEBUG - Token présent: ${pb.authStore.token.isNotEmpty}');
       
       final result = await pb.collection(nomCollection).create(body: donneesCompte);
       
@@ -475,6 +438,33 @@ class PocketBaseService {
 
     } catch (e) {
       print('❌ Erreur ajout compte PocketBase: $e');
+      rethrow;
+    }
+  }
+
+  // Méthode pour mettre à jour un compte
+  static Future<void> updateCompte(String compteId, Map<String, dynamic> donnees) async {
+    try {
+      print('🔄 PocketBaseService - Mise à jour compte: $compteId');
+      final pb = await _getPocketBaseInstance();
+
+      // Déterminer la collection en cherchant dans toutes les collections
+      final collections = ['comptes_cheques', 'comptes_credits', 'comptes_investissement', 'comptes_dettes', 'pret_personnel'];
+      
+      for (final nomCollection in collections) {
+        try {
+          await pb.collection(nomCollection).update(compteId, body: donnees);
+          print('✅ Compte mis à jour dans $nomCollection');
+          return;
+        } catch (e) {
+          // Continuer vers la collection suivante si le compte n'est pas trouvé
+          continue;
+        }
+      }
+      
+      throw Exception('Compte non trouvé dans aucune collection');
+    } catch (e) {
+      print('❌ Erreur mise à jour compte PocketBase: $e');
       rethrow;
     }
   }
@@ -527,55 +517,6 @@ class PocketBaseService {
       print('✅ Création catégories de test terminée');
     } catch (e) {
       print('❌ Erreur création catégories de test: $e');
-    }
-  }
-
-  // Mettre à jour un compte dans PocketBase
-  static Future<void> updateCompte(String compteId, Map<String, dynamic> donnees) async {
-    try {
-      print('🔄 PocketBaseService - Mise à jour compte: $compteId');
-      final pb = await _getPocketBaseInstance();
-      
-      // Vérifier que l'utilisateur est connecté
-      final utilisateurId = pb.authStore.model?.id;
-      if (utilisateurId == null) {
-        print('❌ Aucun utilisateur connecté - impossible de mettre à jour le compte');
-        return;
-      }
-
-      // Collections de comptes possibles
-      final collectionsComptes = [
-        'comptes_cheques',
-        'comptes_credits', 
-        'comptes_dettes',
-        'comptes_investissement',
-      ];
-
-      // Chercher le compte dans toutes les collections
-      bool compteModifie = false;
-      for (final nomCollection in collectionsComptes) {
-        try {
-          // Vérifier si le compte existe dans cette collection
-          final record = await pb.collection(nomCollection).getOne(compteId);
-          
-          // Si trouvé, le mettre à jour
-          await pb.collection(nomCollection).update(compteId, body: donnees);
-          print('✅ Compte $compteId mis à jour dans $nomCollection');
-          compteModifie = true;
-          break;
-        } catch (e) {
-          // Compte pas dans cette collection, continuer
-          continue;
-        }
-      }
-
-      if (!compteModifie) {
-        print('❌ Compte $compteId non trouvé dans aucune collection');
-      }
-      
-    } catch (e) {
-      print('❌ Erreur mise à jour compte PocketBase: $e');
-      throw e;
     }
   }
 

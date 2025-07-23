@@ -84,13 +84,6 @@ class _PageLoginState extends State<PageLogin> {
 
           print('🔄 Navigation vers MyHomePage...');
 
-          // Créer des catégories de test dans PocketBase
-          try {
-            await PocketBaseService.creerCategoriesTest();
-          } catch (e) {
-            print('⚠️ Erreur création catégories de test: $e');
-          }
-
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const MyHomePage()),
           );

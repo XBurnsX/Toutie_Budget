@@ -1,518 +1,571 @@
 import 'package:flutter/material.dart';
-import 'package:toutie_budget/pages/page_creation_compte.dart';
-import 'package:toutie_budget/pages/page_transactions_compte.dart';
-import 'package:toutie_budget/pages/page_modification_compte.dart';
-import 'package:toutie_budget/pages/page_reconciliation.dart';
-import 'package:toutie_budget/pages/page_pret_personnel.dart';
-import 'package:toutie_budget/pages/page_parametres_dettes.dart';
-import 'package:toutie_budget/pages/page_investissement.dart';
+import 'package:toutie_budget/models/compte.dart';
+import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/pocketbase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
-import 'package:toutie_budget/models/dette.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:toutie_budget/services/cache_service.dart';
+import 'page_creation_compte.dart';
+import 'page_transactions_compte.dart';
+import 'page_modification_compte.dart';
+import 'page_reconciliation.dart';
+import 'page_parametres_dettes.dart';
+import 'page_pret_personnel.dart';
+import 'page_investissement.dart';
+import 'page_carte_de_credit.dart';
+import 'package:toutie_budget/services/investissement_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/compte.dart';
-import '../services/pocketbase_service.dart';
-
-/// Page d'affichage des comptes bancaires et d'investissement
-class PageComptes extends StatelessWidget {
+class PageComptes extends StatefulWidget {
   const PageComptes({super.key});
 
   @override
+  State<PageComptes> createState() => _PageComptesState();
+}
+
+class _PageComptesState extends State<PageComptes> {
+  bool _editionMode = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Mes comptes'),
-          elevation: 0,
-        ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: _buildComptesContent(context),
-          ),
-        ),
-      );
-    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes comptes'),
-        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: _editionMode ? 'Valider l\'ordre' : 'Réorganiser',
+            icon: Icon(_editionMode ? Icons.check : Icons.swap_vert),
+            onPressed: () => setState(() => _editionMode = !_editionMode),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Ajouter',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PageCreationCompte()),
+              );
+            },
+          ),
+        ],
       ),
-      body: _buildComptesContent(context),
+      body: StreamBuilder<List<Compte>>(
+        stream: PocketBaseService.lireTousLesComptes(),
+        builder: (context, snapshot) {
+          final comptes = (snapshot.data ?? [])
+              .where((c) => c.estArchive == false)
+              .toList()
+            ..sort((a, b) => (a.ordre ?? 999999).compareTo(b.ordre ?? 999999));
+
+          final cheques = comptes.where((c) => c.type == 'Chèque').toList();
+          final credits =
+              comptes.where((c) => c.type == 'Carte de crédit').toList();
+          final dettesManuelles =
+              comptes.where((c) => c.type == 'Dette').toList();
+          final investissements =
+              comptes.where((c) => c.type == 'Investissement').toList();
+
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            children: [
+              _buildSection('Comptes chèques', Colors.blue, cheques),
+              _buildSection('Cartes de crédit', Colors.purple, credits),
+              // Section Dettes - combine les dettes manuelles et les dettes de la collection dettes
+              _buildDettesSection(dettesManuelles),
+              _buildSection('Investissement', Colors.green, investissements),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildComptesContent(BuildContext context) {
-    return Column(
-      children: [
-        if (!kIsWeb) SizedBox(height: 45),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (!kIsWeb)
-                Text(
-                  'Mes comptes',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const PageCreationCompte(),
-                    ),
-                  );
-                },
-                icon: Icon(Icons.add),
-                label: Text('Ajouter'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView(
-            children: [
-              // Section Comptes Chèques
-              _buildSectionComptes(
-                context,
-                'Comptes chèques',
-                PocketBaseService.lireComptesChecques(),
-                Colors.blue,
-              ),
-              
-              // Section Cartes de Crédit
-              _buildSectionComptes(
-                context,
-                'Cartes de crédit',
-                PocketBaseService.lireComptesCredits(),
-                Colors.orange,
-              ),
-              
-              // Section Investissements
-              _buildSectionComptes(
-                context,
-                'Investissements',
-                PocketBaseService.lireComptesInvestissement(),
-                Colors.green,
-              ),
-              
-              // Section Dettes (incluant prêts personnels)
-              _buildSectionComptes(
-                context,
-                'Dettes et prêts',
-                PocketBaseService.lireComptesDettes(),
-                Colors.red,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildDettesSection(List<Compte> dettesManuelles) {
+    return StreamBuilder<List<Dette>>(
+      stream: DetteService().dettesActives(),
+      builder: (context, dettesSnapshot) {
+        final dettesActives = dettesSnapshot.data ?? [];
+        // On récupère les IDs des dettes qui sont déjà gérées comme des comptes manuels
+        final idsDettesManuelles = dettesManuelles.map((c) => c.id).toSet();
 
-  // Widget pour construire une section de comptes avec son propre StreamBuilder
-  Widget _buildSectionComptes(
-    BuildContext context,
-    String titre,
-    Stream<List<Compte>> stream,
-    Color couleur,
-  ) {
-    return StreamBuilder<List<Compte>>(
-      stream: stream,
-      builder: (context, snapshot) {
-        print('=== STREAMBUILDER $titre ===');
-        print('HasData: ${snapshot.hasData}');
-        print('HasError: ${snapshot.hasError}');
-        print('Error: ${snapshot.error}');
-        print('Data length: ${snapshot.data?.length ?? 0}');
-
-        final comptes = (snapshot.data ?? [])
-            .where((c) => c.estArchive == false)
+        // Filtrer pour n'afficher que les dettes contractées qui ne sont PAS déjà des comptes manuels
+        final dettesAutomatiques = dettesActives
+            .where(
+              (d) => d.type == 'dette' && !idsDettesManuelles.contains(d.id),
+            )
             .toList();
 
-        print('$titre non archivés: ${comptes.length}');
-        for (var compte in comptes) {
-          print('- ${compte.nom} (${compte.type}) - Archivé: ${compte.estArchive}');
-        }
+        final dettesAfficher = [
+          ...dettesManuelles,
+          ...dettesAutomatiques,
+        ];
 
-        if (comptes.isEmpty) {
-          return SizedBox.shrink(); // Ne rien afficher si pas de comptes
-        }
+        if (dettesAfficher.isEmpty) return const SizedBox.shrink();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
               child: Text(
-                titre,
-                style: TextStyle(
+                'Dettes',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white70,
                 ),
               ),
             ),
-            ...comptes.map((compte) => CompteCardWidget(
-              compte: compte,
-              defaultColor: couleur,
-              contextParent: context,
-              isCheque: compte.type == 'Chèque',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => PageTransactionsCompte(compte: compte),
-                  ),
-                );
-              },
-              onLongPress: () {
-                _afficherMenuCompte(context, compte, compte.type == 'Chèque');
-              },
-            )),
-            SizedBox(height: 16),
+            ...dettesAfficher.map((item) {
+              if (item is Compte) {
+                // Dette manuelle (compte)
+                return _buildCard(item, Colors.red);
+              } else if (item is Dette) {
+                // Dette de la collection dettes
+                return _buildDetteCard(item);
+              }
+              return const SizedBox.shrink();
+            }),
+            const SizedBox(height: 24),
           ],
         );
       },
     );
   }
 
-  Widget _buildCompteCard(
-    Compte compte,
-    Color defaultColor,
-    BuildContext context,
-    bool isCheque,
-  ) {
-    final color = Color(compte.couleur);
-    final isDette = compte.type == 'Dette';
+  Widget _buildSection(String title, Color color, List<Compte> comptes) {
+    if (comptes.isEmpty) return const SizedBox.shrink();
 
-    // Pour les dettes, le solde affiché est toujours celui du compte
-    final soldeAffiche = compte.solde;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        elevation: 2,
-        color: const Color(0xFF313334),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            if (isDette) {
-              // Pour une dette manuelle, on doit récupérer l'objet Dette complet
-              // pour passer toutes les infos à la page des paramètres.
-              final dette = await DetteService().getDette(compte.id);
-
-              if (dette != null && context.mounted) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => PageParametresDettes(dette: dette),
-                  ),
-                );
-              } else if (context.mounted) {
-                // Fallback si la dette n'existe pas encore dans la collection 'dettes'
-                final detteManuelle = Dette(
-                  id: compte.id,
-                  nomTiers: compte.nom,
-                  type: 'dette',
-                  montantInitial: compte.solde.abs(),
-                  solde: soldeAffiche,
-                  historique: [],
-                  archive: false,
-                  dateCreation: DateTime.now(),
-                  userId: '',
-                  estManuelle: true,
-                );
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        PageParametresDettes(dette: detteManuelle),
-                  ),
-                );
-              }
-            } else if (compte.type == 'Investissement') {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PageInvestissement(compteId: compte.id),
-                ),
+    if (_editionMode) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+            child: Text(title,
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70)),
+          ),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: comptes.length,
+            onReorder: (oldIndex, newIndex) =>
+                _reorder(comptes, oldIndex, newIndex),
+            buildDefaultDragHandles: false,
+            itemBuilder: (context, index) {
+              final compte = comptes[index];
+              return ReorderableDragStartListener(
+                key: ValueKey(compte.id),
+                index: index,
+                child: _buildCard(compte, color, editing: true),
               );
-            } else {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PageTransactionsCompte(compte: compte),
-                ),
-              );
-            }
-          },
-          onLongPress: () => _afficherMenuCompte(context, compte, isCheque),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            },
+          ),
+        ],
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+            child: Text(title,
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70)),
+          ),
+          ...comptes.map((c) => _buildCard(c, color)),
+        ],
+      );
+    }
+  }
+
+  Widget _buildCard(Compte compte, Color color, {bool editing = false}) {
+    final isCheque = compte.type == 'Chèque';
+    double cashDisponible = compte.pretAPlacer;
+    if (compte.type == 'Investissement') {
+      return FutureBuilder<Map<String, dynamic>>(
+        future: InvestissementService().calculerPerformanceCompte(compte.id),
+        builder: (context, snapshot) {
+          double valeurActions = 0.0;
+          if (snapshot.hasData) {
+            valeurActions =
+                (snapshot.data?['totalValeurActuelle'] ?? 0.0) as double;
+          }
+          final soldeAffiche = valeurActions + cashDisponible;
+          return Container(
+            key: ValueKey(compte.id),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 2,
+              color: const Color(0xFF232526),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: editing
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PageInvestissement(compteId: compte.id),
+                          ),
+                        );
+                      },
+                onLongPress: editing
+                    ? null
+                    : () => _showCompteMenu(context, compte, isCheque),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      Text(
-                        compte.nom,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        width: 4,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Color(compte.couleur),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        compte.type,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              compte.nom,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              compte.type,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
                       ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? SizedBox(
+                                  width: 40,
+                                  height: 16,
+                                  child: Center(
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)))
+                              : Text(
+                                  '${soldeAffiche.toStringAsFixed(2)} \$',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: soldeAffiche >= 0
+                                        ? Colors.green
+                                        : Colors.red[700],
+                                  ),
+                                ),
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Color(compte.couleur),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'CASH : ${cashDisponible.toStringAsFixed(2)} \$',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      editing
+                          ? const Icon(Icons.drag_handle, color: Colors.white54)
+                          : Icon(Icons.chevron_right, color: Colors.grey[400]),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${soldeAffiche.toStringAsFixed(2)} \$',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: soldeAffiche >= 0
-                            ? Colors.green[700]
-                            : Colors.red[700],
-                      ),
-                    ),
-                    if (isCheque)
+              ),
+            ),
+          );
+        },
+      );
+    } else if (compte.type == 'Carte de crédit') {
+      // Affichage spécial pour carte de crédit : lire soldeActuel Firestore
+      return FutureBuilder<DocumentSnapshot>(
+        future: FirebaseFirestore.instance
+            .collection('comptes')
+            .doc(compte.id)
+            .get(),
+        builder: (context, snapshot) {
+          double soldeAffiche = compte.solde;
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            soldeAffiche =
+                -((data['soldeActuel'] as num?)?.toDouble() ?? compte.solde);
+          }
+          return Container(
+            key: ValueKey(compte.id),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 2,
+              color: const Color(0xFF232526),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: editing
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PageDetailCarteCredit(
+                                compteId: compte.id, nomCarte: compte.nom),
+                          ),
+                        );
+                      },
+                onLongPress: editing
+                    ? null
+                    : () => _showCompteMenu(context, compte, isCheque),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
                       Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
+                        width: 4,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(12),
+                          color: Color(compte.couleur),
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        child: Text(
-                          'Prêt à placer: ${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              compte.nom,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              compte.type,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${soldeAffiche.toStringAsFixed(2)} \$',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      editing
+                          ? const Icon(Icons.drag_handle, color: Colors.white54)
+                          : Icon(Icons.chevron_right, color: Colors.grey[400]),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      double soldeAffiche = compte.solde;
+      if (compte.type == 'Investissement') {
+        // On va chercher la valeur totale des actions + cash disponible
+        // Pour l'instant, on affiche solde + cash, mais il faudrait idéalement requêter la vraie valeur des actions
+        // (On peut améliorer avec un service ou un cache si besoin)
+        // TODO: Remplacer par la vraie valeur des actions si dispo
+        soldeAffiche = compte.solde + cashDisponible;
+      }
+
+      return Container(
+        key: ValueKey(compte.id),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Card(
+          elevation: 2,
+          color: const Color(0xFF232526),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: editing
+                ? null
+                : () {
+                    if (compte.type == 'Investissement') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PageInvestissement(compteId: compte.id),
+                        ),
+                      );
+                    } else if (compte.type == 'Carte de crédit') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PageDetailCarteCredit(
+                              compteId: compte.id, nomCarte: compte.nom),
+                        ),
+                      );
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PageTransactionsCompte(compte: compte),
+                        ),
+                      );
+                    }
+                  },
+            onLongPress: editing
+                ? null
+                : () => _showCompteMenu(context, compte, isCheque),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Color(compte.couleur),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          compte.nom,
                           style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          compte.type,
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${soldeAffiche.toStringAsFixed(2)} \$',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: soldeAffiche >= 0
+                              ? Colors.green[700]
+                              : Colors.red[700],
+                        ),
                       ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: Colors.grey[400]),
-              ],
+                      if (isCheque || compte.type == 'Investissement')
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Color(compte.couleur),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            compte.type == 'Investissement'
+                                ? 'CASH : ${cashDisponible.toStringAsFixed(2)} \$'
+                                : 'Prêt à placer: ${compte.pretAPlacer.toStringAsFixed(2)} \$',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  editing
+                      ? const Icon(Icons.drag_handle, color: Colors.white54)
+                      : Icon(Icons.chevron_right, color: Colors.grey[400]),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
 
-  void _afficherMenuCompte(BuildContext context, Compte compte, bool isCheque) {
-    print('=== MENU COMPTE OUVERT ===');
-    print('Compte: ${compte.nom}');
-    print('Type: ${compte.type}');
-    print('ID: ${compte.id}');
-    print('IsCheque: $isCheque');
-
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Modifier'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          PageModificationCompte(compte: compte),
-                    ),
-                  );
-                },
-              ),
-              if (isCheque || compte.type == 'Carte de crédit')
-                ListTile(
-                  leading: const Icon(Icons.sync),
-                  title: const Text('Réconcilier'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            PageReconciliation(compte: compte),
-                      ),
-                    );
-                  },
-                ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: Colors.red),
-                ),
-                onTap: () {
-                  print('=== BOUTON SUPPRIMER CLIQUÉ ===');
-                  print('Compte: ${compte.nom}');
-                  Navigator.pop(context);
-                  _confirmerSuppression(context, compte);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _confirmerSuppression(BuildContext context, Compte compte) {
-    print('=== CONFIRMATION SUPPRESSION ===');
-    print('Compte à supprimer: ${compte.nom}');
-    print('Type: ${compte.type}');
-    print('ID: ${compte.id}');
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirmer la suppression'),
-          content: Text(
-            'Êtes-vous sûr de vouloir supprimer le compte "${compte.nom}" ?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                try {
-                  print('=== DÉBUT SUPPRESSION ===');
-                  print('Type de compte: ${compte.type}');
-                  print('Nom du compte: ${compte.nom}');
-                  print('ID du compte: ${compte.id}');
-                  print('Est archivé actuellement: ${compte.estArchive}');
-
-                  // Logger la suppression
-                  final pb = await PocketBaseService.instance;
-                  final userId = pb.authStore.model?.id ?? 'anonymous';
-                  print('Utilisateur connecté: $userId');
-
-                  // Log de l'archivage (remplace FirebaseMonitorService)
-                  print('🔄 Archivage du compte: ${compte.nom} (Type: ${compte.type})');
-
-                  print('Tentative d\'archivage...');
-
-                  // Utiliser la même logique d'archivage pour tous les types de comptes
-                  await PocketBaseService.updateCompte(compte.id, {
-                    'estArchive': true,
-                    'dateSuppression': DateTime.now().toIso8601String(),
-                  });
-
-                  print('=== SUPPRESSION RÉUSSIE ===');
-                  print('Compte supprimé avec succès: ${compte.nom}');
-                  print('Type de compte: ${compte.type}');
-                  print('ID du compte: ${compte.id}');
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content:
-                            Text('Compte ${compte.nom} supprimé avec succès'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  print('=== ERREUR DE SUPPRESSION ===');
-                  print('Erreur lors de la suppression: $e');
-                  print('Type d\'erreur: ${e.runtimeType}');
-                  print('Stack trace: ${StackTrace.current}');
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(
-                      content: Text('Erreur lors de la suppression: $e'),
-                      backgroundColor: Colors.red,
-                    ));
-                  }
-                }
-              },
-              child: const Text(
-                'Supprimer',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildDetteCard(Dette dette, BuildContext context) {
+  Widget _buildDetteCard(Dette dette) {
     final color = Colors.red; // Couleur rouge pour les dettes
     final isDetteManuelle =
         dette.estManuelle; // Vérifier si c'est une dette manuelle
 
-    // Debug silencieux
-
     return Container(
+      key: ValueKey(dette.id),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Card(
         elevation: 2,
-        color: const Color(0xFF313334),
+        color: const Color(0xFF232526),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            // Navigation conditionnelle selon le type de dette
-            if (isDetteManuelle) {
-              // Dette manuelle → PageParametresDettes
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PageParametresDettes(dette: dette),
-                ),
-              );
-            } else {
-              // Dette automatique → PagePretPersonnel (section Prêts & Dettes)
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PagePretPersonnel(),
-                ),
-              );
-            }
-          },
-          onLongPress: () {
-            // Pas de menu pour les dettes automatiques
-          },
+          onTap: _editionMode
+              ? null
+              : () {
+                  // Navigation conditionnelle selon le type de dette
+                  if (isDetteManuelle) {
+                    // Dette manuelle → PageParametresDettes
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PageParametresDettes(dette: dette),
+                      ),
+                    );
+                  } else {
+                    // Dette automatique → PagePretPersonnel (section Prêts & Dettes)
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PagePretPersonnel(),
+                      ),
+                    );
+                  }
+                },
+          onLongPress:
+              _editionMode ? null : null, // Pas de menu pour les dettes
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -588,10 +641,9 @@ class PageComptes extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 8),
-                Icon(
-                  isDetteManuelle ? Icons.settings : Icons.account_balance,
-                  color: Colors.grey[400],
-                ),
+                _editionMode
+                    ? const Icon(Icons.drag_handle, color: Colors.white54)
+                    : Icon(Icons.chevron_right, color: Colors.grey[400]),
               ],
             ),
           ),
@@ -599,115 +651,113 @@ class PageComptes extends StatelessWidget {
       ),
     );
   }
-}
 
-class CompteCardWidget extends StatelessWidget {
-  final Compte compte;
-  final Color defaultColor;
-  final BuildContext contextParent;
-  final bool isCheque;
-  final void Function()? onTap;
-  final void Function()? onLongPress;
+  Future<void> _reorder(
+      List<Compte> section, int oldIndex, int newIndex) async {
+    if (oldIndex < newIndex) newIndex -= 1;
+    final item = section.removeAt(oldIndex);
+    section.insert(newIndex, item);
 
-  const CompteCardWidget({
-    super.key,
-    required this.compte,
-    required this.defaultColor,
-    required this.contextParent,
-    required this.isCheque,
-    this.onTap,
-    this.onLongPress,
-  });
+    // Met à jour l\'ordre dans Firestore pour cette section uniquement.
+    for (var i = 0; i < section.length; i++) {
+      await PocketBaseService.updateCompte(section[i].id, {'ordre': i});
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final color = Color(compte.couleur);
-    final isDette = compte.type == 'Dette';
-    final soldeAffiche = compte.solde;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        elevation: 2,
-        color: const Color(0xFF313334),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        compte.nom,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        compte.type,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${soldeAffiche.toStringAsFixed(2)} \$',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: soldeAffiche >= 0
-                            ? Colors.green[700]
-                            : Colors.red[700],
-                      ),
+    setState(() {}); // Rafraîchir l\'UI
+  }
+
+  void _showCompteMenu(BuildContext context, Compte compte, bool isCheque) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Modifier'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          PageModificationCompte(compte: compte),
                     ),
-                    if (isCheque)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Prêt à placer: ${compte.pretAPlacer.toStringAsFixed(2)} \$',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                  );
+                },
+              ),
+              if (isCheque || compte.type == 'Carte de crédit')
+                ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Réconcilier'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            PageReconciliation(compte: compte),
                       ),
-                  ],
+                    );
+                  },
                 ),
-                const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: Colors.grey[400]),
-              ],
-            ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Supprimer',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDelete(context, compte);
+                },
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Compte compte) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmer la suppression'),
+          content: Text(
+              'Êtes-vous sûr de vouloir supprimer le compte "${compte.nom}" ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await PocketBaseService.updateCompte(compte.id, {
+                    'estArchive': true,
+                    'dateSuppression': DateTime.now().toIso8601String(),
+                  });
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Compte supprimé avec succès')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur: $e')),
+                    );
+                  }
+                }
+              },
+              child:
+                  const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 }
