@@ -3,7 +3,6 @@ import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../models/enveloppe.dart';
 import '../services/argent_service.dart';
-import '../services/firebase_service.dart';
 import '../services/color_service.dart';
 import '../services/cache_service.dart';
 import '../services/persistent_cache_service.dart';
@@ -438,7 +437,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   Widget _buildVirerArgentContent(BuildContext context) {
     return StreamBuilder<List<Compte>>(
       key: ValueKey('comptes_$_refreshKey'),
-      stream: FirebaseService().lireComptes(),
+      stream: PocketBaseService.lireComptes(),
       builder: (context, comptesSnapshot) {
         print('🔍 DEBUG StreamBuilder<List<Compte>> - hasData: ${comptesSnapshot.hasData}, hasError: ${comptesSnapshot.hasError}');
         if (comptesSnapshot.hasError) {
@@ -459,7 +458,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         
         return StreamBuilder<List<Categorie>>(
           key: ValueKey('categories_$_refreshKey'),
-          stream: FirebaseService().lireCategories(),
+          stream: PocketBaseService.lireCategories(),
           builder: (context, catSnapshot) {
             print('🔍 DEBUG StreamBuilder<List<Categorie>> - hasData: ${catSnapshot.hasData}, hasError: ${catSnapshot.hasError}');
             if (catSnapshot.hasError) {
