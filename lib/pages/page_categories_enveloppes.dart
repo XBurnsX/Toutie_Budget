@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/categorie.dart';
 import '../models/enveloppe.dart';
 import '../services/auth_service.dart';
-import '../services/firebase_service.dart';
-import '../services/cache_service.dart';
 import '../services/pocketbase_service.dart';
 import 'page_set_objectif.dart';
 import 'dart:async';
@@ -36,15 +34,19 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
   }
 
   Future<void> _initCategories() async {
-    // Charger les catégories initiales depuis le cache
+    // Charger les catégories initiales depuis PocketBase
     try {
-      final categories = await CacheService.getCategories(FirebaseService());
-      if (mounted) {
-        final sortedCategories = _sortCategoriesWithDetteFirst(categories);
-        setState(() {
-          _categories = sortedCategories;
-          _isLoading = false;
-        });
+      // Utiliser directement PocketBase au lieu du cache Firebase
+      final categoriesStream = PocketBaseService.lireCategories();
+      await for (final categories in categoriesStream.take(1)) {
+        if (mounted) {
+          final sortedCategories = _sortCategoriesWithDetteFirst(categories);
+          setState(() {
+            _categories = sortedCategories;
+            _isLoading = false;
+          });
+        }
+        break;
       }
     } catch (e) {
       if (mounted) {
@@ -54,8 +56,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       }
     }
 
-    // Ensuite, écouter les changements en temps réel
-    _categoriesSubscription = FirebaseService().lireCategories().listen((
+    // Ensuite, écouter les changements en temps réel depuis PocketBase
+    _categoriesSubscription = PocketBaseService.lireCategories().listen((
       categories,
     ) {
       if (mounted && !_editionMode) {
@@ -147,16 +149,18 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       _categories = updatedCategories;
     });
 
-    // Mettre à jour l'ordre dans Firebase
+    // Mettre à jour l'ordre dans PocketBase
     try {
       // Mettre à jour chaque catégorie individuellement avec son nouvel ordre
       for (int i = 0; i < updatedCategories.length; i++) {
         final cat = updatedCategories[i];
-        await FirebaseService()
-            .firestore
-            .collection('categories')
-            .doc(cat.id)
-            .update({'ordre': i});
+        final updatedCat = Categorie(
+          id: cat.id,
+          utilisateurId: cat.utilisateurId,
+          nom: cat.nom,
+          ordre: i,
+        );
+        await PocketBaseService.ajouterCategorie(updatedCat);
       }
     } catch (e) {
       // En cas d'erreur, afficher un message
@@ -301,18 +305,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         ordre: categorie.ordre,
       );
 
-      // Sauvegarder dans Firebase
-      await FirebaseService().ajouterCategorie(updatedCat);
-
-      // Mettre à jour l'état local immédiatement
-      final categorieIndex = _categories.indexWhere(
-        (c) => c.id == categorie.id,
-      );
-      if (categorieIndex != -1) {
-        setState(() {
-          _categories[categorieIndex] = updatedCat;
-        });
-      }
+      // Sauvegarder dans PocketBase
+      await PocketBaseService.ajouterCategorie(updatedCat);
     }
   }
 
@@ -348,8 +342,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         ordre: categorie.ordre,
       );
 
-      // Sauvegarder dans Firebase
-      await FirebaseService().ajouterCategorie(updatedCat);
+      // Sauvegarder dans PocketBase
+      await PocketBaseService.ajouterCategorie(updatedCat);
 
       // Mettre à jour l'état local immédiatement
       final categorieIndex = _categories.indexWhere(
@@ -384,7 +378,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       ),
     );
     if (confirm == true) {
-      await FirebaseService().supprimerCategorie(categorie.id);
+      await PocketBaseService.supprimerCategorie(categorie.id);
 
       // Mettre à jour l'état local pour refléter la suppression immédiatement
       setState(() {
@@ -432,8 +426,8 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
         ordre: categorie.ordre,
       );
 
-      // Sauvegarder dans Firebase
-      await FirebaseService().ajouterCategorie(updatedCat);
+      // Sauvegarder dans PocketBase
+      await PocketBaseService.ajouterCategorie(updatedCat);
 
       // Mettre à jour l'état local immédiatement
       final categorieIndex = _categories.indexWhere(
@@ -469,7 +463,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       ),
     );
     if (confirm == true) {
-      await FirebaseService().archiverEnveloppe(categorie.id, enveloppe.id);
+      await PocketBaseService.archiverEnveloppe(enveloppe.id);
     }
   }
 
@@ -490,11 +484,13 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                     _categoriesSubscription?.pause();
                     for (int i = 0; i < _categories.length; i++) {
                       final cat = _categories[i];
-                      await FirebaseService()
-                          .firestore
-                          .collection('categories')
-                          .doc(cat.id)
-                          .update({'ordre': i});
+                      final updatedCat = Categorie(
+                        id: cat.id,
+                        utilisateurId: cat.utilisateurId,
+                        nom: cat.nom,
+                        ordre: i,
+                      );
+                      await PocketBaseService.ajouterCategorie(updatedCat);
                     }
                     setState(() {
                       _editionMode = false;
@@ -568,11 +564,13 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                   _categoriesSubscription?.pause();
                   for (int i = 0; i < _categories.length; i++) {
                     final cat = _categories[i];
-                    await FirebaseService()
-                        .firestore
-                        .collection('categories')
-                        .doc(cat.id)
-                        .update({'ordre': i});
+                    final updatedCat = Categorie(
+                      id: cat.id,
+                      utilisateurId: cat.utilisateurId,
+                      nom: cat.nom,
+                      ordre: i,
+                    );
+                    await PocketBaseService.ajouterCategorie(updatedCat);
                   }
                   setState(() {
                     _editionMode = false;
@@ -675,10 +673,12 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                               false, // On utilise une poignée personnalisée
                           itemBuilder: (context, index) {
                             final categorie = _categories[index];
-                            return _buildCategorieItem(
-                              categorie,
-                              index: index,
-                              key: ValueKey(categorie.id),
+                            return Container(
+                              key: ValueKey('categorie_${categorie.id}'),
+                              child: _buildCategorieItem(
+                                categorie,
+                                index: index,
+                              ),
                             );
                           },
                         ),
@@ -717,18 +717,24 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
                 physics: const NeverScrollableScrollPhysics(),
                 buildDefaultDragHandles: false,
                 itemCount: enveloppes.length,
-                itemBuilder: (context, idx) => _buildEnveloppeItem(
-                  categorie,
-                  enveloppes[idx],
-                  index: idx,
-                  key: ValueKey(enveloppes[idx].id),
+                itemBuilder: (context, idx) => Container(
+                  key: ValueKey('enveloppe_${enveloppes[idx].id}'),
+                  child: _buildEnveloppeItem(
+                    categorie,
+                    enveloppes[idx],
+                    index: idx,
+                  ),
                 ),
                 onReorder: (oldIndex, newIndex) =>
                     _reorderEnveloppes(categorie, oldIndex, newIndex),
               )
             : Column(
                 children: enveloppes
-                    .map((enveloppe) => _buildEnveloppeItem(categorie, enveloppe))
+                    .map((enveloppe) => _buildEnveloppeItem(
+                          categorie, 
+                          enveloppe,
+                          key: ValueKey('enveloppe_normal_${enveloppe.id}'),
+                        ))
                     .toList(),
               );
 

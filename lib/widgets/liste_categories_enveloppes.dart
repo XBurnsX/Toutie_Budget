@@ -342,6 +342,10 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
   Widget _buildEnveloppeWidget(
       Map<String, dynamic> enveloppe, Map<String, dynamic> categorie) {
+    // Debug: Afficher les données de l'enveloppe
+    print('🔍 DEBUG _buildEnveloppeWidget - Enveloppe: ${enveloppe['nom']}');
+    print('🔍 DEBUG _buildEnveloppeWidget - Données brutes: $enveloppe');
+
     // --- Logique d'affichage de l'historique ---
     Map<String, dynamic> historique = enveloppe['historique'] != null
         ? Map<String, dynamic>.from(enveloppe['historique'])
@@ -363,44 +367,52 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         (selectedDate.year == now.year &&
             selectedDate.month > now.month);
 
-    double solde;
+    double soldeEnveloppe;
     double objectif;
     double depense;
 
     if (widget.selectedMonthKey == null ||
         widget.selectedMonthKey == currentMonthKey) {
       // Mois courant -> valeurs globales
-      solde = (enveloppe['solde'] ?? 0.0).toDouble();
-      objectif = (enveloppe['objectif'] ?? 0.0).toDouble();
+      soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
+      objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
       depense = (enveloppe['depense'] ?? 0.0).toDouble();
+      print('🔍 DEBUG - Mois courant - soldeEnveloppe: $soldeEnveloppe');
     } else if (histoMois != null) {
       // Mois passé avec historique -> valeurs de l'historique
-      solde = (histoMois['solde'] ?? 0.0).toDouble();
+      soldeEnveloppe = (histoMois['solde'] ?? 0.0).toDouble();
       objectif = (histoMois['objectif'] ?? 0.0).toDouble();
       depense = (histoMois['depense'] ?? 0.0).toDouble();
+      print('🔍 DEBUG - Mois historique - soldeEnveloppe: $soldeEnveloppe');
     } else if (isFutureMonth) {
       // Mois futur -> valeurs projetées
-      solde = (enveloppe['solde'] ?? 0.0).toDouble();
-      objectif = (enveloppe['objectif'] ?? 0.0).toDouble();
+      soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
+      objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
       depense = 0.0;
+      print('🔍 DEBUG - Mois futur - soldeEnveloppe: $soldeEnveloppe');
     } else {
       // Mois passé sans historique -> 0
-      solde = 0.0;
+      soldeEnveloppe = 0.0;
       objectif = 0.0;
       depense = 0.0;
+      print('🔍 DEBUG - Mois passé sans historique - soldeEnveloppe: $soldeEnveloppe');
     }
 
-    final bool estNegative = solde < 0;
+    print('🔍 DEBUG - Solde final calculé: $soldeEnveloppe');
+    print('🔍 DEBUG - selectedMonthKey: ${widget.selectedMonthKey}');
+    print('🔍 DEBUG - currentMonthKey: $currentMonthKey');
+
+    final bool estNegative = soldeEnveloppe < 0;
     final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
     final double progression = (objectif > 0)
-        ? (estDepenseAtteint ? 1.0 : (solde / objectif).clamp(0.0, 1.0))
+        ? (estDepenseAtteint ? 1.0 : (soldeEnveloppe / objectif).clamp(0.0, 1.0))
         : 0.0;
-    final Color etatColor = _getEtatColor(solde, objectif);
+    final Color etatColor = _getEtatColor(soldeEnveloppe, objectif);
 
     // --- Widget bulle enveloppe interactif ---
     Color bulleColor;
-    final String compteId = enveloppe['provenance_compte_id'] ?? '';
-    if (solde == 0) {
+    final String compteId = enveloppe['compte_provenance_id'] ?? '';
+    if (soldeEnveloppe == 0) {
       bulleColor = const Color(0xFF44474A);
     } else if (estNegative) {
       bulleColor = Colors.red;
@@ -446,12 +458,20 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                 ),
               ),
             ),
-            Text(
-              '${solde.toStringAsFixed(2)}\$',
-              style: TextStyle(
-                color: estNegative ? Colors.red[800] : Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            // Bulle colorée avec le montant dedans
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: bulleColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${soldeEnveloppe.toStringAsFixed(2)}\$',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
@@ -473,7 +493,7 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
               );
             },
             onLongPress: () {
-              if (solde > 0) {
+              if (soldeEnveloppe > 0) {
                 _showViderEnveloppeMenu(context, enveloppe);
               }
             },

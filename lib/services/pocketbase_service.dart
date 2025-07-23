@@ -122,6 +122,51 @@ class PocketBaseService {
     }
   }
 
+  // ============================================================================
+  // MÉTHODES POUR GÉRER LES CATÉGORIES
+  // ============================================================================
+
+  // Méthode pour ajouter ou mettre à jour une catégorie
+  static Future<String> ajouterCategorie(Categorie categorie) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      if (userId == null) throw Exception('Utilisateur non connecté');
+      
+      final categorieData = {
+        'utilisateur_id': userId,
+        'nom': categorie.nom,
+        'ordre': categorie.ordre,
+      };
+      
+      // Si l'ID existe, on met à jour, sinon on crée
+      if (categorie.id.isNotEmpty) {
+        await pb.collection('categories').update(categorie.id, body: categorieData);
+        print('✅ Catégorie mise à jour avec succès: ${categorie.id}');
+        return categorie.id;
+      } else {
+        final record = await pb.collection('categories').create(body: categorieData);
+        print('✅ Catégorie ajoutée avec succès: ${record.id}');
+        return record.id;
+      }
+    } catch (e) {
+      print('❌ Erreur ajout/mise à jour catégorie: $e');
+      throw Exception('Erreur lors de l\'ajout/mise à jour de la catégorie: $e');
+    }
+  }
+
+  // Méthode pour supprimer une catégorie
+  static Future<void> supprimerCategorie(String categorieId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('categories').delete(categorieId);
+      print('✅ Catégorie supprimée avec succès: $categorieId');
+    } catch (e) {
+      print('❌ Erreur suppression catégorie: $e');
+      throw Exception('Erreur lors de la suppression de la catégorie: $e');
+    }
+  }
+
   // Lire uniquement les comptes chèques depuis PocketBase
   static Stream<List<Compte>> lireComptesChecques() async* {
     try {
@@ -538,43 +583,7 @@ class PocketBaseService {
     await mettreAJourEnveloppe(enveloppeId, donneesModification);
   }
 
-  // Méthode pour ajouter une catégorie
-  static Future<void> ajouterCategorie(Categorie categorie) async {
-    try {
-      final pb = await _getPocketBaseInstance();
-      await pb.collection('categories').create(body: categorie.toMap());
-      print('✅ Catégorie ajoutée avec succès: ${categorie.nom}');
-    } catch (e) {
-      print('❌ Erreur ajout catégorie: $e');
-      throw Exception('Erreur lors de l\'ajout de la catégorie: $e');
-    }
-  }
-
-  // Méthodes pour compatibilité migration_service
-  static Future<List<Compte>> getComptes() async {
-    final comptes = <Compte>[];
-    await for (final listeComptes in lireTousLesComptes()) {
-      comptes.addAll(listeComptes);
-      break; // Prendre seulement la première émission du stream
-    }
-    return comptes;
-  }
-
-  static Future<List<Categorie>> getCategories() async {
-    final categories = <Categorie>[];
-    await for (final listeCategories in lireCategories()) {
-      categories.addAll(listeCategories);
-      break; // Prendre seulement la première émission du stream
-    }
-    return categories;
-  }
-
-  static Future<List<dynamic>> getTransactions() async {
-    // TODO: Implémenter quand on aura le modèle Transaction
-    return [];
-  }
-
-  // Ajouter un compte dans PocketBase
+  // Méthode pour ajouter un compte dans PocketBase
   static Future<void> ajouterCompte(Compte compte) async {
     try {
       print('🔄 PocketBaseService - Ajout compte: ${compte.nom}');
