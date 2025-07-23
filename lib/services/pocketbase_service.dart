@@ -335,12 +335,12 @@ class PocketBaseService {
       }
 
       // Récupérer tous les comptes de l'utilisateur
-      final records = await pb.collection('comptes').getList(
+      final records = await pb.collection('comptes').getFullList(
         filter: 'utilisateur_id = "$userId"',
         sort: 'ordre,nom',
       );
 
-      final comptes = records.items.map((record) {
+      final comptes = records.map((record) {
         return Compte(
           id: record.id,
           nom: record.data['nom'] ?? '',
@@ -366,12 +366,12 @@ class PocketBaseService {
   static Future<List<Map<String, dynamic>>> lireEnveloppesParCategorie(String categorieId) async {
     try {
       final pb = await _getPocketBaseInstance();
-      final records = await pb.collection('enveloppes').getList(
+      final records = await pb.collection('enveloppes').getFullList(
         filter: 'categorie_id = "$categorieId"',
         sort: 'nom',
       );
       
-      return records.items.map((record) => record.toJson()).toList();
+      return records.map((record) => record.toJson()).toList();
     } catch (e) {
       print('❌ Erreur récupération enveloppes par catégorie: $e');
       return [];
@@ -382,22 +382,45 @@ class PocketBaseService {
   static Future<Map<String, List<Map<String, dynamic>>>> lireEnveloppesGroupeesParCategorie() async {
     try {
       final pb = await _getPocketBaseInstance();
-      final records = await pb.collection('enveloppes').getList(
+      
+      // Vérifier que l'utilisateur est connecté
+      final utilisateurId = pb.authStore.model?.id;
+      if (utilisateurId == null) {
+        print('❌ Aucun utilisateur connecté dans PocketBase');
+        return {};
+      }
+      
+      // Filtrer par utilisateur connecté
+      final filtre = 'utilisateur_id = "$utilisateurId"';
+      print('🔍 Filtre utilisé pour enveloppes: $filtre');
+      
+      final records = await pb.collection('enveloppes').getFullList(
+        filter: filtre,
         expand: 'categorie_id',
         sort: 'categorie_id.nom,nom',
       );
       
+      print('🔍 DEBUG lireEnveloppesGroupeesParCategorie - ${records.length} enveloppes récupérées');
+      
       final Map<String, List<Map<String, dynamic>>> enveloppesParCategorie = {};
       
-      for (final record in records.items) {
+      for (final record in records) {
         final categorieId = record.data['categorie_id'] as String;
         final enveloppeData = record.toJson();
+        final nomEnveloppe = record.data['nom'] ?? 'Sans nom';
+        
+        print('🔍 Enveloppe "$nomEnveloppe" -> catégorie ID: "$categorieId"');
         
         if (!enveloppesParCategorie.containsKey(categorieId)) {
           enveloppesParCategorie[categorieId] = [];
         }
         enveloppesParCategorie[categorieId]!.add(enveloppeData);
       }
+      
+      print('🔍 DEBUG Résultat groupement:');
+      enveloppesParCategorie.forEach((catId, enveloppes) {
+        print('🔍 Catégorie ID "$catId" -> ${enveloppes.length} enveloppes');
+      });
       
       return enveloppesParCategorie;
     } catch (e) {
@@ -413,13 +436,13 @@ class PocketBaseService {
       final userId = pb.authStore.model?.id;
       if (userId == null) throw Exception('Utilisateur non connecté');
       
-      final records = await pb.collection('enveloppes').getList(
+      final records = await pb.collection('enveloppes').getFullList(
         filter: 'utilisateur_id = "$userId"',
         expand: 'categorie_id',
         sort: 'categorie_id.nom,nom',
       );
       
-      return records.items.map((record) => record.toJson()).toList();
+      return records.map((record) => record.toJson()).toList();
     } catch (e) {
       print('❌ Erreur récupération toutes enveloppes: $e');
       return [];

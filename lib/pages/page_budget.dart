@@ -349,6 +349,25 @@ class _PageBudgetState extends State<PageBudget> {
                                     
                                     final enveloppesParCategorie = enveloppesSnapshot.data!;
                                     
+                                    // Debug: Afficher les clés du dictionnaire des enveloppes
+                                    print('🔍 DEBUG - Clés du dictionnaire enveloppesParCategorie:');
+                                    enveloppesParCategorie.keys.forEach((key) {
+                                      print('🔍 Clé: "$key" -> ${enveloppesParCategorie[key]!.length} enveloppes');
+                                    });
+                                    
+                                    // Debug: Afficher les IDs des catégories
+                                    print('🔍 DEBUG - IDs des catégories:');
+                                    for (final cat in categories) {
+                                      print('🔍 Catégorie "${cat.nom}" -> ID: "${cat.id}"');
+                                    }
+                                    
+                                    // Debug: Afficher combien d'enveloppes par catégorie
+                                    print('🔍 DEBUG MAPPING - Enveloppes par catégorie:');
+                                    for (final cat in categories) {
+                                      final enveloppesCat = enveloppesParCategorie[cat.id] ?? [];
+                                      print('🔍 Catégorie "${cat.nom}" (ID: ${cat.id}) -> ${enveloppesCat.length} enveloppes');
+                                    }
+                                    
                                     return ListeCategoriesEnveloppes(
                                       categories: categories
                                           .map((c) => {
@@ -728,6 +747,25 @@ class _PageBudgetState extends State<PageBudget> {
                         }
                         
                         final enveloppesParCategorie = enveloppesSnapshot.data!;
+                        
+                        // Debug: Afficher les clés du dictionnaire des enveloppes
+                        print('🔍 DEBUG - Clés du dictionnaire enveloppesParCategorie:');
+                        enveloppesParCategorie.keys.forEach((key) {
+                          print('🔍 Clé: "$key" -> ${enveloppesParCategorie[key]!.length} enveloppes');
+                        });
+                        
+                        // Debug: Afficher les IDs des catégories
+                        print('🔍 DEBUG - IDs des catégories:');
+                        for (final cat in categories) {
+                          print('🔍 Catégorie "${cat.nom}" -> ID: "${cat.id}"');
+                        }
+                        
+                        // Debug: Afficher combien d'enveloppes par catégorie
+                        print('🔍 DEBUG MAPPING - Enveloppes par catégorie:');
+                        for (final cat in categories) {
+                          final enveloppesCat = enveloppesParCategorie[cat.id] ?? [];
+                          print('🔍 Catégorie "${cat.nom}" (ID: ${cat.id}) -> ${enveloppesCat.length} enveloppes');
+                        }
                         
                         return ListeCategoriesEnveloppes(
                           categories: categories
