@@ -735,7 +735,7 @@ class _PageComptesState extends State<PageComptes> {
                 Navigator.of(context).pop();
                 try {
                   await PocketBaseService.updateCompte(compte.id, {
-                    'estArchive': true,
+                    'archive': true,
                     'dateSuppression': DateTime.now().toIso8601String(),
                   });
                   if (context.mounted) {
