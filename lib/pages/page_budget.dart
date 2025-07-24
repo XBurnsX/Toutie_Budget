@@ -24,10 +24,10 @@ class PageBudget extends StatefulWidget {
 }
 
 class _PageBudgetState extends State<PageBudget> {
-  DateTime selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month, 1);
-
+  DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
   int refreshKey = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -36,26 +36,51 @@ class _PageBudgetState extends State<PageBudget> {
   }
 
   Future<void> _triggerRollover() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
     try {
       // Traiter le rollover mensuel avec AllocationService
       await AllocationService.traiterRolloverMensuel();
 
       if (mounted) {
         setState(() {
-          refreshKey++; // Force a refresh of the UI
+          refreshKey++;
+          _isLoading = false;
         });
       }
     } catch (e) {
       print('❌ Erreur rollover: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erreur lors du chargement des données';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> handleMonthChange(DateTime date) async {
     if (!mounted) return;
+    
     setState(() {
-      // Normaliser la date au 1er jour du mois
+      _isLoading = true;
+      _errorMessage = null;
       selectedMonth = DateTime(date.year, date.month, 1);
     });
+    
+    // Attendre un court instant pour permettre à l'UI de se mettre à jour
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   String get selectedMonthKey =>
@@ -101,7 +126,38 @@ class _PageBudgetState extends State<PageBudget> {
           stream: PocketBaseService.lireTousLesComptes(),
           builder: (context, snapshot) {
             if (!snapshot.hasData || !mounted) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Chargement des comptes...'),
+                  ],
+                ),
+              );
+            }
+            
+            if (_errorMessage != null) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _triggerRollover,
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              );
             }
             final comptes = snapshot.data ?? [];
             final comptesNonArchives =
@@ -343,9 +399,49 @@ class _PageBudgetState extends State<PageBudget> {
                                       .lireEnveloppesGroupeesParCategorie(
                                           mois: selectedMonth),
                                   builder: (context, enveloppesSnapshot) {
+                                    if (_isLoading) {
+                                      return const Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            CircularProgressIndicator(),
+                                            SizedBox(height: 16),
+                                            Text('Chargement des enveloppes...'),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    
+                                    if (enveloppesSnapshot.hasError) {
+                                      return Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                                            const SizedBox(height: 16),
+                                            const Text(
+                                              'Erreur lors du chargement des enveloppes',
+                                              style: TextStyle(color: Colors.red),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                            const SizedBox(height: 16),
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  refreshKey++;
+                                                });
+                                              },
+                                              child: const Text('Réessayer'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    
                                     if (!enveloppesSnapshot.hasData) {
                                       return const Center(
-                                          child: CircularProgressIndicator());
+                                        child: Text('Aucune donnée disponible'),
+                                      );
                                     }
 
                                     final enveloppesParCategorie =

@@ -470,41 +470,70 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                      compteSnapshot.data!['collection_compte_source'] != null) {
               // Utiliser le compte source de l'allocation mensuelle
               final compteSourceId = compteSnapshot.data!['compte_source_id']!;
-              final collectionSource =
-                  compteSnapshot.data!['collection_compte_source']!;
+              final collectionSource = compteSnapshot.data!['collection_compte_source']!;
 
               print(
-                  '🎨 COULEUR ${enveloppe['nom']}: Compte source trouvé: $compteSourceId ($collectionSource)');
+                  '🎨 COULEUR ${enveloppe['nom']}: Compte source trouvé: $compteSourceId ($collectionSource)' );
 
               // Chercher le compte dans la liste des comptes
               Map<String, dynamic>? compte;
               try {
-                compte = widget.comptes.firstWhere(
-                  (c) => c['id'].toString() == compteSourceId,
-                );
-              } catch (e) {
-                // Si non trouvé, prendre le premier compte
-                if (widget.comptes.isNotEmpty) {
-                  compte = widget.comptes[0];
+                // Vérifier d'abord si la collection du compte correspond
+                final comptesFiltres = widget.comptes.where((c) => 
+                  c['id'].toString() == compteSourceId &&
+                  c['collection']?.toString().toLowerCase() == collectionSource.toLowerCase()
+                ).toList();
+                
+                if (comptesFiltres.isNotEmpty) {
+                  compte = comptesFiltres.first;
+                  print('🎨 COULEUR: Compte trouvé avec la bonne collection: ${compte['nom']}');
+                } else {
+                  // Si non trouvé avec la collection, essayer juste avec l'ID
+                  print('⚠️ Aucun compte trouvé avec la collection $collectionSource, recherche par ID uniquement');
+                  compte = widget.comptes.firstWhere(
+                    (c) => c['id'].toString() == compteSourceId,
+                  );
                 }
+              } catch (e) {
+                print('⚠️ Erreur recherche compte source: $e');
+                // Si non trouvé, prendre le premier compte de la même collection
+                final comptesMemeCollection = widget.comptes.where(
+                  (c) => c['collection']?.toString().toLowerCase() == collectionSource.toLowerCase()
+                ).toList();
+                
+                if (comptesMemeCollection.isNotEmpty) {
+                  compte = comptesMemeCollection[0];
+                  print('🎨 COUBLEUR: Utilisation d\'un compte de la même collection: ${compte['nom']}');
+                } else if (widget.comptes.isNotEmpty) {
+                  compte = widget.comptes[0];
+                  print('⚠️ Aucun compte trouvé dans la collection $collectionSource, utilisation du premier compte disponible');
+                }    
               }
 
-              if (compte != null &&
-                  compte['couleur'] != null &&
-                  compte['couleur'] is int) {
+              if (compte != null) {
                 try {
-                  bulleColor = Color(compte['couleur'] as int);
-                  print(
-                      '🎨 COULEUR ${enveloppe['nom']}: Couleur du compte ${compte['nom']} appliquée: ${compte['couleur']}');
+                  // Vérifier si la couleur est un int (valeur brute) ou un champ 'value' dans un objet
+                  dynamic couleurValue = compte['couleur'];
+                  if (couleurValue is Map && couleurValue['value'] != null) {
+                    couleurValue = couleurValue['value'];
+                  }
+                  
+                  if (couleurValue != null) {
+                    bulleColor = Color(couleurValue is int ? couleurValue : int.tryParse(couleurValue.toString()) ?? 0xFF44474A);
+                    print('🎨 COULEUR ${enveloppe['nom']}: Couleur du compte ${compte['nom']} appliquée: $couleurValue');
+                  } else {
+                    print('⚠️ COULEUR ${enveloppe['nom']}: Aucune couleur valide trouvée pour le compte');
+                    bulleColor = Colors.amber;
+                  }
                 } catch (e) {
+                  print('❌ ERREUR COULEUR ${enveloppe['nom']}: $e');
                   bulleColor = Colors.amber;
                   print(
                       '🎨 COULEUR ${enveloppe['nom']}: Erreur couleur -> Amber');
                 }
               } else {
                 bulleColor = Colors.amber;
-                print(
-                    '🎨 COULEUR ${enveloppe['nom']}: Compte non trouvé ou pas de couleur -> Amber');
+                print('🎨 COULEUR ${enveloppe['nom']}: Compte non trouvé ou pas de couleur -> Amber');
               }
             } else {
               // Fallback: utiliser le premier compte de la liste
