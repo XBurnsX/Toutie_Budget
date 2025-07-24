@@ -439,108 +439,149 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         final Color etatColor = _getEtatColor(soldeEnveloppe, objectif);
 
         // --- Widget bulle enveloppe interactif ---
-        Color bulleColor;
-
-        // Chercher le compte source depuis les allocations
-        String compteSourceId = '';
-        if (soldeAllocation > 0) {
-          // Utiliser le premier compte de la liste comme fallback
-          if (widget.comptes.isNotEmpty) {
-            compteSourceId = widget.comptes.first['id'].toString();
-          }
-        }
-
-        if (soldeEnveloppe == 0) {
-          bulleColor = const Color(0xFF44474A);
-        } else if (estNegative) {
-          bulleColor = Colors.red;
-        } else if (compteSourceId.isNotEmpty) {
-          final compte = widget.comptes.firstWhere(
-            (c) => c['id'].toString() == compteSourceId.toString(),
-            orElse: () => <String, Object>{},
-          );
-          if (compte['couleur'] != null && compte['couleur'] is int) {
-            try {
-              bulleColor = Color(compte['couleur'] as int);
-            } catch (_) {
-              bulleColor = Colors.amber;
-            }
-          } else {
-            bulleColor = Colors.amber;
-          }
-        } else {
-          bulleColor = Colors.amber;
-        }
-
-        final cardWidget = Card(
-          color: estNegative
-              ? Theme.of(context).colorScheme.error.withValues(alpha: 0.15)
-              : const Color(0xFF232526),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Icône d'avertissement pour les enveloppes négatives
-                if (estNegative) ...[
-                  Icon(Icons.warning, color: Colors.red[700], size: 20),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    enveloppe['nom'],
-                    style: TextStyle(
-                      color: estNegative ? Colors.red[800] : Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                // Bulle colorée avec le montant dedans
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: bulleColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${soldeEnveloppe.toStringAsFixed(2)}\$',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        return FutureBuilder<Map<String, String?>>(
+          future: AllocationService.obtenirCompteSourceEnveloppe(
+            enveloppeId: enveloppe['id'],
+            mois: moisAllocation,
           ),
-        );
+          builder: (context, compteSnapshot) {
+            Color bulleColor;
+            
+            print('🎨 COULEUR ${enveloppe['nom']}: solde=$soldeEnveloppe, snapshot=${compteSnapshot.hasData}');
 
-        return widget.editionMode
-            ? cardWidget
-            : InkWell(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => AssignationBottomSheet(
-                      enveloppe: enveloppe,
-                      comptes: widget.comptes,
-                      onAssignationComplete: () {
-                        setState(() {});
-                      },
-                    ),
-                  );
-                },
-                onLongPress: () {
-                  if (soldeEnveloppe > 0) {
-                    _showViderEnveloppeMenu(context, enveloppe);
+            if (soldeEnveloppe == 0) {
+              bulleColor = const Color(0xFF44474A);
+              print('🎨 COULEUR ${enveloppe['nom']}: Solde 0 -> Gris');
+            } else if (estNegative) {
+              bulleColor = Colors.red;
+              print('🎨 COULEUR ${enveloppe['nom']}: Négatif -> Rouge');
+            } else if (compteSnapshot.hasData && 
+                       compteSnapshot.data!['compte_source_id'] != null &&
+                       compteSnapshot.data!['collection_compte_source'] != null) {
+              // Utiliser le compte source de l'allocation mensuelle
+              final compteSourceId = compteSnapshot.data!['compte_source_id']!;
+              final collectionSource = compteSnapshot.data!['collection_compte_source']!;
+              
+              print('🎨 COULEUR ${enveloppe['nom']}: Compte source trouvé: $compteSourceId ($collectionSource)');
+              
+              // Chercher le compte dans la liste des comptes
+              Map<String, dynamic>? compte;
+              try {
+                compte = widget.comptes.firstWhere(
+                  (c) => c['id'].toString() == compteSourceId,
+                );
+              } catch (e) {
+                // Si non trouvé, prendre le premier compte
+                if (widget.comptes.isNotEmpty) {
+                  compte = widget.comptes[0];
+                }
+              }
+              
+              if (compte != null && compte['couleur'] != null && compte['couleur'] is int) {
+                try {
+                  bulleColor = Color(compte['couleur'] as int);
+                  print('🎨 COULEUR ${enveloppe['nom']}: Couleur du compte ${compte['nom']} appliquée: ${compte['couleur']}');
+                } catch (e) {
+                  bulleColor = Colors.amber;
+                  print('🎨 COULEUR ${enveloppe['nom']}: Erreur couleur -> Amber');
+                }
+              } else {
+                bulleColor = Colors.amber;
+                print('🎨 COULEUR ${enveloppe['nom']}: Compte non trouvé ou pas de couleur -> Amber');
+              }
+            } else {
+              // Fallback: utiliser le premier compte de la liste
+              if (widget.comptes.isNotEmpty) {
+                final compte = widget.comptes.first;
+                if (compte['couleur'] != null && compte['couleur'] is int) {
+                  try {
+                    bulleColor = Color(compte['couleur'] as int);
+                    print('🎨 COULEUR ${enveloppe['nom']}: Fallback premier compte ${compte['nom']}: ${compte['couleur']}');
+                  } catch (_) {
+                    bulleColor = Colors.amber;
+                    print('🎨 COULEUR ${enveloppe['nom']}: Fallback erreur -> Amber');
                   }
-                },
-                child: cardWidget,
-              );
+                } else {
+                  bulleColor = Colors.amber;
+                  print('🎨 COULEUR ${enveloppe['nom']}: Fallback pas de couleur -> Amber');
+                }
+              } else {
+                bulleColor = Colors.amber;
+                print('🎨 COULEUR ${enveloppe['nom']}: Aucun compte -> Amber');
+              }
+            }
+
+            final cardWidget = Card(
+              color: estNegative
+                  ? Theme.of(context).colorScheme.error.withValues(alpha: 0.15)
+                  : const Color(0xFF232526),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Icône d'avertissement pour les enveloppes négatives
+                    if (estNegative) ...[
+                      Icon(Icons.warning, color: Colors.red[700], size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        enveloppe['nom'],
+                        style: TextStyle(
+                          color: estNegative ? Colors.red[800] : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    // Bulle colorée avec le montant dedans
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: bulleColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '${soldeEnveloppe.toStringAsFixed(2)}\$',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+
+            return widget.editionMode
+                ? cardWidget
+                : InkWell(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => AssignationBottomSheet(
+                          enveloppe: enveloppe,
+                          comptes: widget.comptes,
+                          onAssignationComplete: () {
+                            setState(() {});
+                          },
+                        ),
+                      );
+                    },
+                    onLongPress: () {
+                      if (soldeEnveloppe > 0) {
+                        _showViderEnveloppeMenu(context, enveloppe);
+                      }
+                    },
+                    child: cardWidget,
+                  );
+          },
+        );
       },
     );
   }

@@ -262,70 +262,124 @@ class AllocationService {
     }
   }
 
+  // Récupérer les informations du compte source pour une enveloppe et un mois donné
+  static Future<Map<String, String?>> obtenirCompteSourceEnveloppe({
+    required String enveloppeId,
+    required DateTime mois,
+  }) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      if (userId == null) {
+        print('🔍 COMPTE_SOURCE: userId null');
+        return {'compte_source_id': null, 'collection_compte_source': null};
+      }
+
+      // Essayer plusieurs formats de filtre pour trouver le bon
+      print('🔍 COMPTE_SOURCE: Recherche pour enveloppe $enveloppeId');
+      
+      // Premiere tentative : sans filtre de date, juste enveloppe et utilisateur
+      var allocations = await pb.collection('allocations_mensuelles').getList(
+            filter: 'enveloppe_id = "$enveloppeId" && utilisateur_id = "$userId"',
+          );
+      
+      print('🔍 COMPTE_SOURCE: ${allocations.items.length} allocations trouvees sans filtre de date');
+      
+      // Si on trouve des allocations, filtrer par mois en code
+      List<dynamic> allocationsFinales = [];
+      if (allocations.items.isNotEmpty) {
+        allocationsFinales = allocations.items.where((allocation) {
+          final moisAllocation = allocation.data['mois']?.toString();
+          if (moisAllocation == null) return false;
+          
+          // Essayer de parser la date et comparer le mois/annee
+          try {
+            final dateMois = DateTime.parse(moisAllocation);
+            return dateMois.year == mois.year && dateMois.month == mois.month;
+          } catch (e) {
+            print('🔍 COMPTE_SOURCE: Erreur parsing date: $moisAllocation');
+            return false;
+          }
+        }).toList();
+        
+        print('🔍 COMPTE_SOURCE: ${allocationsFinales.length} allocations apres filtrage par mois');
+      }
+      
+      print('🔍 COMPTE_SOURCE: ${allocationsFinales.length} allocations finales a traiter');
+
+      // Afficher les allocations filtrées
+      for (int i = 0; i < allocationsFinales.length; i++) {
+        final allocation = allocationsFinales[i];
+        print('🔍 COMPTE_SOURCE: Allocation $i: ID=${allocation.id}');
+        print('🔍 COMPTE_SOURCE: - enveloppe_id: ${allocation.data['enveloppe_id']}');
+        print('🔍 COMPTE_SOURCE: - mois: ${allocation.data['mois']}');
+        print('🔍 COMPTE_SOURCE: - solde: ${allocation.data['solde']}');
+        print('🔍 COMPTE_SOURCE: - compte_source_id: ${allocation.data['compte_source_id']}');
+        print('🔍 COMPTE_SOURCE: - collection_compte_source: ${allocation.data['collection_compte_source']}');
+      }
+
+      for (final allocation in allocationsFinales) {
+        final compteSourceId = allocation.data['compte_source_id']?.toString();
+        final collectionCompteSource = allocation.data['collection_compte_source']?.toString();
+        
+        if (compteSourceId != null && compteSourceId.isNotEmpty &&
+            collectionCompteSource != null && collectionCompteSource.isNotEmpty) {
+          print('🔍 COMPTE_SOURCE: Compte source trouvé: $compteSourceId ($collectionCompteSource)');
+          return {
+            'compte_source_id': compteSourceId,
+            'collection_compte_source': collectionCompteSource,
+          };
+        }
+      }
+
+      print('🔍 COMPTE_SOURCE: Aucun compte source valide trouvé');
+      return {'compte_source_id': null, 'collection_compte_source': null};
+    } catch (e) {
+      print('🔍 COMPTE_SOURCE: Erreur: $e');
+      return {'compte_source_id': null, 'collection_compte_source': null};
+    }
+  }
+
   // Calculer le solde actuel d'une enveloppe pour un mois donné
   static Future<double> calculerSoldeEnveloppe({
     required String enveloppeId,
     required DateTime mois,
   }) async {
     try {
-      print(
-          '🔍 Calcul solde enveloppe: $enveloppeId, mois: ${mois.toIso8601String()}');
-
-      // Calcul direct depuis PocketBase
       final pb = await _getPocketBaseInstance();
       final userId = pb.authStore.model?.id;
       final premierDuMois = DateTime(mois.year, mois.month, 1);
 
       final filtre =
           'enveloppe_id = "$enveloppeId" && mois = "${premierDuMois.toIso8601String()}" && utilisateur_id = "$userId"';
-      print('🔍 Filtre utilisé: $filtre');
 
       final allocations = await pb.collection('allocations_mensuelles').getList(
             filter: filtre,
           );
-
-      print('📊 Allocations trouvées: ${allocations.items.length}');
-
-      // Test avec juste l'utilisateur actuel
-      final allocationsUtilisateur =
-          await pb.collection('allocations_mensuelles').getList(
-                filter: 'utilisateur_id = "$userId"',
-              );
-      print(
-          '📊 Allocations utilisateur: ${allocationsUtilisateur.items.length}');
-      for (final alloc in allocationsUtilisateur.items) {
-        print(
-            '📋 Allocation: enveloppe=${alloc.data['enveloppe_id']}, mois=${alloc.data['mois']}, solde=${alloc.data['solde']}');
-      }
 
       double soldeTotal = 0.0;
 
       for (final allocation in allocations.items) {
         final solde = (allocation.data['solde'] ?? 0).toDouble();
         soldeTotal += solde;
-        print('📋 Allocation ID: ${allocation.id}, solde: $solde');
       }
-
-      print('💰 Solde total: $soldeTotal');
 
       // Si aucune allocation trouvée avec le filtre, utiliser les allocations utilisateur
       if (allocations.items.isEmpty) {
-        print(
-            '⚠️ Aucune allocation trouvée avec filtre, utilisation des allocations utilisateur');
+        final allocationsUtilisateur =
+            await pb.collection('allocations_mensuelles').getList(
+                  filter: 'utilisateur_id = "$userId"',
+                );
         for (final allocation in allocationsUtilisateur.items) {
           if (allocation.data['enveloppe_id'] == enveloppeId) {
             final solde = (allocation.data['solde'] ?? 0).toDouble();
             soldeTotal += solde;
-            print(
-                '📋 Allocation utilisateur ID: ${allocation.id}, solde: $solde');
           }
         }
-        print('💰 Solde total final: $soldeTotal');
       }
 
       return soldeTotal;
     } catch (e) {
-      print('❌ Erreur calcul solde enveloppe: $e');
       return 0.0;
     }
   }
