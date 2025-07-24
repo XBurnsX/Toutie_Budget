@@ -1027,9 +1027,18 @@ class PocketBaseService {
 
       for (final nomCollection in collections) {
         try {
+          print(
+              '🔍 Tentative de mise à jour dans $nomCollection pour le compte $compteId');
           await pb.collection(nomCollection).update(compteId, body: donnees);
+          print('✅ Compte mis à jour avec succès dans $nomCollection');
+
+          // Forcer une mise à jour du cache temps réel avec délai
+          await Future.delayed(const Duration(milliseconds: 100));
+          await _updateComptesData();
+
           return;
         } catch (e) {
+          print('❌ Erreur dans $nomCollection: $e');
           // Continuer vers la collection suivante si le compte n'est pas trouvé
           continue;
         }
@@ -1037,6 +1046,7 @@ class PocketBaseService {
 
       throw Exception('Compte non trouvé dans aucune collection');
     } catch (e) {
+      print('❌ Erreur updateCompte: $e');
       rethrow;
     }
   }

@@ -4,7 +4,7 @@ import '../models/compte.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../services/firebase_service.dart';
+import '../services/pocketbase_service.dart';
 
 /// Page de modification d'un compte existant
 class PageModificationCompte extends StatefulWidget {
@@ -326,11 +326,14 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                           0.0;
                       print(
                           'DEBUG: Mise à jour pretAPlacer : $pretAPlacerValue');
+                      print(
+                          'DEBUG: Couleur envoyée : #${_couleur.value.toRadixString(16).padLeft(8, '0')}');
 
-                      await FirebaseService().updateCompte(widget.compte.id, {
-                        'pretAPlacer': pretAPlacerValue,
+                      await PocketBaseService.updateCompte(widget.compte.id, {
+                        'pret_a_placer': pretAPlacerValue,
                         'nom': _nom,
-                        'couleur': _couleur.value,
+                        'couleur':
+                            '#${_couleur.value.toRadixString(16).padLeft(8, '0')}',
                       });
                     } else {
                       // Nettoyer les valeurs avant parsing
@@ -349,13 +352,16 @@ class _PageModificationCompteState extends State<PageModificationCompte> {
                           'DEBUG: Solde nettoyé: "$soldeText" -> $soldeValue');
                       print(
                           'DEBUG: Prêt à placer nettoyé: "$pretAPlacerText" -> $pretAPlacerValue');
+                      print(
+                          'DEBUG: Couleur envoyée : #${_couleur.value.toRadixString(16).padLeft(8, '0')}');
 
-                      await FirebaseService().updateCompte(widget.compte.id, {
+                      await PocketBaseService.updateCompte(widget.compte.id, {
                         'solde': soldeValue,
-                        'pretAPlacer': pretAPlacerValue,
+                        'pret_a_placer': pretAPlacerValue,
                         'nom': _nom,
                         'type': _type,
-                        'couleur': _couleur.value,
+                        'couleur':
+                            '#${_couleur.value.toRadixString(16).padLeft(8, '0')}',
                       });
                     }
 
