@@ -245,10 +245,13 @@ class AllocationService {
 
       final premierDuMois = DateTime(mois.year, mois.month, 1);
 
-      final allocations = await pb.collection('allocations_mensuelles').getList(
+      final allocations = await pb
+          .collection('allocations_mensuelles')
+          .getList(
             filter:
                 'enveloppe_id = "$enveloppeId" && mois = "${premierDuMois.toIso8601String()}" && utilisateur_id = "$userId"',
-          );
+          )
+          .timeout(const Duration(seconds: 5));
 
       return allocations.items
           .map((record) => AllocationMensuelle.fromMap(record.data))
@@ -268,26 +271,59 @@ class AllocationService {
       print(
           '🔍 Calcul solde enveloppe: $enveloppeId, mois: ${mois.toIso8601String()}');
 
-      final allocations = await lireAllocationsMensuelles(
-        enveloppeId: enveloppeId,
-        mois: mois,
-      );
+      // Calcul direct depuis PocketBase
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      final premierDuMois = DateTime(mois.year, mois.month, 1);
 
-      print('📊 Allocations trouvées: ${allocations.length}');
+      final filtre =
+          'enveloppe_id = "$enveloppeId" && mois = "${premierDuMois.toIso8601String()}" && utilisateur_id = "$userId"';
+      print('🔍 Filtre utilisé: $filtre');
 
-      double soldeTotal = 0.0;
-      double depenseTotal = 0.0;
+      final allocations = await pb.collection('allocations_mensuelles').getList(
+            filter: filtre,
+          );
 
-      for (final allocation in allocations) {
-        soldeTotal += allocation.solde;
-        depenseTotal += allocation.depense;
+      print('📊 Allocations trouvées: ${allocations.items.length}');
+
+      // Test avec juste l'utilisateur actuel
+      final allocationsUtilisateur =
+          await pb.collection('allocations_mensuelles').getList(
+                filter: 'utilisateur_id = "$userId"',
+              );
+      print(
+          '📊 Allocations utilisateur: ${allocationsUtilisateur.items.length}');
+      for (final alloc in allocationsUtilisateur.items) {
+        print(
+            '📋 Allocation: enveloppe=${alloc.data['enveloppe_id']}, mois=${alloc.data['mois']}, solde=${alloc.data['solde']}');
       }
 
-      final resultat = soldeTotal - depenseTotal;
-      print(
-          '💰 Solde calculé: $resultat (solde: $soldeTotal, dépense: $depenseTotal)');
+      double soldeTotal = 0.0;
 
-      return resultat;
+      for (final allocation in allocations.items) {
+        final solde = (allocation.data['solde'] ?? 0).toDouble();
+        soldeTotal += solde;
+        print('📋 Allocation ID: ${allocation.id}, solde: $solde');
+      }
+
+      print('💰 Solde total: $soldeTotal');
+
+      // Si aucune allocation trouvée avec le filtre, utiliser les allocations utilisateur
+      if (allocations.items.isEmpty) {
+        print(
+            '⚠️ Aucune allocation trouvée avec filtre, utilisation des allocations utilisateur');
+        for (final allocation in allocationsUtilisateur.items) {
+          if (allocation.data['enveloppe_id'] == enveloppeId) {
+            final solde = (allocation.data['solde'] ?? 0).toDouble();
+            soldeTotal += solde;
+            print(
+                '📋 Allocation utilisateur ID: ${allocation.id}, solde: $solde');
+          }
+        }
+        print('💰 Solde total final: $soldeTotal');
+      }
+
+      return soldeTotal;
     } catch (e) {
       print('❌ Erreur calcul solde enveloppe: $e');
       return 0.0;

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:toutie_budget/widgets/assignation_bottom_sheet.dart';
 import 'package:toutie_budget/services/argent_service.dart';
 import 'package:toutie_budget/services/allocation_service.dart';
+import 'package:toutie_budget/services/auth_service.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes
 class ListeCategoriesEnveloppes extends StatefulWidget {
@@ -360,128 +361,187 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     double objectif;
     double depense;
 
-    // TEMPORAIRE: Utiliser directement le solde_enveloppe pour éviter le chargement infini
-    if (widget.selectedMonthKey == null ||
-        widget.selectedMonthKey == currentMonthKey) {
-      // Mois courant -> utiliser le solde_enveloppe
-      soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
-      objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
-      depense = (enveloppe['depense'] ?? 0.0).toDouble();
-    } else if (histoMois != null) {
-      // Mois passé avec historique -> valeurs de l'historique
-      soldeEnveloppe = (histoMois['solde'] ?? 0.0).toDouble();
-      objectif = (histoMois['objectif'] ?? 0.0).toDouble();
-      depense = (histoMois['depense'] ?? 0.0).toDouble();
-    } else if (isFutureMonth) {
-      // Mois futur -> utiliser le solde_enveloppe
-      soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
-      objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
-      depense = 0.0;
-    } else {
-      // Mois passé sans historique -> 0
-      soldeEnveloppe = 0.0;
-      objectif = 0.0;
-      depense = 0.0;
-    }
+    // Utiliser les allocations mensuelles pour calculer le solde
+    final moisKey = widget.selectedMonthKey ?? currentMonthKey;
+    final moisAllocation = DateTime.parse('${moisKey}-01');
 
-    final bool estNegative = soldeEnveloppe < 0;
-    final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
-    final double progression = (objectif > 0)
-        ? (estDepenseAtteint
-            ? 1.0
-            : (soldeEnveloppe / objectif).clamp(0.0, 1.0))
-        : 0.0;
-    final Color etatColor = _getEtatColor(soldeEnveloppe, objectif);
+    print('🔍 ID enveloppe: ${enveloppe['id']}');
+    return FutureBuilder<double>(
+      future: AllocationService.calculerSoldeEnveloppe(
+        enveloppeId: enveloppe['id'],
+        mois: moisAllocation,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Card(
+            color: Color(0xFF232526),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                      child: Text('Chargement...',
+                          style: TextStyle(color: Colors.white))),
+                  SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ),
+            ),
+          );
+        }
 
-    // --- Widget bulle enveloppe interactif ---
-    Color bulleColor;
-    final String compteId = enveloppe['compte_provenance_id'] ?? '';
-    if (soldeEnveloppe == 0) {
-      bulleColor = const Color(0xFF44474A);
-    } else if (estNegative) {
-      bulleColor = Colors.red;
-    } else if (compteId.isNotEmpty) {
-      final compte = widget.comptes.firstWhere(
-        (c) => c['id'].toString() == compteId.toString(),
-        orElse: () => <String, Object>{},
-      );
-      if (compte['couleur'] != null && compte['couleur'] is int) {
-        try {
-          bulleColor = Color(compte['couleur'] as int);
-        } catch (_) {
+        if (snapshot.hasError) {
+          print('❌ Erreur FutureBuilder: ${snapshot.error}');
+          return Card(
+            color: const Color(0xFF232526),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              child: Text('Erreur de chargement',
+                  style: TextStyle(color: Colors.red)),
+            ),
+          );
+        }
+
+        final soldeAllocation = snapshot.data ?? 0.0;
+
+        if (widget.selectedMonthKey == null ||
+            widget.selectedMonthKey == currentMonthKey) {
+          // Mois courant -> utiliser les allocations mensuelles
+          soldeEnveloppe = soldeAllocation;
+          objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
+          depense = (enveloppe['depense'] ?? 0.0).toDouble();
+        } else if (histoMois != null) {
+          // Mois passé avec historique -> valeurs de l'historique
+          soldeEnveloppe = (histoMois['solde'] ?? 0.0).toDouble();
+          objectif = (histoMois['objectif'] ?? 0.0).toDouble();
+          depense = (histoMois['depense'] ?? 0.0).toDouble();
+        } else if (isFutureMonth) {
+          // Mois futur -> utiliser les allocations mensuelles
+          soldeEnveloppe = soldeAllocation;
+          objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
+          depense = 0.0;
+        } else {
+          // Mois passé sans historique -> utiliser les allocations mensuelles
+          soldeEnveloppe = soldeAllocation;
+          objectif = 0.0;
+          depense = 0.0;
+        }
+
+        final bool estNegative = soldeEnveloppe < 0;
+        final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
+        final double progression = (objectif > 0)
+            ? (estDepenseAtteint
+                ? 1.0
+                : (soldeEnveloppe / objectif).clamp(0.0, 1.0))
+            : 0.0;
+        final Color etatColor = _getEtatColor(soldeEnveloppe, objectif);
+
+        // --- Widget bulle enveloppe interactif ---
+        Color bulleColor;
+
+        // Chercher le compte source depuis les allocations
+        String compteSourceId = '';
+        if (soldeAllocation > 0) {
+          // Utiliser le premier compte de la liste comme fallback
+          if (widget.comptes.isNotEmpty) {
+            compteSourceId = widget.comptes.first['id'].toString();
+          }
+        }
+
+        if (soldeEnveloppe == 0) {
+          bulleColor = const Color(0xFF44474A);
+        } else if (estNegative) {
+          bulleColor = Colors.red;
+        } else if (compteSourceId.isNotEmpty) {
+          final compte = widget.comptes.firstWhere(
+            (c) => c['id'].toString() == compteSourceId.toString(),
+            orElse: () => <String, Object>{},
+          );
+          if (compte['couleur'] != null && compte['couleur'] is int) {
+            try {
+              bulleColor = Color(compte['couleur'] as int);
+            } catch (_) {
+              bulleColor = Colors.amber;
+            }
+          } else {
+            bulleColor = Colors.amber;
+          }
+        } else {
           bulleColor = Colors.amber;
         }
-      } else {
-        bulleColor = Colors.amber;
-      }
-    } else {
-      bulleColor = Colors.amber;
-    }
 
-    final cardWidget = Card(
-      color: estNegative
-          ? Theme.of(context).colorScheme.error.withValues(alpha: 0.15)
-          : const Color(0xFF232526),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Icône d'avertissement pour les enveloppes négatives
-            if (estNegative) ...[
-              Icon(Icons.warning, color: Colors.red[700], size: 20),
-              const SizedBox(width: 8),
-            ],
-            Expanded(
-              child: Text(
-                enveloppe['nom'],
-                style: TextStyle(
-                  color: estNegative ? Colors.red[800] : Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+        final cardWidget = Card(
+          color: estNegative
+              ? Theme.of(context).colorScheme.error.withValues(alpha: 0.15)
+              : const Color(0xFF232526),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Icône d'avertissement pour les enveloppes négatives
+                if (estNegative) ...[
+                  Icon(Icons.warning, color: Colors.red[700], size: 20),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    enveloppe['nom'],
+                    style: TextStyle(
+                      color: estNegative ? Colors.red[800] : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            // Bulle colorée avec le montant dedans
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: bulleColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                '${soldeEnveloppe.toStringAsFixed(2)}\$',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                // Bulle colorée avec le montant dedans
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: bulleColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${soldeEnveloppe.toStringAsFixed(2)}\$',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
 
-    return widget.editionMode
-        ? cardWidget
-        : InkWell(
-            onTap: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => AssignationBottomSheet(
-                  enveloppe: enveloppe,
-                  comptes: widget.comptes,
-                ),
+        return widget.editionMode
+            ? cardWidget
+            : InkWell(
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => AssignationBottomSheet(
+                      enveloppe: enveloppe,
+                      comptes: widget.comptes,
+                      onAssignationComplete: () {
+                        setState(() {});
+                      },
+                    ),
+                  );
+                },
+                onLongPress: () {
+                  if (soldeEnveloppe > 0) {
+                    _showViderEnveloppeMenu(context, enveloppe);
+                  }
+                },
+                child: cardWidget,
               );
-            },
-            onLongPress: () {
-              if (soldeEnveloppe > 0) {
-                _showViderEnveloppeMenu(context, enveloppe);
-              }
-            },
-            child: cardWidget,
-          );
+      },
+    );
   }
 }

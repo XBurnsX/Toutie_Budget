@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/services/argent_service.dart';
 import 'package:toutie_budget/services/allocation_service.dart';
+import 'package:toutie_budget/services/pocketbase_service.dart';
 
 // Utilisé pour la détection des couleurs négatives/positives si besoin.
 // ignore: unused_import
@@ -11,8 +12,13 @@ import 'package:toutie_budget/services/color_service.dart';
 class AssignationBottomSheet extends StatefulWidget {
   final Map<String, dynamic> enveloppe;
   final List<Map<String, dynamic>> comptes;
-  const AssignationBottomSheet(
-      {super.key, required this.enveloppe, required this.comptes});
+  final VoidCallback? onAssignationComplete;
+  const AssignationBottomSheet({
+    super.key,
+    required this.enveloppe,
+    required this.comptes,
+    this.onAssignationComplete,
+  });
 
   @override
   State<AssignationBottomSheet> createState() => _AssignationBottomSheetState();
@@ -40,6 +46,28 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
       setState(() {
         _montantNecessaire = montant;
       });
+    }
+  }
+
+  // Déterminer la collection du compte selon son type
+  String _getCompteCollection(String compteId) {
+    final compte = widget.comptes.firstWhere(
+      (c) => c['id'].toString() == compteId,
+      orElse: () => <String, Object>{},
+    );
+
+    final type = (compte['type'] ?? '').toString().toLowerCase();
+
+    if (type.contains('chèque') || type.contains('cheque')) {
+      return 'comptes_cheques';
+    } else if (type.contains('crédit') || type.contains('credit')) {
+      return 'comptes_credits';
+    } else if (type.contains('investissement')) {
+      return 'comptes_investissement';
+    } else if (type.contains('dette')) {
+      return 'comptes_dettes';
+    } else {
+      return 'comptes_cheques'; // Par défaut
     }
   }
 
@@ -112,7 +140,9 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
 
     final comptesDisponibles = widget.comptes.where((c) {
       final typeStr = (c['type'] ?? '').toString().toLowerCase();
-      return (typeStr.contains('chèque') || typeStr.contains('cheque')) &&
+      // Inclure tous les types de comptes sauf les dettes et investissements
+      return !typeStr.contains('dette') &&
+          !typeStr.contains('investissement') &&
           c['estArchive'] != true;
     }).toList();
 
@@ -501,10 +531,16 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
     }
 
     try {
-      await ArgentService().virerArgent(
-        sourceId: _compteId!,
-        destinationId: widget.enveloppe['id'].toString(),
+      print('🔍 Compte sélectionné: $_compteId');
+      print('🔍 Compte trouvé: ${compte['nom']} (${compte['id']})');
+
+      // Utiliser le système d'allocations pour placer de l'argent
+      await AllocationService.creerAllocationMensuelle(
+        enveloppeId: widget.enveloppe['id'],
         montant: montantDouble,
+        compteSourceId: _compteId!,
+        collectionCompteSource: _getCompteCollection(_compteId!),
+        estAllocation: true, // Placer de l'argent dans l'enveloppe
       );
 
       if (mounted) {
@@ -517,16 +553,13 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
             duration: const Duration(seconds: 3),
           ),
         );
+
+        // Forcer le rafraîchissement de la page parent
+        widget.onAssignationComplete?.call();
       }
     } catch (e) {
-      final errorMsg = e.toString();
-      if (errorMsg.contains('mélanger') ||
-          errorMsg.contains('provient') ||
-          errorMsg.contains('autre compte')) {
-        _afficherMessageErreurMelangeFonds();
-      } else {
-        _afficherErreur('Erreur lors de l\'assignation : $e');
-      }
+      print('❌ Erreur assignation: $e');
+      _afficherErreur('Erreur lors de l\'assignation : $e');
     }
   }
 }

@@ -72,7 +72,7 @@ class PageSituationsUrgence extends StatelessWidget {
                     final enveloppes = enveloppesSnapshot.data!
                         .map((data) => Enveloppe.fromMap(data))
                         .toList();
-
+                    
                     print(
                         'DEBUG: Catégorie ${categorie.nom} - Enveloppes: ${enveloppes.length}');
                     for (var enveloppe in enveloppes) {
