@@ -75,10 +75,12 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
     final double objectifTotal = (env['objectif'] as num?)?.toDouble() ?? 0.0;
 
     // Calculer le solde avec les allocations mensuelles
-    final soldeEnv = await AllocationService.calculerSoldeEnveloppe(
+    final soldeEnvNullable = await AllocationService.calculerSoldeEnveloppe(
       enveloppeId: env['id'],
       mois: DateTime.now(),
     );
+    // Convertir la valeur nullable en non-nullable avec une valeur par défaut de 0.0
+    final double soldeEnv = soldeEnvNullable ?? 0.0;
 
     final String freq =
         (env['frequence_objectif']?.toString() ?? '').toLowerCase();

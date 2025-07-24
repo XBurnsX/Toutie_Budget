@@ -122,13 +122,16 @@ class Enveloppe {
   String get provenanceCompteId => compteProvenanceId;
 
   // Méthode pour calculer le solde réel avec les allocations mensuelles
+  // Retourne null si pas d'allocation pour ce mois
   static Future<double> calculerSoldeReel(
       String enveloppeId, DateTime mois) async {
     try {
-      return await AllocationService.calculerSoldeEnveloppe(
+      final solde = await AllocationService.calculerSoldeEnveloppe(
         enveloppeId: enveloppeId,
         mois: mois,
       );
+      // Retourne 0.0 si pas d'allocation pour ce mois
+      return solde ?? 0.0;
     } catch (e) {
       print('❌ Erreur calcul solde réel: $e');
       return 0.0;

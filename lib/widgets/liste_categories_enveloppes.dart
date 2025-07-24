@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:toutie_budget/services/allocation_service.dart';
 import 'package:toutie_budget/widgets/assignation_bottom_sheet.dart';
 import 'package:toutie_budget/services/argent_service.dart';
-import 'package:toutie_budget/services/allocation_service.dart';
-import 'package:toutie_budget/services/auth_service.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes
 class ListeCategoriesEnveloppes extends StatefulWidget {
@@ -346,32 +344,32 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
             historique[widget.selectedMonthKey] != null)
         ? Map<String, dynamic>.from(historique[widget.selectedMonthKey])
         : null;
+        
+    // Pour le débogage
+    print('📊 Enveloppe ${enveloppe['nom']} - Mois sélectionné: ${widget.selectedMonthKey}');
 
     final now = DateTime.now();
     final currentMonthKey =
         "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
-    final selectedDate = widget.selectedMonthKey != null
-        ? DateFormat('yyyy-MM').parse(widget.selectedMonthKey!)
-        : now;
-    final isFutureMonth = selectedDate.year > now.year ||
-        (selectedDate.year == now.year && selectedDate.month > now.month);
-
-    // Variables pour les calculs
-    double soldeEnveloppe;
-    double objectif;
-    double depense;
-
+    
     // Utiliser les allocations mensuelles pour calculer le solde
     final moisKey = widget.selectedMonthKey ?? currentMonthKey;
     final moisAllocation = DateTime.parse('${moisKey}-01');
+    final isFutureMonth = moisAllocation.isAfter(DateTime(now.year, now.month + 1, 1));
 
     print('🔍 ID enveloppe: ${enveloppe['id']}');
-    return FutureBuilder<double>(
+    return FutureBuilder<double?>(
       future: AllocationService.calculerSoldeEnveloppe(
         enveloppeId: enveloppe['id'],
         mois: moisAllocation,
       ),
       builder: (context, snapshot) {
+        // Pour les mois futurs, ne rien afficher
+        if (isFutureMonth) {
+          print('⏭️ Enveloppe ${enveloppe['nom']} - Mois futur, masquée');
+          return const SizedBox.shrink();
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Card(
             color: Color(0xFF232526),
@@ -404,39 +402,47 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
           );
         }
 
-        final soldeAllocation = snapshot.data ?? 0.0;
+        // Récupérer le solde de l'allocation
+        // Si pas de données, on considère que le solde est 0
+        final soldeAllocation = snapshot.hasData ? snapshot.data! : 0.0;
+        
+        print('💰 Enveloppe ${enveloppe['nom']} - Solde allocation: $soldeAllocation');
 
+        // Variables pour les calculs
+        double soldeEnveloppe;
+        double objectif;
+        double depense;
+
+        // Initialiser les valeurs par défaut
+        soldeEnveloppe = 0.0;
+        objectif = 0.0;
+        depense = 0.0;
+        
         if (widget.selectedMonthKey == null ||
             widget.selectedMonthKey == currentMonthKey) {
-          // Mois courant -> utiliser les allocations mensuelles
+          // Mois courant -> utiliser les valeurs actuelles de l'enveloppe
           soldeEnveloppe = soldeAllocation;
           objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
           depense = (enveloppe['depense'] ?? 0.0).toDouble();
+          print('📅 Mois courant - Solde: $soldeEnveloppe, Objectif: $objectif');
         } else if (histoMois != null) {
           // Mois passé avec historique -> valeurs de l'historique
           soldeEnveloppe = (histoMois['solde'] ?? 0.0).toDouble();
           objectif = (histoMois['objectif'] ?? 0.0).toDouble();
           depense = (histoMois['depense'] ?? 0.0).toDouble();
-        } else if (isFutureMonth) {
-          // Mois futur -> utiliser les allocations mensuelles
-          soldeEnveloppe = soldeAllocation;
-          objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
-          depense = 0.0;
+          print('📅 Mois passé avec historique - Solde: $soldeEnveloppe, Objectif: $objectif');
         } else {
-          // Mois passé sans historique -> utiliser les allocations mensuelles
-          soldeEnveloppe = soldeAllocation;
+          // Mois passé sans historique -> on affiche avec solde 0
+          soldeEnveloppe = 0.0;
           objectif = 0.0;
           depense = 0.0;
         }
-
+        
         final bool estNegative = soldeEnveloppe < 0;
+        // Variables utilisées plus bas dans le code
         final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
-        final double progression = (objectif > 0)
-            ? (estDepenseAtteint
-                ? 1.0
-                : (soldeEnveloppe / objectif).clamp(0.0, 1.0))
-            : 0.0;
-        final Color etatColor = _getEtatColor(soldeEnveloppe, objectif);
+        
+        print('📊 Enveloppe ${enveloppe['nom']} - Solde final: $soldeEnveloppe, Négatif: $estNegative');
 
         // --- Widget bulle enveloppe interactif ---
         return FutureBuilder<Map<String, String?>>(
@@ -445,25 +451,31 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
             mois: moisAllocation,
           ),
           builder: (context, compteSnapshot) {
-            Color bulleColor;
-            
-            print('🎨 COULEUR ${enveloppe['nom']}: solde=$soldeEnveloppe, snapshot=${compteSnapshot.hasData}');
+            Color bulleColor = const Color(0xFF44474A); // Couleur par défaut gris
 
+            print(
+                '🎨 COULEUR ${enveloppe['nom']}: solde=$soldeEnveloppe, snapshot=${compteSnapshot.hasData}');
+
+            // Si le solde est 0, on garde la couleur grise par défaut
             if (soldeEnveloppe == 0) {
-              bulleColor = const Color(0xFF44474A);
               print('🎨 COULEUR ${enveloppe['nom']}: Solde 0 -> Gris');
             } else if (estNegative) {
               bulleColor = Colors.red;
               print('🎨 COULEUR ${enveloppe['nom']}: Négatif -> Rouge');
-            } else if (compteSnapshot.hasData && 
-                       compteSnapshot.data!['compte_source_id'] != null &&
-                       compteSnapshot.data!['collection_compte_source'] != null) {
+            } 
+            // Ne pas appliquer de couleur de compte s'il n'y a pas d'allocation pour ce mois
+            else if (soldeAllocation > 0 && 
+                     compteSnapshot.hasData &&
+                     compteSnapshot.data!['compte_source_id'] != null &&
+                     compteSnapshot.data!['collection_compte_source'] != null) {
               // Utiliser le compte source de l'allocation mensuelle
               final compteSourceId = compteSnapshot.data!['compte_source_id']!;
-              final collectionSource = compteSnapshot.data!['collection_compte_source']!;
-              
-              print('🎨 COULEUR ${enveloppe['nom']}: Compte source trouvé: $compteSourceId ($collectionSource)');
-              
+              final collectionSource =
+                  compteSnapshot.data!['collection_compte_source']!;
+
+              print(
+                  '🎨 COULEUR ${enveloppe['nom']}: Compte source trouvé: $compteSourceId ($collectionSource)');
+
               // Chercher le compte dans la liste des comptes
               Map<String, dynamic>? compte;
               try {
@@ -476,18 +488,23 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                   compte = widget.comptes[0];
                 }
               }
-              
-              if (compte != null && compte['couleur'] != null && compte['couleur'] is int) {
+
+              if (compte != null &&
+                  compte['couleur'] != null &&
+                  compte['couleur'] is int) {
                 try {
                   bulleColor = Color(compte['couleur'] as int);
-                  print('🎨 COULEUR ${enveloppe['nom']}: Couleur du compte ${compte['nom']} appliquée: ${compte['couleur']}');
+                  print(
+                      '🎨 COULEUR ${enveloppe['nom']}: Couleur du compte ${compte['nom']} appliquée: ${compte['couleur']}');
                 } catch (e) {
                   bulleColor = Colors.amber;
-                  print('🎨 COULEUR ${enveloppe['nom']}: Erreur couleur -> Amber');
+                  print(
+                      '🎨 COULEUR ${enveloppe['nom']}: Erreur couleur -> Amber');
                 }
               } else {
                 bulleColor = Colors.amber;
-                print('🎨 COULEUR ${enveloppe['nom']}: Compte non trouvé ou pas de couleur -> Amber');
+                print(
+                    '🎨 COULEUR ${enveloppe['nom']}: Compte non trouvé ou pas de couleur -> Amber');
               }
             } else {
               // Fallback: utiliser le premier compte de la liste
@@ -496,14 +513,17 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                 if (compte['couleur'] != null && compte['couleur'] is int) {
                   try {
                     bulleColor = Color(compte['couleur'] as int);
-                    print('🎨 COULEUR ${enveloppe['nom']}: Fallback premier compte ${compte['nom']}: ${compte['couleur']}');
+                    print(
+                        '🎨 COULEUR ${enveloppe['nom']}: Fallback premier compte ${compte['nom']}: ${compte['couleur']}');
                   } catch (_) {
                     bulleColor = Colors.amber;
-                    print('🎨 COULEUR ${enveloppe['nom']}: Fallback erreur -> Amber');
+                    print(
+                        '🎨 COULEUR ${enveloppe['nom']}: Fallback erreur -> Amber');
                   }
                 } else {
                   bulleColor = Colors.amber;
-                  print('🎨 COULEUR ${enveloppe['nom']}: Fallback pas de couleur -> Amber');
+                  print(
+                      '🎨 COULEUR ${enveloppe['nom']}: Fallback pas de couleur -> Amber');
                 }
               } else {
                 bulleColor = Colors.amber;
@@ -516,7 +536,8 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                   ? Theme.of(context).colorScheme.error.withValues(alpha: 0.15)
                   : const Color(0xFF232526),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -537,8 +558,8 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                     ),
                     // Bulle colorée avec le montant dedans
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: bulleColor,
                         borderRadius: BorderRadius.circular(16),
