@@ -3,12 +3,10 @@
 // 📋 Description : Service PocketBase pour remplacer FirebaseService - Version COMPLÈTE avec TEMPS RÉEL
 
 import 'package:pocketbase/pocketbase.dart';
-import 'package:pocketbase/pocketbase.dart' show RecordModel;
 import '../models/enveloppe.dart';
 import 'auth_service.dart';
 import '../models/categorie.dart';
 import '../models/compte.dart';
-import 'allocation_service.dart';
 
 import 'dart:async';
 

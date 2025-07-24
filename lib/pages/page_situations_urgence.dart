@@ -5,7 +5,6 @@ import '../models/enveloppe.dart';
 import '../services/firebase_service.dart';
 import '../services/cache_service.dart';
 import '../services/pocketbase_service.dart';
-import '../services/allocation_service.dart';
 import 'page_virer_argent.dart';
 
 /// Page pour afficher et gérer les enveloppes en situation d'urgence (solde négatif)
@@ -72,7 +71,7 @@ class PageSituationsUrgence extends StatelessWidget {
                     final enveloppes = enveloppesSnapshot.data!
                         .map((data) => Enveloppe.fromMap(data))
                         .toList();
-                    
+
                     print(
                         'DEBUG: Catégorie ${categorie.nom} - Enveloppes: ${enveloppes.length}');
                     for (var enveloppe in enveloppes) {

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
-import 'package:toutie_budget/services/argent_service.dart';
 import 'package:toutie_budget/services/allocation_service.dart';
-import 'package:toutie_budget/services/pocketbase_service.dart';
 
 // Utilisé pour la détection des couleurs négatives/positives si besoin.
 // ignore: unused_import

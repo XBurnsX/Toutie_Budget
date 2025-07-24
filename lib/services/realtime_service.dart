@@ -112,7 +112,7 @@ class RealtimeService {
   static Future<void> dispose() async {
     try {
       for (final subscription in _subscriptions.values) {
-        if (subscription is dynamic && subscription.unsubscribe != null) {
+        if (subscription.unsubscribe != null) {
           await subscription.unsubscribe();
         }
       }
