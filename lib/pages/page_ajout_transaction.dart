@@ -4,6 +4,7 @@ import '../controllers/ajout_transaction_controller.dart';
 import '../models/transaction_model.dart';
 import '../models/fractionnement_model.dart';
 import '../services/color_service.dart';
+import '../services/data_service_config.dart';
 import '../widgets/ajout_transaction/selecteur_type_transaction.dart';
 import '../widgets/ajout_transaction/champ_montant.dart';
 import '../widgets/ajout_transaction/section_informations_cles.dart';
@@ -45,6 +46,9 @@ class _EcranAjoutTransactionRefactoredState
   @override
   void initState() {
     super.initState();
+    // Configurer PocketBase par défaut
+    DataServiceConfig.usePocketBase();
+
     _controller = AjoutTransactionController();
     _initialiserController();
     _chargerDonnees();

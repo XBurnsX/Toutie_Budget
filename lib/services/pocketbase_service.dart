@@ -9,6 +9,10 @@ import '../models/categorie.dart';
 import '../models/compte.dart';
 
 import 'dart:async';
+import 'dart:convert'; // Added for jsonEncode and jsonDecode
+import '../models/transaction_model.dart' as app_model;
+import '../models/dette.dart';
+import '../models/fractionnement_model.dart';
 
 class PocketBaseService {
   static final PocketBaseService _instance = PocketBaseService._internal();
@@ -803,14 +807,38 @@ class PocketBaseService {
       String categorieId) async {
     try {
       final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print(
+          '🔍 PocketBaseService: Lecture enveloppes catégorie $categorieId...');
+
       final records = await pb.collection('enveloppes').getFullList(
-            filter: 'categorie_id = "$categorieId"',
-            sort: 'nom',
+            filter:
+                'utilisateur_id = "$userId" && categorie_id = "$categorieId" && est_archive = false',
+            sort: 'ordre',
           );
 
-      return records.map((record) => record.toJson()).toList();
+      final enveloppes = records.map((record) {
+        return {
+          'id': record.id,
+          'nom': record.data['nom'],
+          'solde_enveloppe': record.data['solde_enveloppe'] ?? 0.0,
+          'objectif_montant': record.data['objectif_montant'] ?? 0.0,
+          'depense': record.data['depense'] ?? 0.0,
+          'ordre': record.data['ordre'] ?? 0,
+          'archivee': record.data['est_archive'] ?? false,
+        };
+      }).toList();
+
+      print('✅ ${enveloppes.length} enveloppes lues');
+      return enveloppes;
     } catch (e) {
-      return [];
+      print('❌ Erreur lecture enveloppes: $e');
+      rethrow;
     }
   }
 
@@ -1325,5 +1353,514 @@ class PocketBaseService {
     } catch (e) {
       print('❌ Erreur mise à jour enveloppes: $e');
     }
+  }
+
+  // === MÉTHODES POUR LES TRANSACTIONS ===
+
+  /// Ajouter une nouvelle transaction
+  static Future<void> ajouterTransaction(
+      app_model.Transaction transaction) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Ajout transaction ${transaction.tiers}...');
+
+      // 1. Créer l'entrée dans transactions
+      final transactionData = {
+        'utilisateur_id': userId,
+        'type': _convertirTypeTransaction(transaction.type),
+        'montant': transaction.montant,
+        'date': transaction.date.toIso8601String(),
+        'note': transaction.note ?? '',
+        'compte_id': transaction.compteId,
+        'collection_compte':
+            'comptes_cheques', // TODO: Déterminer la collection
+        'tiers_id': transaction.tiers,
+        'est_fractionnee': transaction.estFractionnee,
+        'transaction_parente_id': transaction.transactionParenteId,
+        'sous_items': transaction.sousItems != null
+            ? jsonEncode(transaction.sousItems!)
+            : null,
+        'marqueur': transaction.marqueur ?? '',
+        'compte_passif_id': transaction.compteDePassifAssocie,
+      };
+
+      final transactionRecord =
+          await pb.collection('transactions').create(body: transactionData);
+      print('✅ Transaction créée: ${transactionRecord.id}');
+
+      // 2. Créer l'entrée dans allocation_mensuelles
+      final mois = DateTime(transaction.date.year, transaction.date.month, 1);
+
+      final allocationData = {
+        'utilisateur_id': userId,
+        'enveloppe_id': transaction.enveloppeId, // null pour les revenus
+        'mois': mois.toIso8601String(),
+        'solde': transaction.montant,
+        'alloue': transaction.montant,
+        'depense': 0.0,
+        'compte_source_id': transaction.compteId,
+        'collection_compte_source':
+            'comptes_cheques', // TODO: Déterminer la collection
+      };
+
+      final allocationRecord = await pb
+          .collection('allocations_mensuelles')
+          .create(body: allocationData);
+      print('✅ Allocation mensuelle créée: ${allocationRecord.id}');
+
+      // 3. Si transaction fractionnée, créer les allocations pour chaque sous-item
+      if (transaction.estFractionnee && transaction.sousItems != null) {
+        for (final sousItem in transaction.sousItems!) {
+          final sousAllocationData = {
+            'utilisateur_id': userId,
+            'enveloppe_id': sousItem['enveloppeId'],
+            'mois': mois.toIso8601String(),
+            'solde': sousItem['montant'],
+            'alloue': sousItem['montant'],
+            'depense': 0.0,
+            'compte_source_id': transaction.compteId,
+            'collection_compte_source':
+                'comptes_cheques', // TODO: Déterminer la collection
+          };
+
+          await pb
+              .collection('allocations_mensuelles')
+              .create(body: sousAllocationData);
+          print('✅ Allocation sous-item créée pour ${sousItem['description']}');
+        }
+      }
+
+      print('✅ Transaction ajoutée avec succès');
+    } catch (e) {
+      print('❌ Erreur ajout transaction: $e');
+      rethrow;
+    }
+  }
+
+  /// Mettre à jour une transaction existante
+  static Future<void> mettreAJourTransaction(
+      app_model.Transaction transaction) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+
+      if (transaction.id == null) {
+        throw Exception('ID de transaction manquant');
+      }
+
+      print(
+          '🔍 PocketBaseService: Mise à jour transaction ${transaction.id}...');
+
+      final transactionData = {
+        'type': _convertirTypeTransaction(transaction.type),
+        'montant': transaction.montant,
+        'date': transaction.date.toIso8601String(),
+        'note': transaction.note ?? '',
+        'compte_id': transaction.compteId,
+        'collection_compte':
+            'comptes_cheques', // TODO: Déterminer la collection
+        'tiers_id': transaction.tiers,
+        'est_fractionnee': transaction.estFractionnee,
+        'transaction_parente_id': transaction.transactionParenteId,
+        'sous_items': transaction.sousItems != null
+            ? jsonEncode(transaction.sousItems!)
+            : null,
+        'marqueur': transaction.marqueur ?? '',
+        'compte_passif_id': transaction.compteDePassifAssocie,
+      };
+
+      await pb
+          .collection('transactions')
+          .update(transaction.id!, body: transactionData);
+      print('✅ Transaction mise à jour avec succès');
+    } catch (e) {
+      print('❌ Erreur mise à jour transaction: $e');
+      rethrow;
+    }
+  }
+
+  /// Supprimer une transaction
+  static Future<void> supprimerTransaction(String transactionId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+
+      print('🔍 PocketBaseService: Suppression transaction $transactionId...');
+
+      // TODO: Supprimer aussi les allocations mensuelles associées
+      await pb.collection('transactions').delete(transactionId);
+
+      print('✅ Transaction supprimée avec succès');
+    } catch (e) {
+      print('❌ Erreur suppression transaction: $e');
+      rethrow;
+    }
+  }
+
+  /// Lire les transactions d'un compte
+  static Future<List<app_model.Transaction>> lireTransactionsCompte(
+      String compteId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print(
+          '🔍 PocketBaseService: Lecture transactions du compte $compteId...');
+
+      final records = await pb.collection('transactions').getFullList(
+            filter: 'utilisateur_id = "$userId" && compte_id = "$compteId"',
+            sort: '-date',
+          );
+
+      final transactions = records.map((record) {
+        return app_model.Transaction(
+          id: record.id,
+          userId: record.data['utilisateur_id'],
+          type: _convertirTypeTransactionDepuisPocketBase(record.data['type']),
+          typeMouvement: app_model.TypeMouvementFinancier
+              .depenseNormale, // TODO: Déterminer le bon type
+          montant: (record.data['montant'] ?? 0).toDouble(),
+          date: DateTime.parse(record.data['date']),
+          note: record.data['note'],
+          compteId: record.data['compte_id'],
+          tiers: record.data['tiers_id'],
+          compteDePassifAssocie: record.data['compte_passif_id'],
+          enveloppeId: record.data['enveloppe_id'],
+          estFractionnee: record.data['est_fractionnee'] ?? false,
+          transactionParenteId: record.data['transaction_parente_id'],
+          sousItems: record.data['sous_items'] != null
+              ? _parseSousItems(record.data['sous_items'])
+              : null,
+          marqueur: record.data['marqueur'],
+        );
+      }).toList();
+
+      print('✅ ${transactions.length} transactions lues');
+      return transactions;
+    } catch (e) {
+      print('❌ Erreur lecture transactions: $e');
+      rethrow;
+    }
+  }
+
+  // === MÉTHODES POUR LES TIERS ===
+
+  /// Lire tous les tiers connus
+  static Future<List<String>> lireTiers() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Lecture des tiers...');
+
+      final records = await pb.collection('tiers').getFullList(
+            filter: 'utilisateur_id = "$userId"',
+            sort: 'nom',
+          );
+
+      final tiers =
+          records.map((record) => record.data['nom'] as String).toList();
+      print('✅ ${tiers.length} tiers lus');
+      return tiers;
+    } catch (e) {
+      print('❌ Erreur lecture tiers: $e');
+      rethrow;
+    }
+  }
+
+  /// Ajouter un nouveau tiers
+  static Future<void> ajouterTiers(String nomTiers) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Ajout du tiers $nomTiers...');
+
+      final data = {
+        'utilisateur_id': userId,
+        'nom': nomTiers,
+      };
+
+      await pb.collection('tiers').create(body: data);
+      print('✅ Tiers ajouté avec succès');
+    } catch (e) {
+      print('❌ Erreur ajout tiers: $e');
+      rethrow;
+    }
+  }
+
+  // === MÉTHODES POUR LES DETTES ===
+
+  /// Créer une nouvelle dette (comptes_dettes)
+  static Future<void> creerDette(Dette dette) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Création dette ${dette.nomTiers}...');
+
+      final data = {
+        'utilisateur_id': userId,
+        'nom': dette.nomTiers,
+        'solde_dette': dette.solde,
+        'taux_interet': dette.tauxInteret ?? 0.0,
+        'montant_initial': dette.montantInitial,
+        'paiement_minimum': dette.montantMensuel ?? 0.0,
+        'ordre': 0, // TODO: Implémenter l'ordre
+        'archive': false,
+      };
+
+      await pb.collection('comptes_dettes').create(body: data);
+      print('✅ Dette créée avec succès');
+    } catch (e) {
+      print('❌ Erreur création dette: $e');
+      rethrow;
+    }
+  }
+
+  /// Mettre à jour une dette
+  static Future<void> mettreAJourDette(
+      String detteId, Map<String, dynamic> data) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+
+      print('🔍 PocketBaseService: Mise à jour dette $detteId...');
+
+      await pb.collection('comptes_dettes').update(detteId, body: data);
+      print('✅ Dette mise à jour avec succès');
+    } catch (e) {
+      print('❌ Erreur mise à jour dette: $e');
+      rethrow;
+    }
+  }
+
+  /// Ajouter un mouvement à une dette
+  static Future<void> ajouterMouvementDette(
+      String detteId, MouvementDette mouvement) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Ajout mouvement dette $detteId...');
+
+      // Créer une transaction de type Pret/Emprunt
+      final transactionData = {
+        'utilisateur_id': userId,
+        'type': mouvement.type == 'remboursement' ? 'Pret' : 'Emprunt',
+        'montant': mouvement.montant,
+        'date': mouvement.date.toIso8601String(),
+        'note': mouvement.note ?? '',
+        'compte_id': detteId,
+        'collection_compte': 'comptes_dettes',
+        'tiers_id': 'Dette', // TODO: Récupérer le nom du tiers
+        'est_fractionnee': false,
+        'transaction_parente_id': null,
+        'sous_items': null,
+        'marqueur': 'dette',
+        'compte_passif_id': null,
+      };
+
+      await pb.collection('transactions').create(body: transactionData);
+      print('✅ Mouvement dette ajouté avec succès');
+    } catch (e) {
+      print('❌ Erreur ajout mouvement dette: $e');
+      rethrow;
+    }
+  }
+
+  /// Lire toutes les dettes actives
+  static Future<List<Dette>> lireDettesActives() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Lecture des dettes actives...');
+
+      final records = await pb.collection('comptes_dettes').getFullList(
+            filter: 'utilisateur_id = "$userId" && archive = false',
+            sort: 'ordre',
+          );
+
+      final dettes = records.map((record) {
+        return Dette(
+          id: record.id,
+          nomTiers: record.data['nom'],
+          montantInitial: (record.data['montant_initial'] ?? 0).toDouble(),
+          solde: (record.data['solde_dette'] ?? 0).toDouble(),
+          type: 'dette',
+          historique: [],
+          archive: record.data['archive'] ?? false,
+          dateCreation: DateTime.parse(
+              record.data['created'] ?? DateTime.now().toIso8601String()),
+          userId: record.data['utilisateur_id'],
+          estManuelle: true,
+          tauxInteret: (record.data['taux_interet'] ?? 0).toDouble(),
+          montantMensuel: (record.data['paiement_minimum'] ?? 0).toDouble(),
+        );
+      }).toList();
+
+      print('✅ ${dettes.length} dettes actives lues');
+      return dettes;
+    } catch (e) {
+      print('❌ Erreur lecture dettes: $e');
+      rethrow;
+    }
+  }
+
+  // === MÉTHODES POUR LES PRÊTS PERSONNELS ===
+
+  /// Créer un prêt personnel
+  static Future<void> creerPretPersonnel(
+      String nomTiers, double montantInitial, String type) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      print('🔍 PocketBaseService: Création prêt personnel $nomTiers...');
+
+      final data = {
+        'utilisateur_id': userId,
+        'nom_tiers': nomTiers,
+        'montant_initial': montantInitial,
+        'solde': montantInitial,
+        'type': type, // 'pret' ou 'dette'
+        'archive': false,
+        'date_creation': DateTime.now().toIso8601String(),
+      };
+
+      await pb.collection('pret_personnel').create(body: data);
+      print('✅ Prêt personnel créé avec succès');
+    } catch (e) {
+      print('❌ Erreur création prêt personnel: $e');
+      rethrow;
+    }
+  }
+
+  // === MÉTHODES UTILITAIRES ===
+
+  /// Convertir le type de transaction vers PocketBase
+  static String _convertirTypeTransaction(app_model.TypeTransaction type) {
+    switch (type) {
+      case app_model.TypeTransaction.depense:
+        return 'Depense';
+      case app_model.TypeTransaction.revenu:
+        return 'Revenu';
+      // TODO: Ajouter les types Pret/Emprunt au modèle TypeTransaction
+      default:
+        return 'Depense';
+    }
+  }
+
+  /// Convertir le type de transaction depuis PocketBase
+  static app_model.TypeTransaction _convertirTypeTransactionDepuisPocketBase(
+      String type) {
+    switch (type) {
+      case 'Depense':
+        return app_model.TypeTransaction.depense;
+      case 'Revenu':
+        return app_model.TypeTransaction.revenu;
+      case 'Pret':
+        return app_model
+            .TypeTransaction.depense; // TODO: Ajouter les types Pret/Emprunt
+      case 'Emprunt':
+        return app_model
+            .TypeTransaction.depense; // TODO: Ajouter les types Pret/Emprunt
+      default:
+        return app_model.TypeTransaction.depense;
+    }
+  }
+
+  /// Parser les sous-items depuis JSON
+  static List<Map<String, dynamic>> _parseSousItems(String jsonString) {
+    try {
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      return jsonList.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      print('❌ Erreur parsing sous-items: $e');
+      return [];
+    }
+  }
+
+  /// Mettre à jour le solde d'une enveloppe
+  static Future<void> mettreAJourSoldeEnveloppe(String enveloppeId,
+      double montant, app_model.TypeTransaction type) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+
+      print(
+          '🔍 PocketBaseService: Mise à jour solde enveloppe $enveloppeId...');
+
+      // Récupérer l'enveloppe actuelle
+      final record = await pb.collection('enveloppes').getOne(enveloppeId);
+      final soldeActuel = (record.data['solde_enveloppe'] ?? 0).toDouble();
+      final depenseActuelle = (record.data['depense'] ?? 0).toDouble();
+
+      // Calculer le nouveau solde
+      double nouveauSolde = soldeActuel;
+      double nouvelleDepense = depenseActuelle;
+
+      if (type == app_model.TypeTransaction.depense) {
+        nouveauSolde -= montant;
+        nouvelleDepense += montant;
+      } else if (type == app_model.TypeTransaction.revenu) {
+        nouveauSolde += montant;
+      }
+
+      // Mettre à jour l'enveloppe
+      final data = {
+        'solde_enveloppe': nouveauSolde,
+        'depense': nouvelleDepense,
+      };
+
+      await pb.collection('enveloppes').update(enveloppeId, body: data);
+      print('✅ Solde enveloppe mis à jour: $nouveauSolde');
+    } catch (e) {
+      print('❌ Erreur mise à jour solde enveloppe: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtenir l'ID de l'utilisateur connecté
+  static String? getCurrentUserId() {
+    // TODO: Implémenter la récupération de l'ID utilisateur
+    return null;
+  }
+
+  /// Vérifier si un utilisateur est connecté
+  static bool get isUserConnected {
+    // TODO: Implémenter la vérification de connexion
+    return false;
   }
 }

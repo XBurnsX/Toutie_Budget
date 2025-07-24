@@ -10,6 +10,7 @@ import 'package:toutie_budget/services/theme_service.dart';
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
 import 'page_firebase_monitor.dart';
+import 'page_test_migration.dart';
 
 import '../themes/dropdown_theme_extension.dart';
 
@@ -212,6 +213,19 @@ class _PageParametresState extends State<PageParametres> {
               title: const Text('À propos'),
               subtitle: const Text('Toutie Budget'),
               onTap: _handleAboutTap,
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz, color: Colors.orange),
+              title: const Text('Test Migration'),
+              subtitle: const Text('Tester la migration Firebase → PocketBase'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const PageTestMigration(),
+                  ),
+                );
+              },
             ),
             const Divider(),
             ListTile(

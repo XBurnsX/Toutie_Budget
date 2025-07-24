@@ -5,6 +5,8 @@ import '../models/fractionnement_model.dart';
 import '../models/dette.dart';
 import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
+import '../services/data_service_config.dart';
+import '../services/allocation_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AjoutTransactionController extends ChangeNotifier {
@@ -173,34 +175,115 @@ class AjoutTransactionController extends ChangeNotifier {
   }
 
   Future<void> _chargerComptesFirebase() async {
-    final service = FirebaseService();
-    final comptes = await service.lireComptes().first;
-    _comptesFirebase = comptes;
-    _mettreAJourListeComptesAffichables();
-    notifyListeners();
+    try {
+      print(
+          '🔍 AjoutTransactionController: Chargement des comptes via DataServiceConfig...');
+      final dataService = DataServiceConfig.instance;
+      final comptes = await dataService.lireComptes();
+      _comptesFirebase = comptes;
+      _mettreAJourListeComptesAffichables();
+      print('✅ AjoutTransactionController: ${comptes.length} comptes chargés');
+      notifyListeners();
+    } catch (e) {
+      print('❌ AjoutTransactionController: Erreur chargement comptes: $e');
+      rethrow;
+    }
   }
 
   Future<void> _chargerTiersConnus() async {
-    final service = FirebaseService();
-    final liste = await service.lireTiers();
-    _listeTiersConnus = liste
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    notifyListeners();
+    try {
+      print(
+          '🔍 AjoutTransactionController: Chargement des tiers via DataServiceConfig...');
+      final dataService = DataServiceConfig.instance;
+      final liste = await dataService.lireTiers();
+      _listeTiersConnus = liste
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      print('✅ AjoutTransactionController: ${liste.length} tiers chargés');
+      notifyListeners();
+    } catch (e) {
+      print('❌ AjoutTransactionController: Erreur chargement tiers: $e');
+      rethrow;
+    }
   }
 
   Future<void> _chargerCategoriesFirebase() async {
-    final service = FirebaseService();
-    final categories = await service.lireCategories().first;
-    _categoriesFirebase = categories
-        .map(
-          (cat) => {
+    try {
+      print(
+          '🔍 AjoutTransactionController: Chargement des catégories via DataServiceConfig...');
+      final dataService = DataServiceConfig.instance;
+      final categories = await dataService.lireCategories();
+
+      // Charger les enveloppes pour chaque catégorie avec calcul des soldes
+      List<Map<String, dynamic>> categoriesAvecEnveloppes = [];
+      for (final cat in categories) {
+        try {
+          final enveloppes = await dataService.lireEnveloppesCategorie(cat.id);
+
+          // Calculer les soldes pour chaque enveloppe
+          List<Map<String, dynamic>> enveloppesAvecSoldes = [];
+          for (final enveloppe in enveloppes) {
+            try {
+              // Utiliser la même logique que la page budget
+              final now = DateTime.now();
+              final currentMonthKey =
+                  "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
+              final moisAllocation = DateTime.parse('${currentMonthKey}-01');
+
+              final soldeAllocation =
+                  await AllocationService.calculerSoldeEnveloppe(
+                enveloppeId: enveloppe['id'],
+                mois: moisAllocation,
+              );
+
+              // Créer une enveloppe avec le solde calculé
+              final enveloppeAvecSolde = Map<String, dynamic>.from(enveloppe);
+              enveloppeAvecSolde['solde'] = soldeAllocation ?? 0.0;
+              enveloppeAvecSolde['objectif_montant'] =
+                  enveloppe['objectif_montant'] ?? 0.0;
+              enveloppeAvecSolde['depense'] = enveloppe['depense'] ?? 0.0;
+
+              enveloppesAvecSoldes.add(enveloppeAvecSolde);
+              print(
+                  '💰 Enveloppe ${enveloppe['nom']}: solde calculé = ${soldeAllocation ?? 0.0}');
+            } catch (e) {
+              print(
+                  '⚠️ Erreur calcul solde pour enveloppe ${enveloppe['nom']}: $e');
+              // Garder l'enveloppe avec solde 0 en cas d'erreur
+              final enveloppeAvecSolde = Map<String, dynamic>.from(enveloppe);
+              enveloppeAvecSolde['solde'] = 0.0;
+              enveloppeAvecSolde['objectif_montant'] =
+                  enveloppe['objectif_montant'] ?? 0.0;
+              enveloppeAvecSolde['depense'] = enveloppe['depense'] ?? 0.0;
+              enveloppesAvecSoldes.add(enveloppeAvecSolde);
+            }
+          }
+
+          categoriesAvecEnveloppes.add({
             'id': cat.id,
             'nom': cat.nom,
-            'enveloppes': [], // Les enveloppes seront récupérées séparément via PocketBase
-          },
-        )
-        .toList();
-    notifyListeners();
+            'enveloppes': enveloppesAvecSoldes,
+          });
+          print(
+              '✅ Catégorie ${cat.nom}: ${enveloppesAvecSoldes.length} enveloppes chargées avec soldes');
+        } catch (e) {
+          print(
+              '⚠️ Erreur chargement enveloppes pour catégorie ${cat.nom}: $e');
+          categoriesAvecEnveloppes.add({
+            'id': cat.id,
+            'nom': cat.nom,
+            'enveloppes': [],
+          });
+        }
+      }
+
+      _categoriesFirebase = categoriesAvecEnveloppes;
+      print(
+          '✅ AjoutTransactionController: ${categories.length} catégories chargées avec enveloppes');
+      notifyListeners();
+    } catch (e) {
+      print('❌ AjoutTransactionController: Erreur chargement catégories: $e');
+      rethrow;
+    }
   }
 
   void _mettreAJourListeComptesAffichables() {
@@ -252,7 +335,18 @@ class AjoutTransactionController extends ChangeNotifier {
       _listeTiersConnus.sort(
         (a, b) => normaliserChaine(a).compareTo(normaliserChaine(b)),
       );
-      await FirebaseService().ajouterTiers(nomTiers);
+
+      try {
+        final dataService = DataServiceConfig.instance;
+        await dataService.ajouterTiers(nomTiers);
+        print('✅ Tiers "$nomTiers" ajouté via DataServiceConfig');
+      } catch (e) {
+        print('❌ Erreur ajout tiers via DataServiceConfig: $e');
+        // Fallback vers Firebase si nécessaire
+        await FirebaseService().ajouterTiers(nomTiers);
+        print('✅ Tiers "$nomTiers" ajouté via Firebase (fallback)');
+      }
+
       notifyListeners();
     }
   }
@@ -538,7 +632,7 @@ class AjoutTransactionController extends ChangeNotifier {
                   (normaliserChaine(
                         d.nomTiers,
                       ).contains(normaliserChaine(nomTiers)) ||
-                  normaliserChaine(
+                      normaliserChaine(
                         nomTiers,
                       ).contains(normaliserChaine(d.nomTiers))) &&
                   d.type == typeDetteRecherche,
@@ -779,7 +873,7 @@ class AjoutTransactionController extends ChangeNotifier {
                 (normaliserChaine(
                       d.nomTiers,
                     ).contains(normaliserChaine(nomTiers)) ||
-                normaliserChaine(
+                    normaliserChaine(
                       nomTiers,
                     ).contains(normaliserChaine(d.nomTiers))) &&
                 d.type == typeDetteRecherche)
