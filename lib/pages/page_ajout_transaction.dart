@@ -11,7 +11,6 @@ import '../widgets/ajout_transaction/section_fractionnement.dart';
 import '../widgets/ajout_transaction/bouton_sauvegarder.dart';
 import '../widgets/modale_fractionnement.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 
 class EcranAjoutTransactionRefactored extends StatefulWidget {
   final List<String> comptesExistants;

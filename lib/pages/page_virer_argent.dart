@@ -614,7 +614,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                       ),
                     ],
                   );
-                } catch (e, stackTrace) {
+                } catch (e) {
                   return Center(
                     child: Text(
                       'Erreur de conversion: $e',

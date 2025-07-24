@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/auth_service.dart';
-import 'package:toutie_budget/services/auth_service_firebase.dart';
 import 'package:toutie_budget/main.dart';
-import 'package:toutie_budget/pages/page_test_simple.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:toutie_budget/services/pocketbase_service.dart';
 
 class PageLogin extends StatefulWidget {
   const PageLogin({super.key});

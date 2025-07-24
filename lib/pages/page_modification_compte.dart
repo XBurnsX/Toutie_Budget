@@ -5,7 +5,6 @@ import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/firebase_service.dart';
-import '../services/cache_service.dart';
 
 /// Page de modification d'un compte existant
 class PageModificationCompte extends StatefulWidget {

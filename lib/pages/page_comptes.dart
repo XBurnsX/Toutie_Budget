@@ -3,7 +3,6 @@ import 'package:toutie_budget/models/compte.dart';
 import 'package:toutie_budget/models/dette.dart';
 import 'package:toutie_budget/services/pocketbase_service.dart';
 import 'package:toutie_budget/services/dette_service.dart';
-import 'package:toutie_budget/services/cache_service.dart';
 import 'page_creation_compte.dart';
 import 'page_transactions_compte.dart';
 import 'page_modification_compte.dart';
@@ -24,6 +23,23 @@ class PageComptes extends StatefulWidget {
 
 class _PageComptesState extends State<PageComptes> {
   bool _editionMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialiser le temps réel PocketBase au démarrage
+    _initializeRealtime();
+  }
+
+  Future<void> _initializeRealtime() async {
+    try {
+      // Initialiser le service de temps réel
+      // Forcer l'initialisation des streams temps réel
+      await PocketBaseService.lireTousLesComptes().first;
+    } catch (e) {
+      print('❌ Erreur initialisation temps réel: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -332,8 +348,7 @@ class _PageComptesState extends State<PageComptes> {
                     : () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) =>
-                                PageDetailCarteCredit(
+                            builder: (_) => PageDetailCarteCredit(
                                 compteId: compte.id, nomCarte: compte.nom),
                           ),
                         );

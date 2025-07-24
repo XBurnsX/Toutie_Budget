@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/categorie.dart';
 import '../models/compte.dart';
 import '../models/enveloppe.dart';
 import 'firebase_service.dart';

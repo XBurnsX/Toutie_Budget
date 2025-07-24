@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/compte.dart';
 import '../models/dette.dart';
-import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
 import '../widgets/numeric_keyboard.dart';
 import '../themes/dropdown_theme_extension.dart';

@@ -5,18 +5,15 @@ import 'package:toutie_budget/services/rollover_service.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../widgets/liste_categories_enveloppes.dart';
-import '../widgets/bandeau_bienvenue.dart';
 import 'page_categories_enveloppes.dart';
 import '../widgets/month_picker.dart';
 import 'page_virer_argent.dart';
 import 'page_pret_personnel.dart';
 import 'page_parametres.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'page_situations_urgence.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'page_statistiques.dart';
 import 'page_ajout_transaction.dart';
-import 'page_comptes.dart';
 import 'page_transactions_compte.dart';
 
 /// Page d'affichage du budget et des enveloppes
@@ -94,7 +91,7 @@ class _PageBudgetState extends State<PageBudget> {
     if (kIsWeb) {
       return Scaffold(
         body: StreamBuilder<List<Compte>>(
-          stream: FirebaseService().lireComptes(),
+          stream: PocketBaseService.lireTousLesComptes(),
           builder: (context, snapshot) {
             if (!snapshot.hasData || !mounted) {
               return const Center(child: CircularProgressIndicator());
@@ -333,21 +330,28 @@ class _PageBudgetState extends State<PageBudget> {
                                 ),
                               // Liste des enveloppes/dépenses
                               Expanded(
-                                child: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-                                  future: PocketBaseService.lireEnveloppesGroupeesParCategorie(),
+                                child: FutureBuilder<
+                                    Map<String, List<Map<String, dynamic>>>>(
+                                  future: PocketBaseService
+                                      .lireEnveloppesGroupeesParCategorie(),
                                   builder: (context, enveloppesSnapshot) {
                                     if (!enveloppesSnapshot.hasData) {
-                                      return const Center(child: CircularProgressIndicator());
+                                      return const Center(
+                                          child: CircularProgressIndicator());
                                     }
-                                    
-                                    final enveloppesParCategorie = enveloppesSnapshot.data!;
-                                    
+
+                                    final enveloppesParCategorie =
+                                        enveloppesSnapshot.data!;
+
                                     return ListeCategoriesEnveloppes(
                                       categories: categories
                                           .map((c) => {
                                                 'id': c.id,
                                                 'nom': c.nom,
-                                                'enveloppes': enveloppesParCategorie[c.id] ?? [],
+                                                'enveloppes':
+                                                    enveloppesParCategorie[
+                                                            c.id] ??
+                                                        [],
                                               })
                                           .toList(),
                                       comptes: comptes
@@ -356,7 +360,8 @@ class _PageBudgetState extends State<PageBudget> {
                                                 'nom': compte.nom,
                                                 'type': compte.type,
                                                 'estArchive': compte.estArchive,
-                                                'pretAPlacer': compte.pretAPlacer,
+                                                'pretAPlacer':
+                                                    compte.pretAPlacer,
                                                 'couleur': compte.couleur,
                                               })
                                           .toList(),
@@ -688,22 +693,25 @@ class _PageBudgetState extends State<PageBudget> {
 
                   // Liste des enveloppes/dépenses
                   Expanded(
-                    child: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-                      future: PocketBaseService.lireEnveloppesGroupeesParCategorie(),
+                    child:
+                        FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+                      future: PocketBaseService
+                          .lireEnveloppesGroupeesParCategorie(),
                       builder: (context, enveloppesSnapshot) {
                         if (!enveloppesSnapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         }
-                        
+
                         final enveloppesParCategorie = enveloppesSnapshot.data!;
-                        
 
                         return ListeCategoriesEnveloppes(
                           categories: categories
                               .map((c) => {
                                     'id': c.id,
                                     'nom': c.nom,
-                                    'enveloppes': enveloppesParCategorie[c.id] ?? [],
+                                    'enveloppes':
+                                        enveloppesParCategorie[c.id] ?? [],
                                   })
                               .toList(),
                           comptes: comptes

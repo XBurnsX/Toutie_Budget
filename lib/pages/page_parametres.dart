@@ -9,7 +9,6 @@ import 'package:toutie_budget/services/theme_service.dart';
 
 import 'package:provider/provider.dart';
 import 'page_archivage.dart';
-import 'page_debug_cache.dart';
 import 'page_firebase_monitor.dart';
 
 import '../themes/dropdown_theme_extension.dart';

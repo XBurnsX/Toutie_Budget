@@ -10,7 +10,6 @@ import 'package:toutie_budget/services/auth_service.dart';
 import 'package:toutie_budget/services/theme_service.dart';
 import 'package:toutie_budget/widgets/bandeau_bienvenue.dart';
 
-import 'package:toutie_budget/services/dette_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'models/categorie.dart';
@@ -20,7 +19,6 @@ import 'pages/page_statistiques.dart';
 import 'pages/page_set_objectif.dart';
 import 'pages/page_ajout_transaction.dart';
 import 'pages/page_pret_personnel.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'themes/dropdown_theme_extension.dart';
 import 'firebase_options.dart';
 import 'services/investissement_service.dart';

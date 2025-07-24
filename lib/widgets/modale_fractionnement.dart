@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/fractionnement_model.dart';
 import '../services/color_service.dart';
 import '../widgets/numeric_keyboard.dart';
-import '../themes/dropdown_theme_extension.dart';
 import '../widgets/ajout_transaction/champ_enveloppe.dart';
 import '../models/compte.dart';
 import '../models/transaction_model.dart';

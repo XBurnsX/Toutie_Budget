@@ -1,6 +1,6 @@
 // 📁 Chemin : lib/services/pocketbase_service.dart
 // 🔗 Dépendances : pocketbase.dart, auth_service.dart
-// 📋 Description : Service PocketBase pour remplacer FirebaseService - Version COMPLÈTE
+// 📋 Description : Service PocketBase pour remplacer FirebaseService - Version COMPLÈTE avec TEMPS RÉEL
 
 import 'package:pocketbase/pocketbase.dart';
 import 'package:pocketbase/pocketbase.dart' show RecordModel;
@@ -8,6 +8,7 @@ import '../models/enveloppe.dart';
 import 'auth_service.dart';
 import '../models/categorie.dart';
 import '../models/compte.dart';
+import 'dart:async';
 
 class PocketBaseService {
   static final PocketBaseService _instance = PocketBaseService._internal();
@@ -15,6 +16,24 @@ class PocketBaseService {
   PocketBaseService._internal();
 
   static PocketBase? _pocketBase;
+
+  // 🔥 TEMPS RÉEL - Streams en temps réel
+  static final Map<String, StreamController<List<Compte>>> _comptesControllers =
+      {};
+  static final Map<String, StreamController<List<Categorie>>>
+      _categoriesControllers = {};
+  static final Map<String, StreamController<List<Enveloppe>>>
+      _enveloppesControllers = {};
+
+  // Cache des données en temps réel
+  static final Map<String, List<Compte>> _comptesCache = {};
+  static final Map<String, List<Categorie>> _categoriesCache = {};
+  static final Map<String, List<Enveloppe>> _enveloppesCache = {};
+
+  // Timers pour les mises à jour périodiques
+  static Timer? _comptesTimer;
+  static Timer? _categoriesTimer;
+  static Timer? _enveloppesTimer;
 
   // Obtenir l'instance PocketBase depuis AuthService
   static Future<PocketBase> _getPocketBaseInstance() async {
@@ -36,11 +55,10 @@ class PocketBaseService {
     // Tester chaque URL dans l'ordre
     for (final url in _pocketBaseUrls) {
       try {
-
         // Test simple pour vérifier la connexion
         _pocketBase = PocketBase(url);
         await _pocketBase!.collection('users').getList(page: 1, perPage: 1);
-        
+
         return _pocketBase!;
       } catch (e) {
         continue;
@@ -50,266 +68,637 @@ class PocketBaseService {
     throw Exception('❌ Aucune connexion PocketBase disponible');
   }
 
-  // Lire les catégories depuis PocketBase
+  // 🔥 MÉTHODES TEMPS RÉEL
+  // ============================================================================
+
+  // Initialiser les streams temps réel
+  static Future<void> _initializeRealtimeStreams() async {
+    try {
+      // Éviter la double initialisation
+      if (_comptesTimer != null &&
+          _categoriesTimer != null &&
+          _enveloppesTimer != null) {
+        print('🔄 Streams déjà initialisés, skip...');
+        return;
+      }
+
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) return;
+
+      print('🔥 Initialisation du temps réel PocketBase...');
+
+      // Créer les contrôleurs de stream
+      _comptesControllers['comptes'] =
+          StreamController<List<Compte>>.broadcast();
+      _categoriesControllers['categories'] =
+          StreamController<List<Categorie>>.broadcast();
+      _enveloppesControllers['enveloppes'] =
+          StreamController<List<Enveloppe>>.broadcast();
+
+      // Charger les données initiales
+      await _loadInitialDataSimple();
+
+      // Démarrer les timers pour les mises à jour périodiques
+      _comptesTimer?.cancel();
+      _categoriesTimer?.cancel();
+      _enveloppesTimer?.cancel();
+
+      _comptesTimer = Timer.periodic(
+          const Duration(milliseconds: 500), (_) => _updateComptesData());
+      _categoriesTimer = Timer.periodic(
+          const Duration(milliseconds: 750), (_) => _updateCategoriesData());
+      _enveloppesTimer = Timer.periodic(
+          const Duration(milliseconds: 1000), (_) => _updateEnveloppesData());
+
+      print('✅ Temps réel PocketBase initialisé avec succès');
+    } catch (e) {
+      print('❌ Erreur initialisation temps réel: $e');
+    }
+  }
+
+  // S'abonner à une collection avec filtrage par utilisateur
+  static Future<void> _subscribeToCollection(
+      String collectionName, String userId, String cacheKey) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+
+      // Créer le contrôleur de stream s'il n'existe pas
+      if (!_comptesControllers.containsKey(cacheKey)) {
+        _comptesControllers[cacheKey] =
+            StreamController<List<Compte>>.broadcast();
+      }
+      if (!_categoriesControllers.containsKey(cacheKey)) {
+        _categoriesControllers[cacheKey] =
+            StreamController<List<Categorie>>.broadcast();
+      }
+      if (!_enveloppesControllers.containsKey(cacheKey)) {
+        _enveloppesControllers[cacheKey] =
+            StreamController<List<Enveloppe>>.broadcast();
+      }
+
+      // S'abonner à la collection avec filtre utilisateur
+      final subscription = pb.collection(collectionName).subscribe(
+            'utilisateur_id = "$userId"',
+            (data) => _handleRealtimeUpdate(collectionName, data, cacheKey),
+          );
+
+      // Plus de subscriptions à gérer
+
+      // Charger les données initiales
+      await _loadInitialData(collectionName, userId, cacheKey);
+    } catch (e) {
+      print('❌ Erreur subscription $collectionName: $e');
+    }
+  }
+
+  // Gérer les mises à jour en temps réel
+  static void _handleRealtimeUpdate(
+      String collectionName, dynamic data, String cacheKey) {
+    try {
+      switch (data.action) {
+        case 'create':
+          _handleCreate(collectionName, data, cacheKey);
+          break;
+        case 'update':
+          _handleUpdate(collectionName, data, cacheKey);
+          break;
+        case 'delete':
+          _handleDelete(collectionName, data, cacheKey);
+          break;
+      }
+    } catch (e) {
+      print('❌ Erreur traitement temps réel: $e');
+    }
+  }
+
+  // Gérer la création d'un enregistrement
+  static void _handleCreate(
+      String collectionName, dynamic data, String cacheKey) {
+    try {
+      final record = data.record;
+      if (record == null) return;
+
+      switch (cacheKey) {
+        case 'comptes':
+          final compte = Compte.fromPocketBase(
+              record.data, record.id, _getCompteType(collectionName));
+          _comptesCache[cacheKey] ??= [];
+          _comptesCache[cacheKey]!.add(compte);
+          _comptesControllers[cacheKey]?.add(_comptesCache[cacheKey]!);
+          break;
+        case 'categories':
+          final categorie = Categorie(
+            id: record.id,
+            utilisateurId: record.data['utilisateur_id'] ?? '',
+            nom: record.data['nom'] ?? '',
+            ordre: record.data['ordre'] ?? 0,
+          );
+          _categoriesCache[cacheKey] ??= [];
+          _categoriesCache[cacheKey]!.add(categorie);
+          _categoriesControllers[cacheKey]?.add(_categoriesCache[cacheKey]!);
+          break;
+        case 'enveloppes':
+          final enveloppe = Enveloppe(
+            id: record.id,
+            utilisateurId: record.data['utilisateur_id'] ?? '',
+            categorieId: record.data['categorie_id'] ?? '',
+            nom: record.data['nom'] ?? '',
+            soldeEnveloppe: (record.data['solde_enveloppe'] ?? 0).toDouble(),
+          );
+          _enveloppesCache[cacheKey] ??= [];
+          _enveloppesCache[cacheKey]!.add(enveloppe);
+          _enveloppesControllers[cacheKey]?.add(_enveloppesCache[cacheKey]!);
+          break;
+      }
+    } catch (e) {
+      print('❌ Erreur création temps réel: $e');
+    }
+  }
+
+  // Gérer la mise à jour d'un enregistrement
+  static void _handleUpdate(
+      String collectionName, dynamic data, String cacheKey) {
+    try {
+      final record = data.record;
+      if (record == null) return;
+
+      switch (cacheKey) {
+        case 'comptes':
+          final compte = Compte.fromPocketBase(
+              record.data, record.id, _getCompteType(collectionName));
+          _comptesCache[cacheKey] ??= [];
+          final index =
+              _comptesCache[cacheKey]!.indexWhere((c) => c.id == record.id);
+          if (index != -1) {
+            _comptesCache[cacheKey]![index] = compte;
+            _comptesControllers[cacheKey]?.add(_comptesCache[cacheKey]!);
+          }
+          break;
+        case 'categories':
+          final categorie = Categorie(
+            id: record.id,
+            utilisateurId: record.data['utilisateur_id'] ?? '',
+            nom: record.data['nom'] ?? '',
+            ordre: record.data['ordre'] ?? 0,
+          );
+          _categoriesCache[cacheKey] ??= [];
+          final index =
+              _categoriesCache[cacheKey]!.indexWhere((c) => c.id == record.id);
+          if (index != -1) {
+            _categoriesCache[cacheKey]![index] = categorie;
+            _categoriesControllers[cacheKey]?.add(_categoriesCache[cacheKey]!);
+          }
+          break;
+        case 'enveloppes':
+          final enveloppe = Enveloppe(
+            id: record.id,
+            utilisateurId: record.data['utilisateur_id'] ?? '',
+            categorieId: record.data['categorie_id'] ?? '',
+            nom: record.data['nom'] ?? '',
+            soldeEnveloppe: (record.data['solde_enveloppe'] ?? 0).toDouble(),
+          );
+          _enveloppesCache[cacheKey] ??= [];
+          final index =
+              _enveloppesCache[cacheKey]!.indexWhere((e) => e.id == record.id);
+          if (index != -1) {
+            _enveloppesCache[cacheKey]![index] = enveloppe;
+            _enveloppesControllers[cacheKey]?.add(_enveloppesCache[cacheKey]!);
+          }
+          break;
+      }
+    } catch (e) {
+      print('❌ Erreur mise à jour temps réel: $e');
+    }
+  }
+
+  // Gérer la suppression d'un enregistrement
+  static void _handleDelete(
+      String collectionName, dynamic data, String cacheKey) {
+    try {
+      final record = data.record;
+      if (record == null) return;
+
+      switch (cacheKey) {
+        case 'comptes':
+          _comptesCache[cacheKey] ??= [];
+          _comptesCache[cacheKey]!.removeWhere((c) => c.id == record.id);
+          _comptesControllers[cacheKey]?.add(_comptesCache[cacheKey]!);
+          break;
+        case 'categories':
+          _categoriesCache[cacheKey] ??= [];
+          _categoriesCache[cacheKey]!.removeWhere((c) => c.id == record.id);
+          _categoriesControllers[cacheKey]?.add(_categoriesCache[cacheKey]!);
+          break;
+        case 'enveloppes':
+          _enveloppesCache[cacheKey] ??= [];
+          _enveloppesCache[cacheKey]!.removeWhere((e) => e.id == record.id);
+          _enveloppesControllers[cacheKey]?.add(_enveloppesCache[cacheKey]!);
+          break;
+      }
+    } catch (e) {
+      print('❌ Erreur suppression temps réel: $e');
+    }
+  }
+
+  // Déterminer le type de compte selon la collection
+  static String _getCompteType(String collectionName) {
+    switch (collectionName) {
+      case 'comptes_cheques':
+        return 'Chèque';
+      case 'comptes_credits':
+        return 'Carte de crédit';
+      case 'comptes_investissement':
+        return 'Investissement';
+      case 'comptes_dettes':
+      case 'pret_personnel':
+        return 'Dette';
+      default:
+        return 'Chèque';
+    }
+  }
+
+  // Charger les données initiales
+  static Future<void> _loadInitialData(
+      String collectionName, String userId, String cacheKey) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+
+      final records = await pb.collection(collectionName).getFullList(
+            filter: 'utilisateur_id = "$userId"',
+          );
+
+      switch (cacheKey) {
+        case 'comptes':
+          final comptes = records
+              .map((record) => Compte.fromPocketBase(
+                  record.data, record.id, _getCompteType(collectionName)))
+              .toList();
+          _comptesCache[cacheKey] = comptes;
+          _comptesControllers[cacheKey]?.add(comptes);
+          break;
+        case 'categories':
+          final categories = records
+              .map((record) => Categorie(
+                    id: record.id,
+                    utilisateurId: record.data['utilisateur_id'] ?? '',
+                    nom: record.data['nom'] ?? '',
+                    ordre: record.data['ordre'] ?? 0,
+                  ))
+              .toList();
+          _categoriesCache[cacheKey] = categories;
+          _categoriesControllers[cacheKey]?.add(categories);
+          break;
+        case 'enveloppes':
+          final enveloppes = records
+              .map((record) => Enveloppe(
+                    id: record.id,
+                    utilisateurId: record.data['utilisateur_id'] ?? '',
+                    categorieId: record.data['categorie_id'] ?? '',
+                    nom: record.data['nom'] ?? '',
+                    soldeEnveloppe:
+                        (record.data['solde_enveloppe'] ?? 0).toDouble(),
+                  ))
+              .toList();
+          _enveloppesCache[cacheKey] = enveloppes;
+          _enveloppesControllers[cacheKey]?.add(enveloppes);
+          break;
+      }
+    } catch (e) {
+      print('❌ Erreur chargement initial $collectionName: $e');
+    }
+  }
+
+  // Nettoyer toutes les subscriptions
+  static Future<void> _disposeAllSubscriptions() async {
+    // Arrêter les timers
+    _comptesTimer?.cancel();
+    _categoriesTimer?.cancel();
+    _enveloppesTimer?.cancel();
+
+    // Fermer les controllers
+    _comptesControllers.values.forEach((controller) => controller.close());
+    _categoriesControllers.values.forEach((controller) => controller.close());
+    _enveloppesControllers.values.forEach((controller) => controller.close());
+
+    // Vider les caches
+    _comptesCache.clear();
+    _categoriesCache.clear();
+    _enveloppesCache.clear();
+
+    print('🧹 Nettoyage des streams terminé');
+  }
+
+  // Nettoyer tous les contrôleurs
+  static void _disposeAllControllers() {
+    for (final controller in _comptesControllers.values) {
+      controller.close();
+    }
+    for (final controller in _categoriesControllers.values) {
+      controller.close();
+    }
+    for (final controller in _enveloppesControllers.values) {
+      controller.close();
+    }
+    _comptesControllers.clear();
+    _categoriesControllers.clear();
+    _enveloppesControllers.clear();
+  }
+
+  // 🔥 STREAMS TEMPS RÉEL
+  // ============================================================================
+
+  // Lire les catégories en temps réel depuis PocketBase
   static Stream<List<Categorie>> lireCategories() async* {
     try {
       final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
 
-      // Vérifier que l'utilisateur est connecté
-      final utilisateurId = pb.authStore.model?.id;
-      
-      if (utilisateurId == null) {
+      if (userId == null) {
         yield [];
         return;
       }
 
-      final records = await pb.collection('categories').getFullList(
-        filter: 'utilisateur_id = "$utilisateurId"',
-      );
-
-      final List<Categorie> categories = [];
-      
-      for (final record in records) {
-        // Récupérer les enveloppes pour cette catégorie
-        final enveloppesRecords = await pb.collection('enveloppes').getFullList(
-          filter: 'categorie_id = "${record.id}" && utilisateur_id = "$utilisateurId"',
-        );
-        
-        // Convertir les enveloppes
-        final enveloppes = enveloppesRecords.map((envRecord) => Enveloppe(
-          id: envRecord.id,
-          utilisateurId: envRecord.data['utilisateur_id'] ?? '',
-          categorieId: envRecord.data['categorie_id'] ?? '',
-          nom: envRecord.data['nom'] ?? '',
-          soldeEnveloppe: (envRecord.data['solde_enveloppe'] ?? 0).toDouble(),
-        )).toList();
-        
-        // Créer la catégorie avec ses enveloppes
-        final categorie = Categorie(
-          id: record.id,
-          utilisateurId: record.data['utilisateur_id'],
-          nom: record.data['nom'] ?? '',
-          ordre: record.data['ordre'] ?? 0,
-        );
-        
-        categories.add(categorie);
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_categoriesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
       }
 
-      yield categories;
+      // Retourner le stream temps réel avec données immédiates
+      if (_categoriesControllers.containsKey('categories')) {
+        // Émettre les données du cache immédiatement si disponibles
+        if (_categoriesCache.containsKey('categories') &&
+            _categoriesCache['categories']!.isNotEmpty) {
+          yield _categoriesCache['categories']!;
+        }
+        yield* _categoriesControllers['categories']!.stream;
+      } else {
+        // Fallback vers la méthode non-temps réel
+        final records = await pb.collection('categories').getFullList(
+              filter: 'utilisateur_id = "$userId"',
+            );
+
+        final List<Categorie> categories = [];
+
+        for (final record in records) {
+          // Récupérer les enveloppes pour cette catégorie
+          final enveloppesRecords =
+              await pb.collection('enveloppes').getFullList(
+                    filter:
+                        'categorie_id = "${record.id}" && utilisateur_id = "$userId"',
+                  );
+
+          // Convertir les enveloppes
+          final enveloppes = enveloppesRecords
+              .map((envRecord) => Enveloppe(
+                    id: envRecord.id,
+                    utilisateurId: envRecord.data['utilisateur_id'] ?? '',
+                    categorieId: envRecord.data['categorie_id'] ?? '',
+                    nom: envRecord.data['nom'] ?? '',
+                    soldeEnveloppe:
+                        (envRecord.data['solde_enveloppe'] ?? 0).toDouble(),
+                  ))
+              .toList();
+
+          // Créer la catégorie avec ses enveloppes
+          final categorie = Categorie(
+            id: record.id,
+            utilisateurId: record.data['utilisateur_id'],
+            nom: record.data['nom'] ?? '',
+            ordre: record.data['ordre'] ?? 0,
+          );
+
+          categories.add(categorie);
+        }
+
+        yield categories;
+      }
     } catch (e) {
       yield [];
     }
   }
 
-  // ============================================================================
-  // MÉTHODES POUR GÉRER LES CATÉGORIES
-  // ============================================================================
-
-  // Méthode pour ajouter ou mettre à jour une catégorie
-  static Future<String> ajouterCategorie(Categorie categorie) async {
-    try {
-      final pb = await _getPocketBaseInstance();
-      final userId = pb.authStore.model?.id;
-      if (userId == null) throw Exception('Utilisateur non connecté');
-      
-      final categorieData = {
-        'utilisateur_id': userId,
-        'nom': categorie.nom,
-        'ordre': categorie.ordre,
-      };
-      
-      // Si l'ID existe, on met à jour, sinon on crée
-      if (categorie.id.isNotEmpty) {
-        await pb.collection('categories').update(categorie.id, body: categorieData);
-        return categorie.id;
-      } else {
-        final record = await pb.collection('categories').create(body: categorieData);
-        return record.id;
-      }
-    } catch (e) {
-      throw Exception('Erreur lors de l\'ajout/mise à jour de la catégorie: $e');
-    }
-  }
-
-  // Méthode pour supprimer une catégorie
-  static Future<void> supprimerCategorie(String categorieId) async {
-    try {
-      final pb = await _getPocketBaseInstance();
-      await pb.collection('categories').delete(categorieId);
-    } catch (e) {
-      throw Exception('Erreur lors de la suppression de la catégorie: $e');
-    }
-  }
-
-  // Lire uniquement les comptes chèques depuis PocketBase
+  // Lire uniquement les comptes chèques en temps réel depuis PocketBase
   static Stream<List<Compte>> lireComptesChecques() async* {
     try {
       final pb = await _getPocketBaseInstance();
-      
-      // Vérifier que l'utilisateur est connecté
-      final utilisateurId = pb.authStore.model?.id;
-      final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
-      
-      if (utilisateurId == null || utilisateurNom.isEmpty) {
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
         yield [];
         return;
       }
-      
-      final filtre = 'utilisateur_id = "$utilisateurId"';
-      
-      final records = await pb.collection('comptes_cheques').getFullList(
-        filter: filtre,
-      );
-      
-      
-      final comptes = records
-          .map((record) => Compte.fromPocketBase(record.data, record.id, 'Chèque'))
-          .toList();
 
-      yield comptes;
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_comptesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
+      }
+
+      // Retourner le stream temps réel
+      if (_comptesControllers.containsKey('comptes')) {
+        yield* _comptesControllers['comptes']!.stream.map(
+            (comptes) => comptes.where((c) => c.type == 'Chèque').toList());
+      } else {
+        // Fallback vers la méthode non-temps réel
+        final filtre = 'utilisateur_id = "$userId"';
+
+        final records = await pb.collection('comptes_cheques').getFullList(
+              filter: filtre,
+            );
+
+        final comptes = records
+            .map((record) =>
+                Compte.fromPocketBase(record.data, record.id, 'Chèque'))
+            .toList();
+
+        yield comptes;
+      }
     } catch (e) {
       yield [];
     }
   }
 
-  // Lire uniquement les comptes de crédit depuis PocketBase
+  // Lire uniquement les comptes de crédit en temps réel depuis PocketBase
   static Stream<List<Compte>> lireComptesCredits() async* {
     try {
       final pb = await _getPocketBaseInstance();
-      
-      // Vérifier que l'utilisateur est connecté
-      final utilisateurId = pb.authStore.model?.id;
-      final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
-      
-      if (utilisateurId == null || utilisateurNom.isEmpty) {
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
         yield [];
         return;
       }
 
-      final records = await pb.collection('comptes_credits').getFullList(
-        filter: 'utilisateur_id = "$utilisateurId"',
-      );
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_comptesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
+      }
 
-      final comptes = records
-          .map((record) => Compte.fromPocketBase(record.data, record.id, 'Carte de crédit'))
-          .toList();
+      // Retourner le stream temps réel
+      if (_comptesControllers.containsKey('comptes')) {
+        yield* _comptesControllers['comptes']!.stream.map((comptes) =>
+            comptes.where((c) => c.type == 'Carte de crédit').toList());
+      } else {
+        // Fallback vers la méthode non-temps réel
+        final records = await pb.collection('comptes_credits').getFullList(
+              filter: 'utilisateur_id = "$userId"',
+            );
 
-      yield comptes;
+        final comptes = records
+            .map((record) => Compte.fromPocketBase(
+                record.data, record.id, 'Carte de crédit'))
+            .toList();
+
+        yield comptes;
+      }
     } catch (e) {
       yield [];
     }
   }
 
-  // Lire uniquement les comptes d'investissement depuis PocketBase
+  // Lire uniquement les comptes d'investissement en temps réel depuis PocketBase
   static Stream<List<Compte>> lireComptesInvestissement() async* {
     try {
       final pb = await _getPocketBaseInstance();
-      
-      // Vérifier que l'utilisateur est connecté
-      final utilisateurId = pb.authStore.model?.id;
-      final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
-      
-      if (utilisateurId == null || utilisateurNom.isEmpty) {
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
         yield [];
         return;
       }
 
-      final records = await pb.collection('comptes_investissement').getFullList(
-        filter: 'utilisateur_id = "$utilisateurId"',
-      );
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_comptesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
+      }
 
-      final comptes = records
-          .map((record) => Compte.fromPocketBase(record.data, record.id, 'Investissement'))
-          .toList();
+      // Retourner le stream temps réel
+      if (_comptesControllers.containsKey('comptes')) {
+        yield* _comptesControllers['comptes']!.stream.map((comptes) =>
+            comptes.where((c) => c.type == 'Investissement').toList());
+      } else {
+        // Fallback vers la méthode non-temps réel
+        final records =
+            await pb.collection('comptes_investissement').getFullList(
+                  filter: 'utilisateur_id = "$userId"',
+                );
 
-      yield comptes;
+        final comptes = records
+            .map((record) =>
+                Compte.fromPocketBase(record.data, record.id, 'Investissement'))
+            .toList();
+
+        yield comptes;
+      }
     } catch (e) {
       yield [];
     }
   }
 
-  // Lire les dettes (comptes_dettes + prêts personnels) depuis PocketBase
+  // Lire les dettes en temps réel depuis PocketBase
   static Stream<List<Compte>> lireComptesDettes() async* {
     try {
       final pb = await _getPocketBaseInstance();
-      
-      final utilisateurId = pb.authStore.model?.id;
-      final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
-      
-      if (utilisateurId == null || utilisateurNom.isEmpty) {
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) {
         yield [];
         return;
       }
-      
-      List<Compte> toutesLesDettes = [];
 
-      // 1. Récupérer les dettes de la collection comptes_dettes
-      try {
-        final recordsDettes = await pb.collection('comptes_dettes').getFullList(
-          filter: 'utilisateur_id = "$utilisateurId"',
-        );
-
-        final comptesDettes = recordsDettes
-            .map((record) => Compte.fromPocketBase(record.data, record.id, 'Dette'))
-            .toList();
-
-        toutesLesDettes.addAll(comptesDettes);
-      } catch (e) {
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_comptesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
       }
 
-      // 2. Récupérer les prêts personnels de la collection pret_personnel
-      try {
-        final recordsPrets = await pb.collection('pret_personnel').getFullList(
-          filter: 'utilisateur_id = "$utilisateurId"',
-        );
+      // Retourner le stream temps réel
+      if (_comptesControllers.containsKey('comptes')) {
+        yield* _comptesControllers['comptes']!
+            .stream
+            .map((comptes) => comptes.where((c) => c.type == 'Dette').toList());
+      } else {
+        // Fallback vers la méthode non-temps réel
+        List<Compte> toutesLesDettes = [];
 
-        final comptesPrets = recordsPrets
-            .map((record) => Compte.fromPocketBase(record.data, record.id, 'Dette'))
-            .toList();
+        // 1. Récupérer les dettes de la collection comptes_dettes
+        try {
+          final recordsDettes =
+              await pb.collection('comptes_dettes').getFullList(
+                    filter: 'utilisateur_id = "$userId"',
+                  );
 
-        toutesLesDettes.addAll(comptesPrets);
-      } catch (e) {
+          final comptesDettes = recordsDettes
+              .map((record) =>
+                  Compte.fromPocketBase(record.data, record.id, 'Dette'))
+              .toList();
+
+          toutesLesDettes.addAll(comptesDettes);
+        } catch (e) {}
+
+        // 2. Récupérer les prêts personnels de la collection pret_personnel
+        try {
+          final recordsPrets =
+              await pb.collection('pret_personnel').getFullList(
+                    filter: 'utilisateur_id = "$userId"',
+                  );
+
+          final comptesPrets = recordsPrets
+              .map((record) =>
+                  Compte.fromPocketBase(record.data, record.id, 'Dette'))
+              .toList();
+
+          toutesLesDettes.addAll(comptesPrets);
+        } catch (e) {}
+
+        yield toutesLesDettes;
       }
-
-      yield toutesLesDettes;
     } catch (e) {
       yield [];
     }
   }
 
-  // Combiner tous les types de comptes en un seul stream
+  // Combiner tous les types de comptes en un seul stream temps réel
   static Stream<List<Compte>> lireTousLesComptes() async* {
     try {
-      
-      // Récupérer tous les comptes de chaque type
-      final List<Compte> tousLesComptes = [];
-      
-      // Comptes chèques
-      await for (final comptesChecques in lireComptesChecques()) {
-        tousLesComptes.addAll(comptesChecques);
-        break; // Prendre seulement la première émission
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_comptesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
       }
-      
-      // Comptes crédits
-      await for (final comptesCredits in lireComptesCredits()) {
-        tousLesComptes.addAll(comptesCredits);
-        break; // Prendre seulement la première émission
+
+      // Retourner le stream temps réel
+      if (_comptesControllers.containsKey('comptes')) {
+        yield* _comptesControllers['comptes']!.stream;
+      } else {
+        // Fallback vers la méthode non-temps réel
+        final List<Compte> tousLesComptes = [];
+
+        // Comptes chèques
+        await for (final comptesChecques in lireComptesChecques()) {
+          tousLesComptes.addAll(comptesChecques);
+          break; // Prendre seulement la première émission
+        }
+
+        // Comptes crédits
+        await for (final comptesCredits in lireComptesCredits()) {
+          tousLesComptes.addAll(comptesCredits);
+          break; // Prendre seulement la première émission
+        }
+
+        // Comptes investissement
+        await for (final comptesInvestissement in lireComptesInvestissement()) {
+          tousLesComptes.addAll(comptesInvestissement);
+          break; // Prendre seulement la première émission
+        }
+
+        // Comptes dettes
+        await for (final comptesDettes in lireComptesDettes()) {
+          tousLesComptes.addAll(comptesDettes);
+          break; // Prendre seulement la première émission
+        }
+
+        yield tousLesComptes;
       }
-      
-      // Comptes investissement
-      await for (final comptesInvestissement in lireComptesInvestissement()) {
-        tousLesComptes.addAll(comptesInvestissement);
-        break; // Prendre seulement la première émission
-      }
-      
-      // Comptes dettes
-      await for (final comptesDettes in lireComptesDettes()) {
-        tousLesComptes.addAll(comptesDettes);
-        break; // Prendre seulement la première émission
-      }
-      
-      yield tousLesComptes;
-      
     } catch (e) {
       yield [];
     }
@@ -320,48 +709,73 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
       final userId = pb.authStore.model?.id;
-      
+
       if (userId == null) {
         yield [];
         return;
       }
 
-      // Récupérer tous les comptes de l'utilisateur
-      final records = await pb.collection('comptes').getFullList(
-        filter: 'utilisateur_id = "$userId"',
-        sort: 'ordre,nom',
-      );
+      // Initialiser les streams temps réel si pas déjà fait
+      if (_comptesControllers.isEmpty) {
+        await _initializeRealtimeStreams();
+      }
 
-      final comptes = records.map((record) {
-        return Compte(
-          id: record.id,
-          nom: record.data['nom'] ?? '',
-          solde: (record.data['solde'] ?? 0.0).toDouble(),
-          type: record.data['type'] ?? 'cheque',
-          couleur: int.tryParse(record.data['couleur']?.toString() ?? '0') ?? 0x2196F3,
-          pretAPlacer: (record.data['pret_a_placer'] ?? 0.0).toDouble(),
-          dateCreation: DateTime.tryParse(record.data['created'] ?? '') ?? DateTime.now(),
-          estArchive: record.data['archive'] ?? false,
-          ordre: record.data['ordre'] ?? 0,
-          userId: record.data['utilisateur_id'] ?? userId,
-        );
-      }).toList();
+      // Retourner le stream temps réel
+      if (_comptesControllers.containsKey('comptes')) {
+        yield* _comptesControllers['comptes']!.stream;
+      } else {
+        // Fallback vers la méthode non-temps réel
+        final records = await pb.collection('comptes').getFullList(
+              filter: 'utilisateur_id = "$userId"',
+              sort: 'ordre,nom',
+            );
 
-      yield comptes;
+        final comptes = records.map((record) {
+          return Compte(
+            id: record.id,
+            nom: record.data['nom'] ?? '',
+            solde: (record.data['solde'] ?? 0.0).toDouble(),
+            type: record.data['type'] ?? 'cheque',
+            couleur: int.tryParse(record.data['couleur']?.toString() ?? '0') ??
+                0x2196F3,
+            pretAPlacer: (record.data['pret_a_placer'] ?? 0.0).toDouble(),
+            dateCreation: DateTime.tryParse(record.data['created'] ?? '') ??
+                DateTime.now(),
+            estArchive: record.data['archive'] ?? false,
+            ordre: record.data['ordre'] ?? 0,
+            userId: record.data['utilisateur_id'] ?? userId,
+          );
+        }).toList();
+
+        yield comptes;
+      }
     } catch (e) {
       yield [];
     }
   }
 
+  // Supprimer une catégorie par ID
+  static Future<void> supprimerCategorieParId(String categorieId) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      await pb.collection('categories').delete(categorieId);
+      print('✅ Catégorie supprimée: $categorieId');
+    } catch (e) {
+      print('❌ Erreur suppression catégorie: $e');
+      rethrow;
+    }
+  }
+
   // Méthode pour récupérer les enveloppes d'une catégorie spécifique
-  static Future<List<Map<String, dynamic>>> lireEnveloppesParCategorie(String categorieId) async {
+  static Future<List<Map<String, dynamic>>> lireEnveloppesParCategorie(
+      String categorieId) async {
     try {
       final pb = await _getPocketBaseInstance();
       final records = await pb.collection('enveloppes').getFullList(
-        filter: 'categorie_id = "$categorieId"',
-        sort: 'nom',
-      );
-      
+            filter: 'categorie_id = "$categorieId"',
+            sort: 'nom',
+          );
+
       return records.map((record) => record.toJson()).toList();
     } catch (e) {
       return [];
@@ -369,43 +783,41 @@ class PocketBaseService {
   }
 
   // Méthode pour récupérer toutes les enveloppes avec leur catégorie
-  static Future<Map<String, List<Map<String, dynamic>>>> lireEnveloppesGroupeesParCategorie() async {
+  static Future<Map<String, List<Map<String, dynamic>>>>
+      lireEnveloppesGroupeesParCategorie() async {
     try {
       final pb = await _getPocketBaseInstance();
-      
+
       // Vérifier que l'utilisateur est connecté
       final utilisateurId = pb.authStore.model?.id;
       if (utilisateurId == null) {
         return {};
       }
-      
+
       // Filtrer par utilisateur connecté
       final filtre = 'utilisateur_id = "$utilisateurId"';
-      
+
       final records = await pb.collection('enveloppes').getFullList(
-        filter: filtre,
-        expand: 'categorie_id',
-        sort: 'categorie_id.nom,nom',
-      );
-      
-      
+            filter: filtre,
+            expand: 'categorie_id',
+            sort: 'categorie_id.nom,nom',
+          );
+
       final Map<String, List<Map<String, dynamic>>> enveloppesParCategorie = {};
-      
+
       for (final record in records) {
         final categorieId = record.data['categorie_id'] as String;
         final enveloppeData = record.toJson();
         final nomEnveloppe = record.data['nom'] ?? 'Sans nom';
-        
-        
+
         if (!enveloppesParCategorie.containsKey(categorieId)) {
           enveloppesParCategorie[categorieId] = [];
         }
         enveloppesParCategorie[categorieId]!.add(enveloppeData);
       }
-      
-      enveloppesParCategorie.forEach((catId, enveloppes) {
-      });
-      
+
+      enveloppesParCategorie.forEach((catId, enveloppes) {});
+
       return enveloppesParCategorie;
     } catch (e) {
       return {};
@@ -418,13 +830,13 @@ class PocketBaseService {
       final pb = await _getPocketBaseInstance();
       final userId = pb.authStore.model?.id;
       if (userId == null) throw Exception('Utilisateur non connecté');
-      
+
       final records = await pb.collection('enveloppes').getFullList(
-        filter: 'utilisateur_id = "$userId"',
-        expand: 'categorie_id',
-        sort: 'categorie_id.nom,nom',
-      );
-      
+            filter: 'utilisateur_id = "$userId"',
+            expand: 'categorie_id',
+            sort: 'categorie_id.nom,nom',
+          );
+
       return records.map((record) => record.toJson()).toList();
     } catch (e) {
       return [];
@@ -436,16 +848,18 @@ class PocketBaseService {
   // ============================================================================
 
   // Méthode pour ajouter une nouvelle enveloppe
-  static Future<String> ajouterEnveloppe(Map<String, dynamic> enveloppeData) async {
+  static Future<String> ajouterEnveloppe(
+      Map<String, dynamic> enveloppeData) async {
     try {
       final pb = await _getPocketBaseInstance();
       final userId = pb.authStore.model?.id;
       if (userId == null) throw Exception('Utilisateur non connecté');
-      
+
       // Ajouter l'ID utilisateur si pas déjà présent
       enveloppeData['utilisateur_id'] = userId;
-      
-      final record = await pb.collection('enveloppes').create(body: enveloppeData);
+
+      final record =
+          await pb.collection('enveloppes').create(body: enveloppeData);
       return record.id;
     } catch (e) {
       throw Exception('Erreur lors de l\'ajout de l\'enveloppe: $e');
@@ -453,7 +867,8 @@ class PocketBaseService {
   }
 
   // Méthode pour mettre à jour une enveloppe
-  static Future<void> mettreAJourEnveloppe(String enveloppeId, Map<String, dynamic> donnees) async {
+  static Future<void> mettreAJourEnveloppe(
+      String enveloppeId, Map<String, dynamic> donnees) async {
     try {
       final pb = await _getPocketBaseInstance();
       await pb.collection('enveloppes').update(enveloppeId, body: donnees);
@@ -502,11 +917,11 @@ class PocketBaseService {
     if (enveloppeId == null) {
       throw Exception('ID de l\'enveloppe manquant pour la modification');
     }
-    
+
     // Retirer l'ID des données à envoyer
     final donneesModification = Map<String, dynamic>.from(donnees);
     donneesModification.remove('id');
-    
+
     await mettreAJourEnveloppe(enveloppeId, donneesModification);
   }
 
@@ -522,7 +937,6 @@ class PocketBaseService {
         throw Exception('❌ Aucun utilisateur connecté dans PocketBase');
       }
 
-      
       // Déterminer la collection selon le type de compte
       String nomCollection;
       Map<String, dynamic> donneesCompte;
@@ -558,7 +972,8 @@ class PocketBaseService {
         case 'Dette':
           nomCollection = 'comptes_dettes';
           donneesCompte = {
-            'utilisateur_id': utilisateurId, // Utiliser le bon champ selon le guide
+            'utilisateur_id':
+                utilisateurId, // Utiliser le bon champ selon le guide
             'nom': compte.nom,
             'nom_tiers': compte.nom, // Nom du tiers
             'solde_dette': compte.solde.abs(), // Montant de la dette (positif)
@@ -573,7 +988,8 @@ class PocketBaseService {
         case 'Investissement':
           nomCollection = 'comptes_investissement';
           donneesCompte = {
-            'utilisateur_id': utilisateurId, // Utiliser le bon champ selon le guide
+            'utilisateur_id':
+                utilisateurId, // Utiliser le bon champ selon le guide
             'nom': compte.nom,
             'valeur_marche': compte.solde,
             'cout_base': compte.pretAPlacer,
@@ -587,23 +1003,28 @@ class PocketBaseService {
           throw Exception('Type de compte non supporté: ${compte.type}');
       }
 
-      
-      final result = await pb.collection(nomCollection).create(body: donneesCompte);
-      
-
+      final result =
+          await pb.collection(nomCollection).create(body: donneesCompte);
     } catch (e) {
       rethrow;
     }
   }
 
   // Méthode pour mettre à jour un compte
-  static Future<void> updateCompte(String compteId, Map<String, dynamic> donnees) async {
+  static Future<void> updateCompte(
+      String compteId, Map<String, dynamic> donnees) async {
     try {
       final pb = await _getPocketBaseInstance();
 
       // Déterminer la collection en cherchant dans toutes les collections
-      final collections = ['comptes_cheques', 'comptes_credits', 'comptes_investissement', 'comptes_dettes', 'pret_personnel'];
-      
+      final collections = [
+        'comptes_cheques',
+        'comptes_credits',
+        'comptes_investissement',
+        'comptes_dettes',
+        'pret_personnel'
+      ];
+
       for (final nomCollection in collections) {
         try {
           await pb.collection(nomCollection).update(compteId, body: donnees);
@@ -613,7 +1034,7 @@ class PocketBaseService {
           continue;
         }
       }
-      
+
       throw Exception('Compte non trouvé dans aucune collection');
     } catch (e) {
       rethrow;
@@ -634,7 +1055,8 @@ class PocketBaseService {
       final categoriesTest = [
         {
           'nom': 'Alimentation',
-          'utilisateur_id': utilisateurId, // Utiliser le bon champ selon le guide
+          'utilisateur_id':
+              utilisateurId, // Utiliser le bon champ selon le guide
           'ordre': 1,
         },
         {
@@ -657,12 +1079,9 @@ class PocketBaseService {
       for (final categorie in categoriesTest) {
         try {
           await pb.collection('categories').create(body: categorie);
-        } catch (e) {
-        }
+        } catch (e) {}
       }
-
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   // Instance singleton pour compatibilité
@@ -686,5 +1105,185 @@ class PocketBaseService {
       'passwordConfirm': password,
       'name': name,
     });
+  }
+
+  // ============================================================================
+  // MÉTHODES POUR GÉRER LES CATÉGORIES
+  // ============================================================================
+
+  // Méthode pour ajouter ou mettre à jour une catégorie
+  static Future<String> ajouterCategorie(Categorie categorie) async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+      if (userId == null) throw Exception('Utilisateur non connecté');
+
+      final categorieData = {
+        'utilisateur_id': userId,
+        'nom': categorie.nom,
+        'ordre': categorie.ordre,
+      };
+
+      // Si l'ID existe, on met à jour, sinon on crée
+      if (categorie.id.isNotEmpty) {
+        await pb
+            .collection('categories')
+            .update(categorie.id, body: categorieData);
+        return categorie.id;
+      } else {
+        final record =
+            await pb.collection('categories').create(body: categorieData);
+        return record.id;
+      }
+    } catch (e) {
+      throw Exception(
+          'Erreur lors de l\'ajout/mise à jour de la catégorie: $e');
+    }
+  }
+
+  // Méthode pour nettoyer toutes les ressources temps réel
+  static Future<void> dispose() async {
+    _comptesTimer?.cancel();
+    _categoriesTimer?.cancel();
+    _enveloppesTimer?.cancel();
+
+    for (final controller in _comptesControllers.values) {
+      controller.close();
+    }
+    for (final controller in _categoriesControllers.values) {
+      controller.close();
+    }
+    for (final controller in _enveloppesControllers.values) {
+      controller.close();
+    }
+
+    _comptesControllers.clear();
+    _categoriesControllers.clear();
+    _enveloppesControllers.clear();
+    _comptesCache.clear();
+    _categoriesCache.clear();
+    _enveloppesCache.clear();
+  }
+
+  // Charger les données initiales
+  static Future<void> _loadInitialDataSimple() async {
+    try {
+      // Charger les données en parallèle pour plus de rapidité
+      await Future.wait([
+        _updateComptesData(),
+        _updateCategoriesData(),
+        _updateEnveloppesData(),
+      ]);
+    } catch (e) {
+      print('❌ Erreur chargement initial: $e');
+    }
+  }
+
+  // Mettre à jour les données des comptes
+  static Future<void> _updateComptesData() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) return;
+
+      final List<Compte> tousLesComptes = [];
+
+      // Récupérer tous les types de comptes en parallèle
+      final collections = [
+        'comptes_cheques',
+        'comptes_credits',
+        'comptes_investissement',
+        'comptes_dettes',
+        'pret_personnel'
+      ];
+
+      final futures = collections.map((collection) async {
+        try {
+          final records = await pb.collection(collection).getFullList(
+                filter: 'utilisateur_id = "$userId"',
+              );
+
+          return records
+              .map((record) => Compte.fromPocketBase(
+                  record.data, record.id, _getCompteType(collection)))
+              .toList();
+        } catch (e) {
+          print('❌ Erreur lecture $collection: $e');
+          return <Compte>[];
+        }
+      });
+
+      final results = await Future.wait(futures);
+      for (final comptes in results) {
+        tousLesComptes.addAll(comptes);
+      }
+
+      // Mettre à jour le cache et émettre
+      _comptesCache['comptes'] = tousLesComptes;
+      _comptesControllers['comptes']?.add(tousLesComptes);
+    } catch (e) {
+      print('❌ Erreur mise à jour comptes: $e');
+    }
+  }
+
+  // Mettre à jour les données des catégories
+  static Future<void> _updateCategoriesData() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) return;
+
+      final records = await pb.collection('categories').getFullList(
+            filter: 'utilisateur_id = "$userId"',
+          );
+
+      final categories = records
+          .map((record) => Categorie(
+                id: record.id,
+                utilisateurId: record.data['utilisateur_id'] ?? '',
+                nom: record.data['nom'] ?? '',
+                ordre: record.data['ordre'] ?? 0,
+              ))
+          .toList();
+
+      // Mettre à jour le cache et émettre
+      _categoriesCache['categories'] = categories;
+      _categoriesControllers['categories']?.add(categories);
+    } catch (e) {
+      print('❌ Erreur mise à jour catégories: $e');
+    }
+  }
+
+  // Mettre à jour les données des enveloppes
+  static Future<void> _updateEnveloppesData() async {
+    try {
+      final pb = await _getPocketBaseInstance();
+      final userId = pb.authStore.model?.id;
+
+      if (userId == null) return;
+
+      final records = await pb.collection('enveloppes').getFullList(
+            filter: 'utilisateur_id = "$userId"',
+          );
+
+      final enveloppes = records
+          .map((record) => Enveloppe(
+                id: record.id,
+                utilisateurId: record.data['utilisateur_id'] ?? '',
+                categorieId: record.data['categorie_id'] ?? '',
+                nom: record.data['nom'] ?? '',
+                soldeEnveloppe:
+                    (record.data['solde_enveloppe'] ?? 0).toDouble(),
+              ))
+          .toList();
+
+      // Mettre à jour le cache et émettre
+      _enveloppesCache['enveloppes'] = enveloppes;
+      _enveloppesControllers['enveloppes']?.add(enveloppes);
+    } catch (e) {
+      print('❌ Erreur mise à jour enveloppes: $e');
+    }
   }
 }

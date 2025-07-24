@@ -378,7 +378,7 @@ class _PageCategoriesEnveloppesState extends State<PageCategoriesEnveloppes> {
       ),
     );
     if (confirm == true) {
-      await PocketBaseService.supprimerCategorie(categorie.id);
+      await PocketBaseService.supprimerCategorieParId(categorie.id);
 
       // Mettre à jour l'état local pour refléter la suppression immédiatement
       setState(() {
