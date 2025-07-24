@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:toutie_budget/widgets/assignation_bottom_sheet.dart';
 import 'package:toutie_budget/services/argent_service.dart';
+import 'package:toutie_budget/services/allocation_service.dart';
 
 /// Widget pour afficher dynamiquement les catégories et enveloppes
 class ListeCategoriesEnveloppes extends StatefulWidget {
@@ -225,12 +226,12 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
       itemCount: _getSortedCategories().length,
       itemBuilder: (context, index) {
         final categorie = _getSortedCategories()[index];
-        
-        final toutesEnveloppes = (categorie['enveloppes'] as List<Map<String, dynamic>>);
 
-        final enveloppes = toutesEnveloppes
-            .where((env) => env['archivee'] != true)
-            .toList();
+        final toutesEnveloppes =
+            (categorie['enveloppes'] as List<Map<String, dynamic>>);
+
+        final enveloppes =
+            toutesEnveloppes.where((env) => env['archivee'] != true).toList();
 
         // --- LOGIQUE SPÉCIALE POUR DETTE ---
         if ((categorie['nom'] as String).toLowerCase().contains('dette')) {
@@ -325,7 +326,8 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
                 ),
               ],
             ),
-            ...enveloppes.map((enveloppe) => _buildEnveloppeWidget(enveloppe, categorie)),
+            ...enveloppes.map(
+                (enveloppe) => _buildEnveloppeWidget(enveloppe, categorie)),
             const SizedBox(height: 24),
           ],
         );
@@ -339,12 +341,10 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     Map<String, dynamic> historique = enveloppe['historique'] != null
         ? Map<String, dynamic>.from(enveloppe['historique'])
         : {};
-    Map<String, dynamic>? histoMois =
-        (widget.selectedMonthKey != null &&
-                historique[widget.selectedMonthKey] != null)
-            ? Map<String, dynamic>.from(
-                historique[widget.selectedMonthKey])
-            : null;
+    Map<String, dynamic>? histoMois = (widget.selectedMonthKey != null &&
+            historique[widget.selectedMonthKey] != null)
+        ? Map<String, dynamic>.from(historique[widget.selectedMonthKey])
+        : null;
 
     final now = DateTime.now();
     final currentMonthKey =
@@ -353,16 +353,17 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         ? DateFormat('yyyy-MM').parse(widget.selectedMonthKey!)
         : now;
     final isFutureMonth = selectedDate.year > now.year ||
-        (selectedDate.year == now.year &&
-            selectedDate.month > now.month);
+        (selectedDate.year == now.year && selectedDate.month > now.month);
 
+    // Variables pour les calculs
     double soldeEnveloppe;
     double objectif;
     double depense;
 
+    // TEMPORAIRE: Utiliser directement le solde_enveloppe pour éviter le chargement infini
     if (widget.selectedMonthKey == null ||
         widget.selectedMonthKey == currentMonthKey) {
-      // Mois courant -> valeurs globales
+      // Mois courant -> utiliser le solde_enveloppe
       soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
       objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
       depense = (enveloppe['depense'] ?? 0.0).toDouble();
@@ -372,7 +373,7 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
       objectif = (histoMois['objectif'] ?? 0.0).toDouble();
       depense = (histoMois['depense'] ?? 0.0).toDouble();
     } else if (isFutureMonth) {
-      // Mois futur -> valeurs projetées
+      // Mois futur -> utiliser le solde_enveloppe
       soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
       objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
       depense = 0.0;
@@ -386,7 +387,9 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     final bool estNegative = soldeEnveloppe < 0;
     final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
     final double progression = (objectif > 0)
-        ? (estDepenseAtteint ? 1.0 : (soldeEnveloppe / objectif).clamp(0.0, 1.0))
+        ? (estDepenseAtteint
+            ? 1.0
+            : (soldeEnveloppe / objectif).clamp(0.0, 1.0))
         : 0.0;
     final Color etatColor = _getEtatColor(soldeEnveloppe, objectif);
 

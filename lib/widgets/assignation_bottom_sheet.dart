@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:toutie_budget/widgets/numeric_keyboard.dart';
 import 'package:toutie_budget/services/argent_service.dart';
+import 'package:toutie_budget/services/allocation_service.dart';
 
 // Utilisé pour la détection des couleurs négatives/positives si besoin.
 // ignore: unused_import
@@ -30,12 +31,27 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
     super.initState();
     _ctrl = TextEditingController(text: '0.00');
     _compteId = widget.enveloppe['provenance_compte_id'];
-    _montantNecessaire = _calcMontant(widget.enveloppe);
+    _calcMontantAsync();
   }
 
-  double _calcMontant(Map<String, dynamic> env) {
+  Future<void> _calcMontantAsync() async {
+    final montant = await _calcMontant(widget.enveloppe);
+    if (mounted) {
+      setState(() {
+        _montantNecessaire = montant;
+      });
+    }
+  }
+
+  Future<double> _calcMontant(Map<String, dynamic> env) async {
     final double objectifTotal = (env['objectif'] as num?)?.toDouble() ?? 0.0;
-    final double soldeEnv = (env['solde'] as num?)?.toDouble() ?? 0.0;
+
+    // Calculer le solde avec les allocations mensuelles
+    final soldeEnv = await AllocationService.calculerSoldeEnveloppe(
+      enveloppeId: env['id'],
+      mois: DateTime.now(),
+    );
+
     final String freq =
         (env['frequence_objectif']?.toString() ?? '').toLowerCase();
     final DateTime now = DateTime.now();

@@ -1,3 +1,5 @@
+import '../services/allocation_service.dart';
+
 class Enveloppe {
   final String id;
   final String utilisateurId;
@@ -43,8 +45,8 @@ class Enveloppe {
       depense: (map['depense'] ?? 0).toDouble(),
       estArchive: map['est_archive'] ?? false,
       objectifMontant: (map['objectif_montant'] ?? 0).toDouble(),
-      moisObjectif: map['moisObjectif'] != null && map['moisObjectif'] is String 
-          ? DateTime.parse(map['moisObjectif']) 
+      moisObjectif: map['moisObjectif'] != null && map['moisObjectif'] is String
+          ? DateTime.parse(map['moisObjectif'])
           : null,
     );
   }
@@ -118,4 +120,18 @@ class Enveloppe {
   double get objectif => objectifMontant;
   bool get archivee => estArchive;
   String get provenanceCompteId => compteProvenanceId;
+
+  // Méthode pour calculer le solde réel avec les allocations mensuelles
+  static Future<double> calculerSoldeReel(
+      String enveloppeId, DateTime mois) async {
+    try {
+      return await AllocationService.calculerSoldeEnveloppe(
+        enveloppeId: enveloppeId,
+        mois: mois,
+      );
+    } catch (e) {
+      print('❌ Erreur calcul solde réel: $e');
+      return 0.0;
+    }
+  }
 }

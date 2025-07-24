@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:toutie_budget/services/firebase_service.dart';
 import 'package:toutie_budget/services/pocketbase_service.dart';
-import 'package:toutie_budget/services/rollover_service.dart';
+import 'package:toutie_budget/services/allocation_service.dart';
 import '../models/compte.dart';
 import '../models/categorie.dart';
 import '../widgets/liste_categories_enveloppes.dart';
@@ -25,8 +24,9 @@ class PageBudget extends StatefulWidget {
 }
 
 class _PageBudgetState extends State<PageBudget> {
-  DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
-  final RolloverService _rolloverService = RolloverService();
+  DateTime selectedMonth =
+      DateTime(DateTime.now().year, DateTime.now().month, 1);
+
   int refreshKey = 0;
 
   @override
@@ -36,18 +36,25 @@ class _PageBudgetState extends State<PageBudget> {
   }
 
   Future<void> _triggerRollover() async {
-    final bool rolloverProcessed = await _rolloverService.processRollover();
-    if (rolloverProcessed && mounted) {
-      setState(() {
-        refreshKey++; // Force a refresh of the UI
-      });
+    try {
+      // Traiter le rollover mensuel avec AllocationService
+      await AllocationService.traiterRolloverMensuel();
+
+      if (mounted) {
+        setState(() {
+          refreshKey++; // Force a refresh of the UI
+        });
+      }
+    } catch (e) {
+      print('❌ Erreur rollover: $e');
     }
   }
 
   Future<void> handleMonthChange(DateTime date) async {
     if (!mounted) return;
     setState(() {
-      selectedMonth = date;
+      // Normaliser la date au 1er jour du mois
+      selectedMonth = DateTime(date.year, date.month, 1);
     });
   }
 
@@ -333,7 +340,8 @@ class _PageBudgetState extends State<PageBudget> {
                                 child: FutureBuilder<
                                     Map<String, List<Map<String, dynamic>>>>(
                                   future: PocketBaseService
-                                      .lireEnveloppesGroupeesParCategorie(),
+                                      .lireEnveloppesGroupeesParCategorie(
+                                          mois: selectedMonth),
                                   builder: (context, enveloppesSnapshot) {
                                     if (!enveloppesSnapshot.hasData) {
                                       return const Center(
@@ -695,8 +703,9 @@ class _PageBudgetState extends State<PageBudget> {
                   Expanded(
                     child:
                         FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-                      future: PocketBaseService
-                          .lireEnveloppesGroupeesParCategorie(),
+                      future:
+                          PocketBaseService.lireEnveloppesGroupeesParCategorie(
+                              mois: selectedMonth),
                       builder: (context, enveloppesSnapshot) {
                         if (!enveloppesSnapshot.hasData) {
                           return const Center(

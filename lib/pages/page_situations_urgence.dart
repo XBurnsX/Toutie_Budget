@@ -5,6 +5,7 @@ import '../models/enveloppe.dart';
 import '../services/firebase_service.dart';
 import '../services/cache_service.dart';
 import '../services/pocketbase_service.dart';
+import '../services/allocation_service.dart';
 import 'page_virer_argent.dart';
 
 /// Page pour afficher et gérer les enveloppes en situation d'urgence (solde négatif)
@@ -64,14 +65,19 @@ class PageSituationsUrgence extends StatelessWidget {
               for (var categorie in categories) {
                 // Utiliser FutureBuilder au lieu de await dans une fonction non-async
                 return FutureBuilder<List<Map<String, dynamic>>>(
-                  future: PocketBaseService.lireEnveloppesParCategorie(categorie.id),
+                  future: PocketBaseService.lireEnveloppesParCategorie(
+                      categorie.id),
                   builder: (context, enveloppesSnapshot) {
                     if (!enveloppesSnapshot.hasData) return Container();
-                    final enveloppes = enveloppesSnapshot.data!.map((data) => Enveloppe.fromMap(data)).toList();
-                    
-                    print('DEBUG: Catégorie ${categorie.nom} - Enveloppes: ${enveloppes.length}');
+                    final enveloppes = enveloppesSnapshot.data!
+                        .map((data) => Enveloppe.fromMap(data))
+                        .toList();
+
+                    print(
+                        'DEBUG: Catégorie ${categorie.nom} - Enveloppes: ${enveloppes.length}');
                     for (var enveloppe in enveloppes) {
-                      print('DEBUG:   Enveloppe ${enveloppe.nom} - Solde: ${enveloppe.soldeEnveloppe}');
+                      print(
+                          'DEBUG:   Enveloppe ${enveloppe.nom} - Solde: ${enveloppe.soldeEnveloppe}');
                     }
 
                     // Filtrer les comptes avec prêt à placer négatif
@@ -94,16 +100,21 @@ class PageSituationsUrgence extends StatelessWidget {
                     for (var categorie in categories) {
                       final enveloppesData = enveloppesSnapshot.data;
                       if (enveloppesData != null) {
-                        final enveloppes = enveloppesData.map((data) => Enveloppe.fromMap(data)).toList();
-                        final enveloppesNegatives = enveloppes.where((env) => env.soldeEnveloppe < 0).toList();
+                        final enveloppes = enveloppesData
+                            .map((data) => Enveloppe.fromMap(data))
+                            .toList();
+                        final enveloppesNegatives = enveloppes
+                            .where((env) => env.soldeEnveloppe < 0)
+                            .toList();
                         if (enveloppesNegatives.isNotEmpty) {
                           print(
                               'DEBUG: Catégorie ${categorie.nom} a ${enveloppesNegatives.length} enveloppes négatives');
                           categoriesAvecEnveloppesNegatives.add({
                             'id': categorie.id,
                             'nom': categorie.nom,
-                            'enveloppes':
-                                enveloppesNegatives.map((e) => e.toMap()).toList(),
+                            'enveloppes': enveloppesNegatives
+                                .map((e) => e.toMap())
+                                .toList(),
                           });
                         }
                       }
@@ -118,7 +129,8 @@ class PageSituationsUrgence extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.check_circle, color: Colors.green, size: 64),
+                            Icon(Icons.check_circle,
+                                color: Colors.green, size: 64),
                             SizedBox(height: 16),
                             Text(
                               'Aucune situation d\'urgence !',
@@ -130,7 +142,8 @@ class PageSituationsUrgence extends StatelessWidget {
                             SizedBox(height: 8),
                             Text(
                               'Tous vos comptes et enveloppes sont en positif.',
-                              style: TextStyle(fontSize: 16, color: Colors.grey),
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -173,7 +186,8 @@ class PageSituationsUrgence extends StatelessWidget {
                               const SizedBox(height: 8),
                               const Text(
                                 'Tapez sur une enveloppe pour la renflouer directement.',
-                                style: TextStyle(fontSize: 14, color: Colors.black),
+                                style: TextStyle(
+                                    fontSize: 14, color: Colors.black),
                               ),
                             ],
                           ),
@@ -221,7 +235,8 @@ class PageSituationsUrgence extends StatelessWidget {
                                 vertical: 8,
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
@@ -299,16 +314,18 @@ class PageSituationsUrgence extends StatelessWidget {
                               onEnveloppePressed: (enveloppeId) {
                                 // Trouver l'enveloppe pour récupérer son solde négatif
                                 double montantNegatif = 0.0;
-                                for (var cat in categoriesAvecEnveloppesNegatives) {
-                                  final enveloppes =
-                                      cat['enveloppes'] as List<Map<String, dynamic>>;
+                                for (var cat
+                                    in categoriesAvecEnveloppesNegatives) {
+                                  final enveloppes = cat['enveloppes']
+                                      as List<Map<String, dynamic>>;
                                   final enveloppe = enveloppes.firstWhere(
                                     (env) => env['id'] == enveloppeId,
                                     orElse: () => <String, dynamic>{},
                                   );
                                   if (enveloppe.isNotEmpty) {
-                                    montantNegatif =
-                                        (enveloppe['solde'] ?? 0.0).toDouble().abs();
+                                    montantNegatif = (enveloppe['solde'] ?? 0.0)
+                                        .toDouble()
+                                        .abs();
                                     break;
                                   }
                                 }
