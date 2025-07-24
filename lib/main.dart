@@ -202,18 +202,13 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    print('🔄 MyHomePage initState() - Début initialisation');
 
     // Mettre à jour les dettes existantes pour ajouter le champ estManuelle
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        print('🔄 MyHomePage - Mise à jour dettes existantes');
         //DetteService().mettreAJourDettesExistantes();
-        print('✅ MyHomePage - Mise à jour dettes terminée');
       }
     });
-
-    print('✅ MyHomePage initState() - Initialisation terminée');
   }
 
   @override

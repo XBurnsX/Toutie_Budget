@@ -617,8 +617,6 @@ class FirebaseService {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Aucun utilisateur n'est connecté.");
 
-    print('DEBUG: updateCompte appelée pour le compte $compteId');
-    print('DEBUG: Données à mettre à jour: $data');
 
     // Logger l'écriture
     FirebaseMonitorService.logWrite(
@@ -631,16 +629,13 @@ class FirebaseService {
 
     try {
       await comptesRef.doc(compteId).update(data);
-      print('DEBUG: Mise à jour Firestore réussie');
 
       // Attendre un peu pour s'assurer que la mise à jour est propagée
       await Future.delayed(const Duration(milliseconds: 100));
 
       // Invalider le cache pour forcer le rafraîchissement
       CacheService.invalidateComptes();
-      print('DEBUG: Cache invalidé');
     } catch (e) {
-      print('DEBUG: Erreur lors de la mise à jour Firestore: $e');
       rethrow;
     }
   }

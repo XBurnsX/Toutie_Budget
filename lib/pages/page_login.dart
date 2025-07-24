@@ -50,7 +50,6 @@ class _PageLoginState extends State<PageLogin> {
     });
 
     try {
-      print('🔄 Début connexion PocketBase...');
       final user = await AuthService.signInWithGoogle();
 
       setState(() {
@@ -58,7 +57,6 @@ class _PageLoginState extends State<PageLogin> {
       });
 
       if (user != null) {
-        print('✅ Connexion PocketBase réussie: ${user.data['email']}');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -69,28 +67,20 @@ class _PageLoginState extends State<PageLogin> {
           );
 
           // Forcer la navigation vers l'app principale
-          print('🔄 Navigation vers MyHomePage...');
 
           // Se connecter aussi à Firebase pour les données
           try {
-            print('🔄 Tentative connexion Firebase...');
             // Utiliser la méthode Firebase directe au lieu de Google Sign-In
             await FirebaseAuth.instance.signInAnonymously();
-            print('✅ Connexion Firebase anonyme réussie');
           } catch (e) {
-            print('❌ Erreur connexion Firebase temporaire: $e');
-            print('⚠️ On continue sans Firebase...');
           }
 
-          print('🔄 Navigation vers MyHomePage...');
 
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const MyHomePage()),
           );
-          print('✅ Navigation vers MyHomePage terminée');
         }
       } else {
-        print('❌ Connexion PocketBase annulée');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -101,7 +91,6 @@ class _PageLoginState extends State<PageLogin> {
         }
       }
     } catch (e) {
-      print('❌ Erreur connexion PocketBase: $e');
       setState(() {
         _isLoading = false;
       });

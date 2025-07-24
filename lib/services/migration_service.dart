@@ -37,20 +37,16 @@ class MigrationService {
       // Test Firebase
       final auth = FirebaseAuth.instance;
       resultats['firebase'] = auth.currentUser != null;
-      print('✅ Connexion Firebase réussie');
     } catch (e) {
       resultats['firebase'] = false;
-      print('❌ Erreur connexion Firebase: $e');
     }
 
     try {
       // Test PocketBase
       await PocketBaseService.instance;
       resultats['pocketbase'] = true;
-      print('✅ Connexion PocketBase réussie');
     } catch (e) {
       resultats['pocketbase'] = false;
-      print('❌ Erreur connexion PocketBase: $e');
     }
 
     return resultats;
@@ -68,12 +64,9 @@ class MigrationService {
   }
 
   Future<void> migrateTestData() async {
-    print('🧪 Migration de données de test...');
     try {
       await migrerUtilisateurConnecte();
-      print('✅ Données de test migrées avec succès');
     } catch (e) {
-      print('❌ Erreur migration données de test: $e');
     }
   }
 
@@ -86,27 +79,21 @@ class MigrationService {
   }
 
   Future<void> testMigration(String userId) async {
-    print('🧪 Test de migration pour $userId...');
     try {
       await migrerUtilisateurConnecte();
-      print('✅ Test de migration terminé');
     } catch (e) {
-      print('❌ Erreur test migration: $e');
     }
   }
 
   Future<void> migrateAllData() => migrerToutesLesDonnees();
 
   Future<void> analyzeFirebaseExport() async {
-    print('🔍 Analyse de l\'export Firebase...');
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         await comparerDonneesUtilisateur(currentUser.uid);
-        print('✅ Analyse terminée');
       }
     } catch (e) {
-      print('❌ Erreur analyse: $e');
     }
   }
 
@@ -120,7 +107,6 @@ class MigrationService {
   // Initialiser le mapping utilisateur Firebase → PocketBase
   Future<void> _initialiserMappingUtilisateur() async {
     try {
-      print('🔄 Initialisation du mapping utilisateur...');
 
       // Récupérer tous les utilisateurs Firebase uniques
       final collectionsFirebase = [
@@ -141,7 +127,6 @@ class MigrationService {
         }
       }
 
-      print('👥 Utilisateurs Firebase trouvés: ${utilisateursFirebase.length}');
 
       // Créer automatiquement les utilisateurs PocketBase
       for (final firebaseUserId in utilisateursFirebase) {
@@ -161,17 +146,13 @@ class MigrationService {
           );
 
           _mappingUtilisateur[firebaseUserId] = utilisateurPocketBase.id;
-          print(
               '   ✅ Utilisateur créé: $firebaseUserId → ${utilisateurPocketBase.id}');
         } catch (e) {
-          print('   ⚠️ Erreur création utilisateur $firebaseUserId: $e');
         }
       }
 
-      print(
           '✅ Mapping utilisateur terminé: ${_mappingUtilisateur.length} utilisateurs');
     } catch (e) {
-      print('❌ Erreur initialisation mapping: $e');
     }
   }
 
@@ -204,7 +185,6 @@ class MigrationService {
   // Migration pour l'utilisateur connecté uniquement
   Future<void> migrerUtilisateurConnecte() async {
     try {
-      print('🚀 Début de la migration pour l\'utilisateur connecté...');
 
       // 1. Vérifier qu'un utilisateur Firebase est connecté
       final utilisateurFirebase = FirebaseAuth.instance.currentUser;
@@ -213,14 +193,12 @@ class MigrationService {
       }
 
       final idFirebase = utilisateurFirebase.uid;
-      print(
           '👤 Utilisateur connecté: ${utilisateurFirebase.email} ($idFirebase)');
 
       // 2. Créer ou récupérer le compte PocketBase pour cet utilisateur
       final utilisateurPocketBase =
           await _creerComptePocketBase(utilisateurFirebase);
       final idPocketBase = utilisateurPocketBase.id;
-      print('✅ Compte PocketBase ID: $idPocketBase');
 
       // 3. IMPORTANT: Configurer le mapping pour cet utilisateur
       _mappingUtilisateur[idFirebase] = idPocketBase;
@@ -232,7 +210,6 @@ class MigrationService {
         throw Exception(
             '❌ Utilisateur PocketBase non authentifié correctement');
       }
-      print('✅ Utilisateur PocketBase authentifié: ${currentAuth.id}');
 
       // 5. NETTOYAGE: Supprimer les catégories "Dettes" existantes
       await _supprimerCategoriesDettes(currentAuth.id);
@@ -240,9 +217,7 @@ class MigrationService {
       // 6. Migrer les données de cet utilisateur uniquement
       await _migrerDonneesUtilisateur(idFirebase, idPocketBase);
 
-      print('🎉 Migration terminée pour ${utilisateurFirebase.email} !');
     } catch (e) {
-      print('❌ Erreur migration utilisateur: $e');
       rethrow;
     }
   }
@@ -250,7 +225,6 @@ class MigrationService {
   // Supprimer les catégories "Dettes" existantes pour éviter les doublons
   Future<void> _supprimerCategoriesDettes(String utilisateurId) async {
     try {
-      print('🧹 Nettoyage des catégories "Dettes" existantes...');
 
       final pb = await PocketBaseService.instance;
       final categories = await pb
@@ -263,45 +237,35 @@ class MigrationService {
         if (_estCategorieDettes(nom)) {
           await pb.collection('categories').delete(categorie.id);
           supprimees++;
-          print('   🗑️ Catégorie supprimée: $nom');
         }
       }
 
       if (supprimees > 0) {
-        print('✅ $supprimees catégorie(s) "Dettes" supprimée(s)');
       } else {
-        print('✅ Aucune catégorie "Dettes" à supprimer');
       }
     } catch (e) {
-      print('⚠️ Erreur nettoyage catégories Dettes: $e');
     }
   }
 
   // Créer un compte PocketBase pour l'utilisateur Firebase connecté
   Future<RecordModel> _creerComptePocketBase(User utilisateurFirebase) async {
     try {
-      print('👤 Création du compte PocketBase...');
 
       // Vérifier que PocketBase est bien initialisé
       final pb = await PocketBaseService.instance;
-      print('✅ PocketBase instance récupérée');
 
       final email = utilisateurFirebase.email ??
           '${utilisateurFirebase.uid}@migration.local';
       final password = 'migration123456';
 
-      print('📝 Email utilisateur: $email');
 
       // Essayer de se connecter d'abord (au cas où l'utilisateur existe déjà)
       try {
-        print('🔄 Tentative de connexion avec utilisateur existant...');
         final authData =
             await pb.collection('users').authWithPassword(email, password);
-        print(
             '✅ Connexion réussie avec utilisateur existant: ${authData.record?.id}');
         return authData.record!;
       } catch (loginError) {
-        print('⚠️ Connexion échouée, création d\'un nouvel utilisateur...');
 
         // Si la connexion échoue, créer un nouvel utilisateur
         final donneesUtilisateur = {
@@ -315,22 +279,18 @@ class MigrationService {
         try {
           final utilisateurPocketBase =
               await pb.collection('users').create(body: donneesUtilisateur);
-          print('✅ Nouvel utilisateur créé: ${utilisateurPocketBase.id}');
 
           // Se connecter avec le nouvel utilisateur
           final authData =
               await pb.collection('users').authWithPassword(email, password);
-          print(
               '✅ Connexion automatique réussie avec token: ${authData.token.isNotEmpty}');
 
           return utilisateurPocketBase;
         } catch (createError) {
-          print('❌ Erreur création utilisateur: $createError');
           rethrow;
         }
       }
     } catch (e) {
-      print('❌ Erreur création compte PocketBase: $e');
       rethrow;
     }
   }
@@ -339,7 +299,6 @@ class MigrationService {
   Future<void> _migrerDonneesUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('📦 Migration des données pour l\'utilisateur $idFirebase...');
 
       // 1. Migrer les catégories de cet utilisateur
       await _migrerCategoriesUtilisateur(idFirebase, idPocketBase);
@@ -362,9 +321,7 @@ class MigrationService {
       // 7. Migrer les tiers de cet utilisateur
       await _migrerTiersUtilisateur(idFirebase, idPocketBase);
 
-      print('✅ Toutes les données migrées pour l\'utilisateur $idFirebase');
     } catch (e) {
-      print('❌ Erreur migration données utilisateur: $e');
       rethrow;
     }
   }
@@ -373,14 +330,12 @@ class MigrationService {
   Future<void> _migrerCategoriesUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('📁 Migration des catégories pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('categories')
           .where('userId', isEqualTo: idFirebase)
           .get();
 
-      print('   📊 ${snapshot.docs.length} catégorie(s) trouvée(s)');
 
       for (final doc in snapshot.docs) {
         try {
@@ -392,7 +347,6 @@ class MigrationService {
             'ordre': donnees['ordre'] ?? 0,
           };
 
-          print(
               '   📝 Création catégorie: ${categorieData['nom']} avec utilisateur_id: $idPocketBase');
           final pb = await PocketBaseService.instance;
 
@@ -402,7 +356,6 @@ class MigrationService {
             throw Exception(
                 'Utilisateur PocketBase non connecté correctement: auth=${currentAuth?.id}, expected=$idPocketBase');
           }
-          print('   🔐 Utilisateur connecté vérifié: ${currentAuth.id}');
 
           // S'assurer que l'utilisateur_id est bien l'ID et non le nom
           categorieData['utilisateur_id'] =
@@ -410,15 +363,11 @@ class MigrationService {
 
           final result =
               await pb.collection('categories').create(body: categorieData);
-          print(
               '   ✅ Catégorie créée avec ID: ${result.id} pour utilisateur: ${result.data['utilisateur_id']}');
         } catch (e) {
-          print('   ❌ Erreur détaillée migration catégorie: $e');
-          print('   📋 Données: ${doc.data()}');
         }
       }
     } catch (e) {
-      print('❌ Erreur migration catégories utilisateur: $e');
     }
   }
 
@@ -426,14 +375,12 @@ class MigrationService {
   Future<void> _migrerComptesUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('🏦 Migration des comptes pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('comptes')
           .where('userId', isEqualTo: idFirebase)
           .get();
 
-      print('   📊 ${snapshot.docs.length} compte(s) trouvé(s)');
 
       Map<String, int> compteurParType = {};
 
@@ -459,7 +406,6 @@ class MigrationService {
             'archive': compte.estArchive,
           };
 
-          print(
               '   📝 Création compte: ${compte.nom} avec utilisateur_id: ${currentAuth.id}');
 
           // Données spécifiques par type
@@ -471,7 +417,6 @@ class MigrationService {
             final result = await pb
                 .collection('comptes_cheques')
                 .create(body: donneesBase);
-            print(
                 '   🔍 Compte chèques créé, utilisateur_id: ${result.data['utilisateur_id']}');
           } else if (typeCollection == 'comptes_credits') {
             donneesBase.addAll({
@@ -482,7 +427,6 @@ class MigrationService {
             final result = await pb
                 .collection('comptes_credits')
                 .create(body: donneesBase);
-            print(
                 '   🔍 Compte crédit créé, utilisateur_id: ${result.data['utilisateur_id']}');
           } else if (typeCollection == 'comptes_dettes') {
             donneesBase.addAll({
@@ -494,7 +438,6 @@ class MigrationService {
             });
             final result =
                 await pb.collection('comptes_dettes').create(body: donneesBase);
-            print(
                 '   🔍 Compte dette créé, utilisateur_id: ${result.data['utilisateur_id']}');
           } else if (typeCollection == 'comptes_investissement') {
             donneesBase.addAll({
@@ -510,21 +453,16 @@ class MigrationService {
             final result = await pb
                 .collection('comptes_investissement')
                 .create(body: donneesBase);
-            print(
                 '   🔍 Compte investissement créé, utilisateur_id: ${result.data['utilisateur_id']}');
           }
 
           compteurParType[typeCollection] =
               (compteurParType[typeCollection] ?? 0) + 1;
-          print('   ✅ Compte migré: ${compte.nom} → $typeCollection');
         } catch (e) {
-          print('   ❌ Erreur migration compte: $e');
         }
       }
 
-      print('   📊 Répartition: $compteurParType');
     } catch (e) {
-      print('❌ Erreur migration comptes utilisateur: $e');
     }
   }
 
@@ -532,7 +470,6 @@ class MigrationService {
   Future<void> _migrerEnveloppesUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('💰 Migration des enveloppes pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('categories')
@@ -553,7 +490,6 @@ class MigrationService {
           final donneesFirebase = docFirebase.data();
           if (donneesFirebase['nom'] == catPB.data['nom']) {
             mappingCategories[docFirebase.id] = catPB.id;
-            print(
                 '   🔗 Mapping catégorie: ${docFirebase.id} → ${catPB.id} (${catPB.data['nom']})');
           }
         }
@@ -566,7 +502,6 @@ class MigrationService {
 
           // IMPORTANT: EXCLURE les enveloppes de la catégorie "Dettes"
           if (_estCategorieDettes(nomCategorie)) {
-            print(
                 '   ⚠️ Enveloppes de catégorie EXCLUES (auto-créées): $nomCategorie');
             continue; // Ignorer toutes les enveloppes de cette catégorie
           }
@@ -575,7 +510,6 @@ class MigrationService {
           final categorieIdPocketBase = mappingCategories[doc.id];
 
           if (categorieIdPocketBase == null) {
-            print('   ⚠️ Catégorie PocketBase non trouvée pour ${doc.id}');
             continue;
           }
 
@@ -602,19 +536,14 @@ class MigrationService {
 
               await pb.collection('enveloppes').create(body: enveloppeData);
               totalEnveloppes++;
-              print('   ✅ Enveloppe migrée: ${enveloppe['nom']}');
             } catch (e) {
-              print('   ❌ Erreur migration enveloppe: $e');
             }
           }
         } catch (e) {
-          print('   ❌ Erreur traitement catégorie: $e');
         }
       }
 
-      print('   📊 $totalEnveloppes enveloppe(s) migrée(s)');
     } catch (e) {
-      print('❌ Erreur migration enveloppes utilisateur: $e');
     }
   }
 
@@ -622,14 +551,12 @@ class MigrationService {
   Future<void> _migrerTransactionsUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('💸 Migration des transactions pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('transactions')
           .where('userId', isEqualTo: idFirebase)
           .get();
 
-      print('   📊 ${snapshot.docs.length} transaction(s) trouvée(s)');
 
       // Créer un mapping des enveloppes Firebase → PocketBase
       final pb = await PocketBaseService.instance;
@@ -640,7 +567,6 @@ class MigrationService {
       for (final envPB in enveloppesPocketBase) {
         mappingEnveloppes[envPB.data['nom']] = envPB.id;
       }
-      print('   🔗 Mapping ${mappingEnveloppes.length} enveloppes créé');
 
       int totalTransactions = 0;
       int totalAllocations = 0;
@@ -677,7 +603,6 @@ class MigrationService {
               transaction.sousItems != null &&
               transaction.sousItems!.isNotEmpty) {
             // Transaction fractionnée : créer une allocation pour chaque sous-item
-            print(
                 '   🔄 Transaction fractionnée détectée avec ${transaction.sousItems!.length} sous-items');
 
             for (final sousItem in transaction.sousItems!) {
@@ -713,7 +638,6 @@ class MigrationService {
                     mappingEnveloppes.containsKey(nomEnveloppeFirebase)) {
                   enveloppeIdPocketBase =
                       mappingEnveloppes[nomEnveloppeFirebase];
-                  print(
                       '   ✅ Enveloppe trouvée pour sous-item: "$nomEnveloppeFirebase" → $enveloppeIdPocketBase');
                 }
 
@@ -741,13 +665,11 @@ class MigrationService {
                       .collection('allocations_mensuelles')
                       .create(body: allocationData);
                   totalAllocations++;
-                  print(
                       '   ✅ Allocation créée pour sous-item: ${sousItem['description'] ?? 'Sans description'} (${montant.toStringAsFixed(2)}\$)');
 
                   // Pour les transactions fractionnées, on ne met pas d'allocation_mensuelle_id
                   // car on utilise le JSON des sous_items pour afficher les enveloppes
                 } else {
-                  print(
                       '   ⚠️ Enveloppe non trouvée pour sous-item: $enveloppeIdFirebase');
                 }
               }
@@ -780,7 +702,6 @@ class MigrationService {
             if (nomEnveloppeFirebase != null &&
                 mappingEnveloppes.containsKey(nomEnveloppeFirebase)) {
               enveloppeIdPocketBase = mappingEnveloppes[nomEnveloppeFirebase];
-              print(
                   '   ✅ Enveloppe trouvée: "$nomEnveloppeFirebase" → $enveloppeIdPocketBase');
             }
 
@@ -808,16 +729,13 @@ class MigrationService {
                   .collection('allocations_mensuelles')
                   .create(body: allocationData);
               totalAllocations++;
-              print(
                   '   ✅ Allocation mensuelle créée pour enveloppe: $enveloppeIdPocketBase');
 
               // Ajouter l'ID de l'allocation dans la transaction
               transactionData['allocation_mensuelle_id'] = allocationRecord.id;
             } else {
-              print('   ⚠️ Enveloppe non trouvée: ${transaction.enveloppeId}');
             }
           } else {
-            print(
                 '   ⚠️ Transaction sans enveloppeId, création allocation quand même...');
 
             // Créer allocation mensuelle même sans enveloppe pour les revenus
@@ -845,9 +763,7 @@ class MigrationService {
                   .collection('allocations_mensuelles')
                   .create(body: allocationData);
               totalAllocations++;
-              print('   ✅ Allocation mensuelle créée sans enveloppe');
             } catch (e) {
-              print('   ❌ Erreur création allocation sans enveloppe: $e');
             }
           }
 
@@ -856,17 +772,12 @@ class MigrationService {
           totalTransactions++;
 
           if (totalTransactions % 10 == 0) {
-            print('   📊 $totalTransactions transactions migrées...');
           }
         } catch (e) {
-          print('   ❌ Erreur migration transaction: $e');
         }
       }
 
-      print('   ✅ $totalTransactions transaction(s) migrée(s)');
-      print('   ✅ $totalAllocations allocation(s) mensuelle(s) créée(s)');
     } catch (e) {
-      print('❌ Erreur migration transactions utilisateur: $e');
     }
   }
 
@@ -874,14 +785,12 @@ class MigrationService {
   Future<void> _migrerDettesUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('💳 Migration des dettes pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('dettes')
           .where('userId', isEqualTo: idFirebase)
           .get();
 
-      print('   📊 ${snapshot.docs.length} dette(s) trouvée(s)');
 
       int dettesVersPretPersonnel = 0;
       int dettesVersComptesDettes = 0;
@@ -920,7 +829,6 @@ class MigrationService {
             final pb = await PocketBaseService.instance;
             await pb.collection('pret_personnel').create(body: donneesBase);
             dettesVersPretPersonnel++;
-            print('   ✅ Dette → pret_personnel: ${dette.nomTiers}');
           } else {
             // estManuelle = true → Collection comptes_dettes
             // IMPORTANT: Ajouter le champ "nom" pour comptes_dettes
@@ -935,17 +843,13 @@ class MigrationService {
             final pb = await PocketBaseService.instance;
             await pb.collection('comptes_dettes').create(body: donneesBase);
             dettesVersComptesDettes++;
-            print('   ✅ Dette → comptes_dettes: ${dette.nomTiers}');
           }
         } catch (e) {
-          print('   ❌ Erreur migration dette: $e');
         }
       }
 
-      print(
           '   📊 pret_personnel: $dettesVersPretPersonnel, comptes_dettes: $dettesVersComptesDettes');
     } catch (e) {
-      print('❌ Erreur migration dettes utilisateur: $e');
     }
   }
 
@@ -953,14 +857,12 @@ class MigrationService {
   Future<void> _migrerInvestissementsUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('📈 Migration des investissements pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('investissements')
           .where('userId', isEqualTo: idFirebase)
           .get();
 
-      print('   📊 ${snapshot.docs.length} investissement(s) trouvé(s)');
 
       int totalMigres = 0;
 
@@ -993,15 +895,11 @@ class MigrationService {
               .collection('comptes_investissement')
               .create(body: investissementData);
           totalMigres++;
-          print('   ✅ Investissement migré: ${investissement.symbole}');
         } catch (e) {
-          print('   ❌ Erreur migration investissement: $e');
         }
       }
 
-      print('   📊 $totalMigres investissement(s) migré(s)');
     } catch (e) {
-      print('❌ Erreur migration investissements utilisateur: $e');
     }
   }
 
@@ -1009,14 +907,12 @@ class MigrationService {
   Future<void> _migrerTiersUtilisateur(
       String idFirebase, String idPocketBase) async {
     try {
-      print('👥 Migration des tiers pour $idFirebase...');
 
       final snapshot = await _firestore
           .collection('tiers')
           .where('userId', isEqualTo: idFirebase)
           .get();
 
-      print('   📊 ${snapshot.docs.length} tiers trouvé(s)');
 
       for (final doc in snapshot.docs) {
         try {
@@ -1029,13 +925,10 @@ class MigrationService {
 
           final pb = await PocketBaseService.instance;
           await pb.collection('tiers').create(body: tiersData);
-          print('   ✅ Tiers migré: ${donnees['nom']}');
         } catch (e) {
-          print('   ❌ Erreur migration tiers: $e');
         }
       }
     } catch (e) {
-      print('❌ Erreur migration tiers utilisateur: $e');
     }
   }
 
@@ -1050,7 +943,6 @@ class MigrationService {
         nomLower == 'debt' ||
         nomLower.contains('dette');
 
-    print(
         '   🔍 Test exclusion: "$nomCategorie" → nomLower="$nomLower" → exclure=$estDette');
     return estDette;
   }
@@ -1097,7 +989,6 @@ class MigrationService {
   // Vérifier toutes les collections PocketBase
   Future<void> verifierToutesLesCollections() async {
     try {
-      print('🔍 Vérification de toutes les collections PocketBase...');
 
       final collections = [
         'users',
@@ -1117,15 +1008,11 @@ class MigrationService {
         try {
           final pb = await PocketBaseService.instance;
           final records = await pb.collection(collection).getFullList();
-          print('   ✅ $collection: ${records.length} enregistrement(s)');
         } catch (e) {
-          print('   ❌ $collection: Erreur - $e');
         }
       }
 
-      print('✅ Vérification terminée');
     } catch (e) {
-      print('❌ Erreur vérification collections: $e');
     }
   }
 
@@ -1183,13 +1070,10 @@ class MigrationService {
         'pocketbase': dettesPocketBase.length + pretsPocketBase.length,
       };
 
-      print('📊 Comparaison des données pour $idFirebase :');
       comparaison.forEach((type, counts) {
-        print(
             '   $type: Firebase=${counts['firebase']}, PocketBase=${counts['pocketbase']}');
       });
     } catch (e) {
-      print('❌ Erreur comparaison données: $e');
     }
 
     return comparaison;
@@ -1248,10 +1132,7 @@ class MigrationService {
   // Migration complète de toutes les données (gardée pour compatibilité)
   Future<void> migrerToutesLesDonnees() async {
     try {
-      print('🚀 Début de la migration complète...');
-      print(
           '⚠️  ATTENTION: Cette méthode migre TOUS les utilisateurs à la fois');
-      print(
           '⚠️  Il est recommandé d\'utiliser migrerUtilisateurConnecte() à la place');
 
       // 1. Initialiser le mapping utilisateur
@@ -1262,13 +1143,10 @@ class MigrationService {
         final idFirebase = entry.key;
         final idPocketBase = entry.value;
 
-        print('\n👤 Migration utilisateur: $idFirebase → $idPocketBase');
         await _migrerDonneesUtilisateur(idFirebase, idPocketBase);
       }
 
-      print('🎉 Migration complète terminée avec succès !');
     } catch (e) {
-      print('❌ Erreur migration complète: $e');
     }
   }
 }

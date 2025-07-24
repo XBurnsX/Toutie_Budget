@@ -175,7 +175,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         );
       }
     } catch (e) {
-      print('DEBUG: Erreur lors du vidage de l\'enveloppe: $e');
       if (mounted) {
         String messageErreur = 'Erreur lors du vidage';
 
@@ -228,17 +227,12 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
       itemBuilder: (context, index) {
         final categorie = _getSortedCategories()[index];
         
-        // Debug: Afficher le nombre d'enveloppes avant et après filtrage
         final toutesEnveloppes = (categorie['enveloppes'] as List<Map<String, dynamic>>);
-        print('🔍 DEBUG Widget - Catégorie "${categorie['nom']}" : ${toutesEnveloppes.length} enveloppes avant filtrage');
-        
-        // Filtrer les enveloppes archivées
+
         final enveloppes = toutesEnveloppes
             .where((env) => env['archivee'] != true)
             .toList();
-            
-        print('🔍 DEBUG Widget - Catégorie "${categorie['nom']}" : ${enveloppes.length} enveloppes après filtrage (archivées supprimées)');
-        
+
         // --- LOGIQUE SPÉCIALE POUR DETTE ---
         if ((categorie['nom'] as String).toLowerCase().contains('dette')) {
           // 1. Récupérer tous les comptes de type Carte de crédit/crédit
@@ -342,10 +336,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
   Widget _buildEnveloppeWidget(
       Map<String, dynamic> enveloppe, Map<String, dynamic> categorie) {
-    // Debug: Afficher les données de l'enveloppe
-    print('🔍 DEBUG _buildEnveloppeWidget - Enveloppe: ${enveloppe['nom']}');
-    print('🔍 DEBUG _buildEnveloppeWidget - Données brutes: $enveloppe');
-
     // --- Logique d'affichage de l'historique ---
     Map<String, dynamic> historique = enveloppe['historique'] != null
         ? Map<String, dynamic>.from(enveloppe['historique'])
@@ -377,30 +367,22 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
       soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
       objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
       depense = (enveloppe['depense'] ?? 0.0).toDouble();
-      print('🔍 DEBUG - Mois courant - soldeEnveloppe: $soldeEnveloppe');
     } else if (histoMois != null) {
       // Mois passé avec historique -> valeurs de l'historique
       soldeEnveloppe = (histoMois['solde'] ?? 0.0).toDouble();
       objectif = (histoMois['objectif'] ?? 0.0).toDouble();
       depense = (histoMois['depense'] ?? 0.0).toDouble();
-      print('🔍 DEBUG - Mois historique - soldeEnveloppe: $soldeEnveloppe');
     } else if (isFutureMonth) {
       // Mois futur -> valeurs projetées
       soldeEnveloppe = (enveloppe['solde_enveloppe'] ?? 0.0).toDouble();
       objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
       depense = 0.0;
-      print('🔍 DEBUG - Mois futur - soldeEnveloppe: $soldeEnveloppe');
     } else {
       // Mois passé sans historique -> 0
       soldeEnveloppe = 0.0;
       objectif = 0.0;
       depense = 0.0;
-      print('🔍 DEBUG - Mois passé sans historique - soldeEnveloppe: $soldeEnveloppe');
     }
-
-    print('🔍 DEBUG - Solde final calculé: $soldeEnveloppe');
-    print('🔍 DEBUG - selectedMonthKey: ${widget.selectedMonthKey}');
-    print('🔍 DEBUG - currentMonthKey: $currentMonthKey');
 
     final bool estNegative = soldeEnveloppe < 0;
     final bool estDepenseAtteint = (depense >= objectif && objectif > 0);

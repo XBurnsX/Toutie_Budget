@@ -310,31 +310,24 @@ class Compte {
 
   // Helper pour parser les couleurs
   static int _parseColor(String? colorString) {
-    print('🎨 _parseColor reçu: "$colorString"');
     
     if (colorString == null || colorString.isEmpty) {
-      print('🎨 Couleur vide, utilisation du bleu par défaut');
       return 0xFF2196F3; // Bleu par défaut
     }
     
     try {
       String hex = colorString.replaceAll('#', '');
-      print('🎨 Hex après nettoyage: "$hex"');
       
       if (hex.length == 6) {
         final result = int.parse('FF$hex', radix: 16);
-        print('🎨 Couleur convertie: $result (0x${result.toRadixString(16)})');
         return result;
       } else if (hex.length == 8) {
         final result = int.parse(hex, radix: 16);
-        print('🎨 Couleur convertie (8 chars): $result (0x${result.toRadixString(16)})');
         return result;
       }
       
-      print('🎨 Longueur hex incorrecte (${hex.length}), utilisation du bleu par défaut');
       return 0xFF2196F3;
     } catch (e) {
-      print('🎨 Erreur parsing couleur: $e, utilisation du bleu par défaut');
       return 0xFF2196F3;
     }
   }

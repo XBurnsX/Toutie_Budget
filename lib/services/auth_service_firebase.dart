@@ -16,12 +16,10 @@ class AuthServiceFirebase {
   // Connexion avec Google
   static Future<UserCredential?> signInWithGoogle() async {
     try {
-      print('🔐 Début authentification Google Firebase...');
 
       // 1. Authentification Google
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        print('❌ Utilisateur a annulé la connexion Google');
         return null;
       }
 
@@ -32,11 +30,9 @@ class AuthServiceFirebase {
       final String? idToken = googleAuth.idToken;
 
       if (accessToken == null || idToken == null) {
-        print('❌ Tokens Google manquants');
         return null;
       }
 
-      print('✅ Authentification Google Firebase réussie: ${googleUser.email}');
 
       // 3. Connexion Firebase avec Google
       final credential = GoogleAuthProvider.credential(
@@ -46,10 +42,8 @@ class AuthServiceFirebase {
 
       final userCredential = await _auth.signInWithCredential(credential);
 
-      print('✅ Connexion Firebase réussie');
       return userCredential;
     } catch (e) {
-      print('❌ Erreur authentification Google Firebase: $e');
       rethrow;
     }
   }
@@ -57,7 +51,6 @@ class AuthServiceFirebase {
   // Déconnexion
   static Future<void> signOut() async {
     try {
-      print('🚪 Déconnexion Firebase...');
 
       // Déconnexion Google
       await _googleSignIn.signOut();
@@ -65,9 +58,7 @@ class AuthServiceFirebase {
       // Déconnexion Firebase
       await _auth.signOut();
 
-      print('✅ Déconnexion Firebase réussie');
     } catch (e) {
-      print('❌ Erreur déconnexion Firebase: $e');
     }
   }
 

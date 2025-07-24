@@ -106,16 +106,9 @@ class _PageBudgetState extends State<PageBudget> {
             final comptesChequesPretAPlacer = comptesNonArchives
                 .where((c) => c.type == 'Chèque' && c.pretAPlacer != 0)
                 .toList();
-            print('🔄 PageBudget - AVANT appel lireCategories()');
             return StreamBuilder<List<Categorie>>(
               stream: PocketBaseService.lireCategories(),
               builder: (context, catSnapshot) {
-                print(
-                    '🔄 PageBudget - DANS StreamBuilder catégories - ConnectionState: ${catSnapshot.connectionState}');
-                print(
-                    '🔄 PageBudget - DANS StreamBuilder catégories - hasData: ${catSnapshot.hasData}');
-                print(
-                    '🔄 PageBudget - DANS StreamBuilder catégories - hasError: ${catSnapshot.hasError}');
                 if (!mounted) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -349,25 +342,6 @@ class _PageBudgetState extends State<PageBudget> {
                                     
                                     final enveloppesParCategorie = enveloppesSnapshot.data!;
                                     
-                                    // Debug: Afficher les clés du dictionnaire des enveloppes
-                                    print('🔍 DEBUG - Clés du dictionnaire enveloppesParCategorie:');
-                                    enveloppesParCategorie.keys.forEach((key) {
-                                      print('🔍 Clé: "$key" -> ${enveloppesParCategorie[key]!.length} enveloppes');
-                                    });
-                                    
-                                    // Debug: Afficher les IDs des catégories
-                                    print('🔍 DEBUG - IDs des catégories:');
-                                    for (final cat in categories) {
-                                      print('🔍 Catégorie "${cat.nom}" -> ID: "${cat.id}"');
-                                    }
-                                    
-                                    // Debug: Afficher combien d'enveloppes par catégorie
-                                    print('🔍 DEBUG MAPPING - Enveloppes par catégorie:');
-                                    for (final cat in categories) {
-                                      final enveloppesCat = enveloppesParCategorie[cat.id] ?? [];
-                                      print('🔍 Catégorie "${cat.nom}" (ID: ${cat.id}) -> ${enveloppesCat.length} enveloppes');
-                                    }
-                                    
                                     return ListeCategoriesEnveloppes(
                                       categories: categories
                                           .map((c) => {
@@ -515,15 +489,7 @@ class _PageBudgetState extends State<PageBudget> {
       body: StreamBuilder<List<Compte>>(
         stream: PocketBaseService.lireTousLesComptes(),
         builder: (context, snapshot) {
-          print(
-              '🔄 PageBudget - StreamBuilder comptes - ConnectionState: ${snapshot.connectionState}');
-          print(
-              '🔄 PageBudget - StreamBuilder comptes - hasData: ${snapshot.hasData}');
-          print(
-              '🔄 PageBudget - StreamBuilder comptes - hasError: ${snapshot.hasError}');
-
           if (!snapshot.hasData || !mounted) {
-            print('🔄 PageBudget - Affichage CircularProgressIndicator');
             return const Center(child: CircularProgressIndicator());
           }
           final comptes = snapshot.data ?? [];
@@ -531,7 +497,6 @@ class _PageBudgetState extends State<PageBudget> {
               comptes.where((c) => !c.estArchive).toList();
 
           if (comptes.isEmpty) {
-            print('🔄 PageBudget - Aucun compte disponible');
             return const Center(
               child: Text(
                 'Aucun compte disponible',
@@ -539,38 +504,22 @@ class _PageBudgetState extends State<PageBudget> {
               ),
             );
           }
-          print(
-              '🔄 PageBudget - ${comptes.length} comptes trouvés, début StreamBuilder catégories');
           return StreamBuilder<List<Categorie>>(
             stream: PocketBaseService.lireCategories(),
             builder: (context, catSnapshot) {
-              print(
-                  '🔄 PageBudget - StreamBuilder catégories - ConnectionState: ${catSnapshot.connectionState}');
-              print(
-                  '🔄 PageBudget - StreamBuilder catégories - hasData: ${catSnapshot.hasData}');
-              print(
-                  '🔄 PageBudget - StreamBuilder catégories - hasError: ${catSnapshot.hasError}');
-
               if (!mounted) {
-                print(
-                    '🔄 PageBudget - Catégories - Affichage CircularProgressIndicator (pas mounted)');
                 return const Center(child: CircularProgressIndicator());
               }
               final categories = catSnapshot.data ?? [];
-              print('🔄 PageBudget - Calcul montant négatif...');
               final montantNegatif = _calculerTotalSituationsUrgence(
                 comptesNonArchives,
                 categories,
               );
-              print(
-                  '✅ PageBudget - Calcul montant négatif terminé: $montantNegatif');
               final aSituationsUrgence = _aSituationsUrgence(
                 comptesNonArchives,
                 categories,
               );
 
-              print(
-                  '🔄 PageBudget - Début rendu interface avec ${comptesNonArchives.length} comptes et ${categories.length} catégories');
               return Column(
                 children: [
                   const SizedBox(height: 20),
@@ -748,25 +697,7 @@ class _PageBudgetState extends State<PageBudget> {
                         
                         final enveloppesParCategorie = enveloppesSnapshot.data!;
                         
-                        // Debug: Afficher les clés du dictionnaire des enveloppes
-                        print('🔍 DEBUG - Clés du dictionnaire enveloppesParCategorie:');
-                        enveloppesParCategorie.keys.forEach((key) {
-                          print('🔍 Clé: "$key" -> ${enveloppesParCategorie[key]!.length} enveloppes');
-                        });
-                        
-                        // Debug: Afficher les IDs des catégories
-                        print('🔍 DEBUG - IDs des catégories:');
-                        for (final cat in categories) {
-                          print('🔍 Catégorie "${cat.nom}" -> ID: "${cat.id}"');
-                        }
-                        
-                        // Debug: Afficher combien d'enveloppes par catégorie
-                        print('🔍 DEBUG MAPPING - Enveloppes par catégorie:');
-                        for (final cat in categories) {
-                          final enveloppesCat = enveloppesParCategorie[cat.id] ?? [];
-                          print('🔍 Catégorie "${cat.nom}" (ID: ${cat.id}) -> ${enveloppesCat.length} enveloppes');
-                        }
-                        
+
                         return ListeCategoriesEnveloppes(
                           categories: categories
                               .map((c) => {

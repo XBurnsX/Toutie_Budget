@@ -472,6 +472,9 @@ class _PageTransactionsCompteState extends State<PageTransactionsCompte> {
                     ),
                   ],
                 );
+
+        // Return par défaut si aucune condition n'est remplie
+        return const Center(child: CircularProgressIndicator());
               },
             );
           }

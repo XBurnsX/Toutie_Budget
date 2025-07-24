@@ -21,14 +21,9 @@ class PocketBaseService {
     // UTILISER L'INSTANCE D'AUTHSERVICE au lieu de créer la nôtre !
     final authServiceInstance = AuthService.pocketBaseInstance;
     if (authServiceInstance != null) {
-      print('🔄 PocketBaseService - Utilisation instance AuthService');
-      print('🔗 URL PocketBase utilisée: ${authServiceInstance.baseUrl}');
-      print('🔐 AuthStore valide: ${authServiceInstance.authStore.isValid}');
-      print('🔐 Utilisateur connecté: ${authServiceInstance.authStore.model?.id}');
       return authServiceInstance;
     }
 
-    print('⚠️ Pas d\'instance AuthService, création fallback...');
     if (_pocketBase != null) return _pocketBase!;
 
     // URLs de fallback dans l'ordre de priorité
@@ -41,17 +36,13 @@ class PocketBaseService {
     // Tester chaque URL dans l'ordre
     for (final url in _pocketBaseUrls) {
       try {
-        print('🔍 Test connexion PocketBase: $url');
 
         // Test simple pour vérifier la connexion
         _pocketBase = PocketBase(url);
         await _pocketBase!.collection('users').getList(page: 1, perPage: 1);
         
-        print('✅ Connexion PocketBase réussie: $url');
-        print('🔗 URL PocketBase utilisée: ${_pocketBase!.baseUrl}');
         return _pocketBase!;
       } catch (e) {
-        print('❌ Échec connexion PocketBase: $url - $e');
         continue;
       }
     }
@@ -62,36 +53,27 @@ class PocketBaseService {
   // Lire les catégories depuis PocketBase
   static Stream<List<Categorie>> lireCategories() async* {
     try {
-      print('🔄 PocketBaseService - Lecture catégories...');
       final pb = await _getPocketBaseInstance();
-      print('🔄 PocketBaseService - Instance obtenue pour catégories');
 
       // Vérifier que l'utilisateur est connecté
       final utilisateurId = pb.authStore.model?.id;
-      print('🔄 PocketBaseService - Utilisateur ID pour catégories: $utilisateurId');
       
       if (utilisateurId == null) {
-        print('❌ Aucun utilisateur connecté dans PocketBase pour catégories');
         yield [];
         return;
       }
 
-      print('🔄 PocketBaseService - Début lecture collection categories');
       final records = await pb.collection('categories').getFullList(
         filter: 'utilisateur_id = "$utilisateurId"',
       );
-      print('✅ PocketBaseService - ${records.length} catégories trouvées');
 
-      print('🔄 PocketBaseService - Conversion des catégories...');
       final List<Categorie> categories = [];
       
       for (final record in records) {
         // Récupérer les enveloppes pour cette catégorie
-        print('🔄 Récupération enveloppes pour catégorie: ${record.data['nom']}');
         final enveloppesRecords = await pb.collection('enveloppes').getFullList(
           filter: 'categorie_id = "${record.id}" && utilisateur_id = "$utilisateurId"',
         );
-        print('✅ ${enveloppesRecords.length} enveloppes trouvées pour ${record.data['nom']}');
         
         // Convertir les enveloppes
         final enveloppes = enveloppesRecords.map((envRecord) => Enveloppe(
@@ -113,11 +95,8 @@ class PocketBaseService {
         categories.add(categorie);
       }
 
-      print('✅ PocketBaseService - Catégories converties: ${categories.length}');
       yield categories;
-      print('✅ PocketBaseService - Catégories yielded avec succès');
     } catch (e) {
-      print('❌ Erreur lecture catégories PocketBase: $e');
       yield [];
     }
   }
@@ -142,15 +121,12 @@ class PocketBaseService {
       // Si l'ID existe, on met à jour, sinon on crée
       if (categorie.id.isNotEmpty) {
         await pb.collection('categories').update(categorie.id, body: categorieData);
-        print('✅ Catégorie mise à jour avec succès: ${categorie.id}');
         return categorie.id;
       } else {
         final record = await pb.collection('categories').create(body: categorieData);
-        print('✅ Catégorie ajoutée avec succès: ${record.id}');
         return record.id;
       }
     } catch (e) {
-      print('❌ Erreur ajout/mise à jour catégorie: $e');
       throw Exception('Erreur lors de l\'ajout/mise à jour de la catégorie: $e');
     }
   }
@@ -160,9 +136,7 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
       await pb.collection('categories').delete(categorieId);
-      print('✅ Catégorie supprimée avec succès: $categorieId');
     } catch (e) {
-      print('❌ Erreur suppression catégorie: $e');
       throw Exception('Erreur lors de la suppression de la catégorie: $e');
     }
   }
@@ -170,7 +144,6 @@ class PocketBaseService {
   // Lire uniquement les comptes chèques depuis PocketBase
   static Stream<List<Compte>> lireComptesChecques() async* {
     try {
-      print('🔄 PocketBaseService - Lecture comptes chèques...');
       final pb = await _getPocketBaseInstance();
       
       // Vérifier que l'utilisateur est connecté
@@ -178,28 +151,23 @@ class PocketBaseService {
       final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
       
       if (utilisateurId == null || utilisateurNom.isEmpty) {
-        print('❌ Aucun utilisateur connecté dans PocketBase');
         yield [];
         return;
       }
       
       final filtre = 'utilisateur_id = "$utilisateurId"';
-      print('🔍 Filtre utilisé: $filtre');
       
       final records = await pb.collection('comptes_cheques').getFullList(
         filter: filtre,
       );
       
-      print('📊 Nombre de records trouvés avec filtre: ${records.length}');
       
       final comptes = records
           .map((record) => Compte.fromPocketBase(record.data, record.id, 'Chèque'))
           .toList();
 
-      print('✅ ${comptes.length} compte(s) chèque(s) trouvé(s)');
       yield comptes;
     } catch (e) {
-      print('❌ Erreur lecture comptes chèques: $e');
       yield [];
     }
   }
@@ -207,7 +175,6 @@ class PocketBaseService {
   // Lire uniquement les comptes de crédit depuis PocketBase
   static Stream<List<Compte>> lireComptesCredits() async* {
     try {
-      print('🔄 PocketBaseService - Lecture comptes crédits...');
       final pb = await _getPocketBaseInstance();
       
       // Vérifier que l'utilisateur est connecté
@@ -215,7 +182,6 @@ class PocketBaseService {
       final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
       
       if (utilisateurId == null || utilisateurNom.isEmpty) {
-        print('❌ Aucun utilisateur connecté dans PocketBase');
         yield [];
         return;
       }
@@ -228,10 +194,8 @@ class PocketBaseService {
           .map((record) => Compte.fromPocketBase(record.data, record.id, 'Carte de crédit'))
           .toList();
 
-      print('✅ ${comptes.length} compte(s) de crédit trouvé(s)');
       yield comptes;
     } catch (e) {
-      print('❌ Erreur lecture comptes crédits: $e');
       yield [];
     }
   }
@@ -239,7 +203,6 @@ class PocketBaseService {
   // Lire uniquement les comptes d'investissement depuis PocketBase
   static Stream<List<Compte>> lireComptesInvestissement() async* {
     try {
-      print('🔄 PocketBaseService - Lecture comptes investissement...');
       final pb = await _getPocketBaseInstance();
       
       // Vérifier que l'utilisateur est connecté
@@ -247,7 +210,6 @@ class PocketBaseService {
       final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
       
       if (utilisateurId == null || utilisateurNom.isEmpty) {
-        print('❌ Aucun utilisateur connecté dans PocketBase');
         yield [];
         return;
       }
@@ -260,10 +222,8 @@ class PocketBaseService {
           .map((record) => Compte.fromPocketBase(record.data, record.id, 'Investissement'))
           .toList();
 
-      print('✅ ${comptes.length} compte(s) d\'investissement trouvé(s)');
       yield comptes;
     } catch (e) {
-      print('❌ Erreur lecture comptes investissement: $e');
       yield [];
     }
   }
@@ -271,14 +231,12 @@ class PocketBaseService {
   // Lire les dettes (comptes_dettes + prêts personnels) depuis PocketBase
   static Stream<List<Compte>> lireComptesDettes() async* {
     try {
-      print('🔄 PocketBaseService - Lecture comptes dettes + prêts personnels...');
       final pb = await _getPocketBaseInstance();
       
       final utilisateurId = pb.authStore.model?.id;
       final utilisateurNom = pb.authStore.model?.getStringValue('name') ?? pb.authStore.model?.getStringValue('username') ?? '';
       
       if (utilisateurId == null || utilisateurNom.isEmpty) {
-        print('❌ Aucun utilisateur connecté dans PocketBase');
         yield [];
         return;
       }
@@ -296,9 +254,7 @@ class PocketBaseService {
             .toList();
 
         toutesLesDettes.addAll(comptesDettes);
-        print('✅ ${comptesDettes.length} dette(s) trouvée(s) dans comptes_dettes');
       } catch (e) {
-        print('⚠️ Erreur lecture comptes_dettes: $e');
       }
 
       // 2. Récupérer les prêts personnels de la collection pret_personnel
@@ -312,24 +268,18 @@ class PocketBaseService {
             .toList();
 
         toutesLesDettes.addAll(comptesPrets);
-        print('✅ ${comptesPrets.length} prêt(s) personnel(s) trouvé(s)');
       } catch (e) {
-        print('⚠️ Erreur lecture pret_personnel: $e');
       }
 
-      print('✅ Total: ${toutesLesDettes.length} dette(s) + prêt(s) trouvé(s)');
       yield toutesLesDettes;
     } catch (e) {
-      print('❌ Erreur lecture dettes: $e');
       yield [];
     }
   }
 
   // Combiner tous les types de comptes en un seul stream
   static Stream<List<Compte>> lireTousLesComptes() async* {
-    print('🔄 Appel de lireTousLesComptes');
     try {
-      print('🔄 PocketBaseService - Lecture de tous les comptes (4 collections)...');
       
       // Récupérer tous les comptes de chaque type
       final List<Compte> tousLesComptes = [];
@@ -358,11 +308,9 @@ class PocketBaseService {
         break; // Prendre seulement la première émission
       }
       
-      print('✅ Total combiné: ${tousLesComptes.length} compte(s)');
       yield tousLesComptes;
       
     } catch (e) {
-      print('❌ Erreur lecture tous les comptes: $e');
       yield [];
     }
   }
@@ -374,7 +322,6 @@ class PocketBaseService {
       final userId = pb.authStore.model?.id;
       
       if (userId == null) {
-        print('❌ Utilisateur non connecté pour lireComptes');
         yield [];
         return;
       }
@@ -402,7 +349,6 @@ class PocketBaseService {
 
       yield comptes;
     } catch (e) {
-      print('❌ Erreur lireComptes: $e');
       yield [];
     }
   }
@@ -418,7 +364,6 @@ class PocketBaseService {
       
       return records.map((record) => record.toJson()).toList();
     } catch (e) {
-      print('❌ Erreur récupération enveloppes par catégorie: $e');
       return [];
     }
   }
@@ -431,13 +376,11 @@ class PocketBaseService {
       // Vérifier que l'utilisateur est connecté
       final utilisateurId = pb.authStore.model?.id;
       if (utilisateurId == null) {
-        print('❌ Aucun utilisateur connecté dans PocketBase');
         return {};
       }
       
       // Filtrer par utilisateur connecté
       final filtre = 'utilisateur_id = "$utilisateurId"';
-      print('🔍 Filtre utilisé pour enveloppes: $filtre');
       
       final records = await pb.collection('enveloppes').getFullList(
         filter: filtre,
@@ -445,7 +388,6 @@ class PocketBaseService {
         sort: 'categorie_id.nom,nom',
       );
       
-      print('🔍 DEBUG lireEnveloppesGroupeesParCategorie - ${records.length} enveloppes récupérées');
       
       final Map<String, List<Map<String, dynamic>>> enveloppesParCategorie = {};
       
@@ -454,7 +396,6 @@ class PocketBaseService {
         final enveloppeData = record.toJson();
         final nomEnveloppe = record.data['nom'] ?? 'Sans nom';
         
-        print('🔍 Enveloppe "$nomEnveloppe" -> catégorie ID: "$categorieId"');
         
         if (!enveloppesParCategorie.containsKey(categorieId)) {
           enveloppesParCategorie[categorieId] = [];
@@ -462,14 +403,11 @@ class PocketBaseService {
         enveloppesParCategorie[categorieId]!.add(enveloppeData);
       }
       
-      print('🔍 DEBUG Résultat groupement:');
       enveloppesParCategorie.forEach((catId, enveloppes) {
-        print('🔍 Catégorie ID "$catId" -> ${enveloppes.length} enveloppes');
       });
       
       return enveloppesParCategorie;
     } catch (e) {
-      print('❌ Erreur récupération enveloppes groupées: $e');
       return {};
     }
   }
@@ -489,7 +427,6 @@ class PocketBaseService {
       
       return records.map((record) => record.toJson()).toList();
     } catch (e) {
-      print('❌ Erreur récupération toutes enveloppes: $e');
       return [];
     }
   }
@@ -509,10 +446,8 @@ class PocketBaseService {
       enveloppeData['utilisateur_id'] = userId;
       
       final record = await pb.collection('enveloppes').create(body: enveloppeData);
-      print('✅ Enveloppe ajoutée avec succès: ${record.id}');
       return record.id;
     } catch (e) {
-      print('❌ Erreur ajout enveloppe: $e');
       throw Exception('Erreur lors de l\'ajout de l\'enveloppe: $e');
     }
   }
@@ -522,9 +457,7 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
       await pb.collection('enveloppes').update(enveloppeId, body: donnees);
-      print('✅ Enveloppe mise à jour avec succès: $enveloppeId');
     } catch (e) {
-      print('❌ Erreur mise à jour enveloppe: $e');
       throw Exception('Erreur lors de la mise à jour de l\'enveloppe: $e');
     }
   }
@@ -534,9 +467,7 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
       await pb.collection('enveloppes').delete(enveloppeId);
-      print('✅ Enveloppe supprimée avec succès: $enveloppeId');
     } catch (e) {
-      print('❌ Erreur suppression enveloppe: $e');
       throw Exception('Erreur lors de la suppression de l\'enveloppe: $e');
     }
   }
@@ -548,9 +479,7 @@ class PocketBaseService {
       await pb.collection('enveloppes').update(enveloppeId, body: {
         'est_archive': true,
       });
-      print('✅ Enveloppe archivée avec succès: $enveloppeId');
     } catch (e) {
-      print('❌ Erreur archivage enveloppe: $e');
       throw Exception('Erreur lors de l\'archivage de l\'enveloppe: $e');
     }
   }
@@ -562,9 +491,7 @@ class PocketBaseService {
       await pb.collection('enveloppes').update(enveloppeId, body: {
         'est_archive': false,
       });
-      print('✅ Enveloppe restaurée avec succès: $enveloppeId');
     } catch (e) {
-      print('❌ Erreur restauration enveloppe: $e');
       throw Exception('Erreur lors de la restauration de l\'enveloppe: $e');
     }
   }
@@ -586,7 +513,6 @@ class PocketBaseService {
   // Méthode pour ajouter un compte dans PocketBase
   static Future<void> ajouterCompte(Compte compte) async {
     try {
-      print('🔄 PocketBaseService - Ajout compte: ${compte.nom}');
       final pb = await _getPocketBaseInstance();
 
       // Vérifier que l'utilisateur est connecté
@@ -596,8 +522,6 @@ class PocketBaseService {
         throw Exception('❌ Aucun utilisateur connecté dans PocketBase');
       }
 
-      print('🔐 Utilisateur connecté pour ajout: $utilisateurId');
-      print('🔐 Nom utilisateur pour ajout: $utilisateurNom');
       
       // Déterminer la collection selon le type de compte
       String nomCollection;
@@ -663,15 +587,11 @@ class PocketBaseService {
           throw Exception('Type de compte non supporté: ${compte.type}');
       }
 
-      print('🔄 Création dans collection: $nomCollection');
       
       final result = await pb.collection(nomCollection).create(body: donneesCompte);
       
-      print('✅ Compte créé avec ID: ${result.id}');
-      print('✅ Ajout compte terminé: ${compte.nom}');
 
     } catch (e) {
-      print('❌ Erreur ajout compte PocketBase: $e');
       rethrow;
     }
   }
@@ -679,7 +599,6 @@ class PocketBaseService {
   // Méthode pour mettre à jour un compte
   static Future<void> updateCompte(String compteId, Map<String, dynamic> donnees) async {
     try {
-      print('🔄 PocketBaseService - Mise à jour compte: $compteId');
       final pb = await _getPocketBaseInstance();
 
       // Déterminer la collection en cherchant dans toutes les collections
@@ -688,7 +607,6 @@ class PocketBaseService {
       for (final nomCollection in collections) {
         try {
           await pb.collection(nomCollection).update(compteId, body: donnees);
-          print('✅ Compte mis à jour dans $nomCollection');
           return;
         } catch (e) {
           // Continuer vers la collection suivante si le compte n'est pas trouvé
@@ -698,7 +616,6 @@ class PocketBaseService {
       
       throw Exception('Compte non trouvé dans aucune collection');
     } catch (e) {
-      print('❌ Erreur mise à jour compte PocketBase: $e');
       rethrow;
     }
   }
@@ -706,13 +623,11 @@ class PocketBaseService {
   // Créer des catégories de test dans PocketBase
   static Future<void> creerCategoriesTest() async {
     try {
-      print('🔄 PocketBaseService - Création catégories de test...');
       final pb = await _getPocketBaseInstance();
 
       // Vérifier que l'utilisateur est connecté
       final utilisateurId = pb.authStore.model?.id;
       if (utilisateurId == null) {
-        print('❌ Aucun utilisateur connecté - impossible de créer des catégories');
         return;
       }
 
@@ -742,15 +657,11 @@ class PocketBaseService {
       for (final categorie in categoriesTest) {
         try {
           await pb.collection('categories').create(body: categorie);
-          print('✅ Catégorie créée: ${categorie['nom']}');
         } catch (e) {
-          print('! Catégorie déjà existante: ${categorie['nom']}');
         }
       }
 
-      print('✅ Création catégories de test terminée');
     } catch (e) {
-      print('❌ Erreur création catégories de test: $e');
     }
   }
 

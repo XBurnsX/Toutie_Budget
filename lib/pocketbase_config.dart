@@ -43,18 +43,15 @@ class PocketBaseConfig {
   static Future<void> testAndSetActiveUrl() async {
     for (final url in possibleUrls) {
       try {
-        print('🔄 Test de connexion à: $url');
         final response = await http.get(Uri.parse('$url/api/health')).timeout(
               const Duration(seconds: 5),
             );
 
         if (response.statusCode == 200) {
           _activeUrl = url;
-          print('✅ PocketBase trouvé sur: $url');
           return;
         }
       } catch (e) {
-        print('❌ Échec de connexion à: $url');
       }
     }
 

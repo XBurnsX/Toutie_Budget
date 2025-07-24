@@ -165,25 +165,19 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   }
 
   dynamic getSelectedById(String? id, List<dynamic> tout) {
-    print('🔍 DEBUG getSelectedById: searching for id=$id (type: ${id.runtimeType})');
     for (var obj in tout) {
       String? objId;
       if (obj is Compte) {
         objId = obj.id;
-        print('🔍 DEBUG getSelectedById Compte: ${obj.id} (type: ${obj.id.runtimeType})');
       } else if (obj is Enveloppe) {
         objId = obj.id;
-        print('🔍 DEBUG getSelectedById Enveloppe: ${obj.id} (type: ${obj.id.runtimeType})');
       } else {
         continue;
       }
-      print('🔍 DEBUG getSelectedById comparing: "$objId" == "$id" = ${objId == id}');
       if (objId == id) {
-        print('🔍 DEBUG getSelectedById FOUND: $obj');
         return obj;
       }
     }
-    print('🔍 DEBUG getSelectedById NOT FOUND for id=$id');
     return null;
   }
 
@@ -191,15 +185,11 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
     String result;
     if (obj is Compte) {
       result = obj.id;
-      print('🔍 DEBUG getId Compte: ${obj.id} (type: ${obj.id.runtimeType})');
     } else if (obj is Enveloppe) {
       result = obj.id;
-      print('🔍 DEBUG getId Enveloppe: ${obj.id} (type: ${obj.id.runtimeType})');
     } else {
       result = '';
-      print('🔍 DEBUG getId Unknown: $obj (type: ${obj.runtimeType})');
     }
-    print('🔍 DEBUG getId result: $result (type: ${result.runtimeType})');
     return result;
   }
 
@@ -392,7 +382,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
 
   @override
   Widget build(BuildContext context) {
-    print('🔍 DEBUG PageVirerArgent build() START');
     if (kIsWeb) {
       return Scaffold(
         appBar: AppBar(
@@ -439,9 +428,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       key: ValueKey('comptes_$_refreshKey'),
       stream: PocketBaseService.lireComptes(),
       builder: (context, comptesSnapshot) {
-        print('🔍 DEBUG StreamBuilder<List<Compte>> - hasData: ${comptesSnapshot.hasData}, hasError: ${comptesSnapshot.hasError}');
         if (comptesSnapshot.hasError) {
-          print('🔍 DEBUG StreamBuilder<List<Compte>> ERROR: ${comptesSnapshot.error}');
           return Center(
             child: Text(
               'Erreur : ${comptesSnapshot.error}',
@@ -450,19 +437,15 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
           );
         }
         if (!comptesSnapshot.hasData) {
-          print('🔍 DEBUG StreamBuilder<List<Compte>> - Loading...');
           return const Center(child: CircularProgressIndicator());
         }
         
-        print('🔍 DEBUG StreamBuilder<List<Compte>> - Data loaded: ${comptesSnapshot.data!.length} comptes');
         
         return StreamBuilder<List<Categorie>>(
           key: ValueKey('categories_$_refreshKey'),
           stream: PocketBaseService.lireCategories(),
           builder: (context, catSnapshot) {
-            print('🔍 DEBUG StreamBuilder<List<Categorie>> - hasData: ${catSnapshot.hasData}, hasError: ${catSnapshot.hasError}');
             if (catSnapshot.hasError) {
-              print('🔍 DEBUG StreamBuilder<List<Categorie>> ERROR: ${catSnapshot.error}');
               return Center(
                 child: Text(
                   'Erreur : ${catSnapshot.error}',
@@ -471,19 +454,15 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
               );
             }
             if (!comptesSnapshot.hasData || !catSnapshot.hasData) {
-              print('🔍 DEBUG StreamBuilder<List<Categorie>> - Loading...');
               return const Center(child: CircularProgressIndicator());
             }
             
-            print('🔍 DEBUG StreamBuilder<List<Categorie>> - Data loaded: ${catSnapshot.data!.length} categories');
             
             final comptes = comptesSnapshot.data!;
             return FutureBuilder<List<Map<String, dynamic>>>(
               future: PocketBaseService.lireToutesEnveloppes(),
               builder: (context, enveloppesSnapshot) {
-                print('🔍 DEBUG FutureBuilder<List<Map<String, dynamic>>> - hasData: ${enveloppesSnapshot.hasData}, hasError: ${enveloppesSnapshot.hasError}');
                 if (enveloppesSnapshot.hasError) {
-                  print('🔍 DEBUG FutureBuilder ERROR: ${enveloppesSnapshot.error}');
                   return Center(
                     child: Text(
                       'Erreur enveloppes: ${enveloppesSnapshot.error}',
@@ -492,19 +471,15 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                   );
                 }
                 if (!enveloppesSnapshot.hasData) {
-                  print('🔍 DEBUG FutureBuilder - Loading enveloppes...');
                   return Container();
                 }
                 
-                print('🔍 DEBUG FutureBuilder - Data loaded: ${enveloppesSnapshot.data!.length} enveloppes raw data');
                 
                 try {
                   final enveloppes = enveloppesSnapshot.data!.map((data) {
-                    print('🔍 DEBUG Converting enveloppe data: $data');
                     return Enveloppe.fromMap(data);
                   }).toList();
                   
-                  print('🔍 DEBUG Successfully converted ${enveloppes.length} enveloppes');
                   
                   // Vérification des données
                   if (catSnapshot.data!.isEmpty) {
@@ -640,8 +615,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
                     ],
                   );
                 } catch (e, stackTrace) {
-                  print('🔍 DEBUG EXCEPTION in FutureBuilder: $e');
-                  print('🔍 DEBUG STACK TRACE: $stackTrace');
                   return Center(
                     child: Text(
                       'Erreur de conversion: $e',
@@ -668,7 +641,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   // Fonction pour construire les items du dropdown avec séparateurs par catégorie
   List<DropdownMenuItem<String>> _buildDropdownItems(List<dynamic> tout,
       String? excludeId, List<Categorie> categories, List<Compte> comptes) {
-    print('🔍 DEBUG _buildDropdownItems: excludeId=$excludeId (type: ${excludeId.runtimeType})');
     final items = <DropdownMenuItem<String>>[];
 
     // Ajouter d'abord tous les comptes
@@ -676,17 +648,14 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         tout.where((obj) {
           if (obj is Compte) {
             final objId = getId(obj);
-            print('🔍 DEBUG _buildDropdownItems Compte filter: $objId != $excludeId = ${objId != excludeId}');
             return objId != excludeId;
           }
           return false;
         }).toList();
     
-    print('🔍 DEBUG _buildDropdownItems: ${comptesFiltres.length} comptes filtrés');
     
     for (var compte in comptesFiltres) {
       final compteId = getId(compte);
-      print('🔍 DEBUG _buildDropdownItems: Adding compte with ID=$compteId');
       items.add(DropdownMenuItem(
         value: compteId,
         child: Row(
@@ -710,29 +679,24 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         .where((obj) {
           if (obj is Enveloppe) {
             final objId = getId(obj);
-            print('🔍 DEBUG _buildDropdownItems Enveloppe filter: $objId != $excludeId = ${objId != excludeId}');
             return objId != excludeId;
           }
           return false;
         })
         .toList();
     
-    print('🔍 DEBUG _buildDropdownItems: ${enveloppes.length} enveloppes filtrées');
     
     final categoriesMap = <String, List<Enveloppe>>{};
 
     // Grouper les enveloppes par catégorie
     for (var enveloppe in enveloppes) {
-      print('🔍 DEBUG _buildDropdownItems: Processing enveloppe ${enveloppe.id} (${enveloppe.nom})');
       final nomCategorie =
           _getNomCategorieEnveloppe(enveloppe as Enveloppe, categories);
-      print('🔍 DEBUG _buildDropdownItems: Enveloppe category = $nomCategorie');
       categoriesMap.putIfAbsent(nomCategorie, () => []).add(enveloppe);
     }
 
     // Ajouter les enveloppes avec séparateurs
     categoriesMap.forEach((nomCategorie, enveloppesCategorie) {
-      print('🔍 DEBUG _buildDropdownItems: Adding category separator: $nomCategorie');
       // Ajouter le séparateur de catégorie
       items.add(DropdownMenuItem<String>(
         value: null, // Valeur null pour le séparateur
@@ -753,7 +717,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       // Ajouter les enveloppes de cette catégorie
       for (var enveloppe in enveloppesCategorie) {
         final enveloppeId = getId(enveloppe);
-        print('🔍 DEBUG _buildDropdownItems: Adding enveloppe with ID=$enveloppeId (${enveloppe.nom})');
         items.add(DropdownMenuItem(
           value: enveloppeId,
           child: Padding(
@@ -776,7 +739,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       }
     });
 
-    print('🔍 DEBUG _buildDropdownItems: Total items created: ${items.length}');
     return items;
   }
 
@@ -882,7 +844,6 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
   // Méthode alternative pour charger directement depuis Firebase
   Future<void> _forceRefreshFromFirebase() async {
     try {
-      print('DEBUG: Forçage du rechargement depuis Firebase...');
 
       // Invalider complètement le cache
       CacheService.invalidateAll();
@@ -890,9 +851,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
       // Nettoyer le cache persistant si possible
       try {
         await PersistentCacheService.clearAllCache();
-        print('DEBUG: Cache persistant nettoyé');
       } catch (e) {
-        print('DEBUG: Impossible de nettoyer le cache persistant: $e');
       }
 
       // Attendre un peu pour s'assurer que l'invalidation est terminée
@@ -903,9 +862,7 @@ class _PageVirerArgentState extends State<PageVirerArgent> {
         _refreshKey++;
       });
 
-      print('DEBUG: Rechargement forcé terminé');
     } catch (e) {
-      print('Erreur lors du rafraîchissement forcé: $e');
     }
   }
 }
