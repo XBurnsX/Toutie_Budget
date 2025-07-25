@@ -81,7 +81,10 @@ class ChampEnveloppe extends StatelessWidget {
 
         // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
         String? valeurActuelle = enveloppeSelectionnee;
-        final occurences = items.where((item) => item.value == valeurActuelle);
+        final occurences = items.where((item) =>
+            item.value == valeurActuelle &&
+            item.value != null &&
+            !item.value!.startsWith('cat_'));
         if (valeurActuelle != null && occurences.length != 1) {
           valeurActuelle = null;
         }
@@ -89,11 +92,20 @@ class ChampEnveloppe extends StatelessWidget {
         return DropdownButtonFormField<String>(
           value: valeurActuelle,
           items: items,
-          onChanged: (String? newValue) => onEnveloppeChanged(newValue),
+          onChanged: (String? newValue) {
+            // Ignorer les en-têtes de catégorie
+            if (newValue != null && newValue.startsWith('cat_')) {
+              return;
+            }
+            onEnveloppeChanged(newValue);
+          },
           selectedItemBuilder: (context) {
             return items.map((item) {
               if (item.value == null) {
                 return const Text('Aucune');
+              }
+              if (item.value!.startsWith('cat_')) {
+                return const SizedBox.shrink(); // Ignorer les en-têtes
               }
               return item.child ?? const SizedBox.shrink();
             }).toList();
@@ -191,65 +203,99 @@ class ChampEnveloppe extends StatelessWidget {
       }
     }
 
-    // Enveloppes normales
-    for (final env in enveloppesCompletes) {
-      final solde = (env['solde_enveloppe'] as num?)?.toDouble() ??
-          (env['solde'] as num?)?.toDouble() ??
-          0.0;
+    // Grouper les enveloppes par catégorie
+    final Map<String, List<Map<String, dynamic>>> enveloppesParCategorie = {};
 
-      // Utiliser ColorService pour la couleur de l'enveloppe
+    for (final env in enveloppesCompletes) {
+      final categorieNom = env['categorie_nom'] as String? ?? 'Sans catégorie';
+      if (!enveloppesParCategorie.containsKey(categorieNom)) {
+        enveloppesParCategorie[categorieNom] = [];
+      }
+      enveloppesParCategorie[categorieNom]!.add(env);
+    }
+
+    // Ajouter les enveloppes groupées par catégorie
+    for (final entry in enveloppesParCategorie.entries) {
+      final categorieNom = entry.key;
+      final enveloppesCategorie = entry.value;
+
+      // En-tête de catégorie (avec une valeur unique qui ne sera jamais sélectionnée)
       items.add(
         DropdownMenuItem<String>(
-          value: env['id'],
-          child: FutureBuilder<Color>(
-            future: ColorService.getCouleurCompteSourceEnveloppeAsync(
-              enveloppeId: env['id'],
-              comptes: comptes
-                  .map((c) => {
-                        'id': c['id'],
-                        'nom': c['nom'],
-                        'couleur': c['couleur'],
-                        'collection':
-                            c.containsKey('collection') ? c['collection'] : '',
-                      })
-                  .toList(),
-              solde: solde,
-              mois: DateTime.now(),
+          value: 'cat_$categorieNom', // Préfixe unique
+          enabled: false,
+          child: Text(
+            '📁 $categorieNom',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).primaryColor,
+              fontSize: 16,
             ),
-            builder: (context, couleurSnapshot) {
-              final couleurCompte = couleurSnapshot.data ?? Colors.grey;
-              return Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      env['nom'],
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: couleurCompte,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${solde.toStringAsFixed(2)}\$',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
           ),
         ),
       );
+
+      // Enveloppes de cette catégorie
+      for (final env in enveloppesCategorie) {
+        final solde = (env['solde_enveloppe'] as num?)?.toDouble() ??
+            (env['solde'] as num?)?.toDouble() ??
+            0.0;
+
+        // Utiliser ColorService pour la couleur de l'enveloppe
+        items.add(
+          DropdownMenuItem<String>(
+            value: env['id'],
+            child: FutureBuilder<Color>(
+              future: ColorService.getCouleurCompteSourceEnveloppeAsync(
+                enveloppeId: env['id'],
+                comptes: comptes
+                    .map((c) => {
+                          'id': c['id'],
+                          'nom': c['nom'],
+                          'couleur': c['couleur'],
+                          'collection': c.containsKey('collection')
+                              ? c['collection']
+                              : '',
+                        })
+                    .toList(),
+                solde: solde,
+                mois: DateTime.now(),
+              ),
+              builder: (context, couleurSnapshot) {
+                final couleurCompte = couleurSnapshot.data ?? Colors.grey;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '  ${env['nom']}', // Indentation pour montrer que c'est sous la catégorie
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: couleurCompte,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${solde.toStringAsFixed(2)}\$',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      }
     }
 
     return items;
