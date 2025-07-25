@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/compte.dart';
 import '../../models/transaction_model.dart';
 import '../../themes/dropdown_theme_extension.dart';
+import '../../services/color_service.dart';
 
 class ChampEnveloppe extends StatelessWidget {
   final String? enveloppeSelectionnee;
@@ -131,7 +132,42 @@ class ChampEnveloppe extends StatelessWidget {
       // Ajouter les enveloppes de cette catégorie
       for (final env in enveloppesVisibles) {
         final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
-        final couleurCompte = getCouleurCompteEnveloppe(env);
+        // Chercher le compte source si possible
+        Map<String, String?>? compteSourceInfo;
+        if (env['compte_source_id'] != null &&
+            env['collection_compte_source'] != null) {
+          compteSourceInfo = {
+            'compte_source_id': env['compte_source_id']?.toString(),
+            'collection_compte_source':
+                env['collection_compte_source']?.toString(),
+          };
+        }
+        // Conversion manuelle des comptes pour garantir les champs nécessaires
+        final comptesMap = comptesFirebase
+            .map((c) => {
+                  'id': c.id,
+                  'couleur': c.couleur,
+                  'collection': c.type == 'Chèque'
+                      ? 'comptes_cheques'
+                      : c.type == 'Carte de crédit'
+                          ? 'comptes_credit'
+                          : c.type == 'Dette'
+                              ? 'comptes_dettes'
+                              : c.type == 'Investissement'
+                                  ? 'comptes_investissement'
+                                  : null,
+                })
+            .toList();
+        Color couleurCompte;
+        try {
+          couleurCompte = ColorService.getCouleurCompteSourceEnveloppe(
+            enveloppe: env,
+            comptes: comptesMap,
+            compteSourceInfo: compteSourceInfo,
+          );
+        } catch (e) {
+          couleurCompte = Colors.grey;
+        }
 
         items.add(
           DropdownMenuItem<String>(
