@@ -51,7 +51,8 @@ void main() async {
   await Future.delayed(const Duration(seconds: 2));
   print('🔄 Début de la synchronisation de masse...');
   try {
-    await AllocationService.synchroniserToutesLesEnveloppesUtilisateur();
+    // Synchronisation automatique désactivée pour éviter les rechargements multiples
+    // await AllocationService.synchroniserToutesLesEnveloppesUtilisateur();
     print('✅ Synchronisation de masse terminée avec succès');
   } catch (e) {
     print('❌ Erreur lors de la synchronisation de masse: $e');

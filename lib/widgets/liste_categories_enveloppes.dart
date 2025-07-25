@@ -54,12 +54,22 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     super.didUpdateWidget(oldWidget);
 
     // Ne recalculer que si les données ont vraiment changé
+    // Hashcode basé uniquement sur les IDs et noms des catégories/enveloppes (pas les soldes)
     final newHashCode = widget.categories
-        .map((c) => '${c['id']}_${c['nom']}_${(c['enveloppes'] as List).length}')
+        .map((c) => '${c['id']}_${c['nom']}_${(c['enveloppes'] as List).map((e) => '${e['id']}_${e['nom']}').join('|')}')
         .join('_')
         .hashCode;
+
+    print('🔍 DEBUG HASHCODE - Ancien: $_lastCategoriesHashCode, Nouveau: $newHashCode');
+    print('🔍 DEBUG HASHCODE - Nombres de catégories: ${widget.categories.length}');
+
     if (newHashCode != _lastCategoriesHashCode) {
       print('🔄 Données des catégories modifiées, mise à jour du cache');
+      print('🔍 DEBUG - Détail des catégories qui ont changé:');
+      for (int i = 0; i < widget.categories.length; i++) {
+        final cat = widget.categories[i];
+        print('   Catégorie $i: ${cat['id']} - ${cat['nom']} - ${(cat['enveloppes'] as List).length} enveloppes');
+      }
       // Invalider le cache des soldes quand les données changent
       _soldesCache.clear();
       _pendingSoldesFutures.clear();

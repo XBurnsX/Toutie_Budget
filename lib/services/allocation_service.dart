@@ -69,7 +69,6 @@ class AllocationService {
           'alloue': nouveauAlloue,
         });
 
-        print('✅ Allocation mensuelle mise à jour: ${allocation.id}');
         // Synchroniser l'enveloppe après update
         await synchroniserEnveloppeDepuisAllocations(enveloppeId);
       } else {
@@ -88,12 +87,10 @@ class AllocationService {
         await pb
             .collection('allocations_mensuelles')
             .create(body: nouvelleAllocation);
-        print('✅ Nouvelle allocation mensuelle créée');
         // Synchroniser l'enveloppe après création
         await synchroniserEnveloppeDepuisAllocations(enveloppeId);
       }
     } catch (e) {
-      print('❌ Erreur création allocation mensuelle: $e');
       rethrow;
     }
   }
@@ -145,7 +142,6 @@ class AllocationService {
           'depense': nouvelleDepense,
         });
 
-        print('✅ Allocation mise à jour pour transaction: ${allocation.id}');
         // Synchroniser l'enveloppe après update
         await synchroniserEnveloppeDepuisAllocations(enveloppeId);
       } else {
@@ -164,12 +160,10 @@ class AllocationService {
         await pb
             .collection('allocations_mensuelles')
             .create(body: nouvelleAllocation);
-        print('✅ Nouvelle allocation créée pour transaction');
         // Synchroniser l'enveloppe après création
         await synchroniserEnveloppeDepuisAllocations(enveloppeId);
       }
     } catch (e) {
-      print('❌ Erreur mise à jour allocation pour transaction: $e');
       rethrow;
     }
   }
@@ -230,13 +224,12 @@ class AllocationService {
               await pb
                   .collection('allocations_mensuelles')
                   .create(body: allocationRollover);
-              print('✅ Rollover créé pour enveloppe: ${enveloppe.id}');
             }
           }
         }
       }
     } catch (e) {
-      print('❌ Erreur traitement rollover: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 
@@ -265,7 +258,6 @@ class AllocationService {
           .map((record) => AllocationMensuelle.fromMap(record.data))
           .toList();
     } catch (e) {
-      print('❌ Erreur lecture allocations mensuelles: $e');
       return [];
     }
   }
@@ -276,27 +268,17 @@ class AllocationService {
     required DateTime mois,
   }) async {
     try {
-      print(
-          '🔍🔍 DEBUT OBTENIR_COMPTE_SOURCE pour enveloppe: $enveloppeId, mois: ${mois.year}-${mois.month}');
       final pb = await _getPocketBaseInstance();
       final userId = pb.authStore.model?.id;
       if (userId == null) {
-        print('❌ COMPTE_SOURCE: userId null - utilisateur non connecté');
         return {'compte_source_id': null, 'collection_compte_source': null};
       }
-
-      // Essayer plusieurs formats de filtre pour trouver le bon
-      print(
-          '🔍 COMPTE_SOURCE: Recherche pour enveloppe: $enveloppeId, mois: ${mois.year}-${mois.month}');
 
       // Premiere tentative : sans filtre de date, juste enveloppe et utilisateur
       var allocations = await pb.collection('allocations_mensuelles').getList(
             filter:
                 'enveloppe_id = "$enveloppeId" && utilisateur_id = "$userId"',
           );
-
-      print(
-          '🔍 COMPTE_SOURCE: ${allocations.items.length} allocations trouvees sans filtre de date');
 
       // Si on trouve des allocations, filtrer par mois en code
       List<dynamic> allocationsFinales = [];
@@ -310,32 +292,9 @@ class AllocationService {
             final dateMois = DateTime.parse(moisAllocation);
             return dateMois.year == mois.year && dateMois.month == mois.month;
           } catch (e) {
-            print('🔍 COMPTE_SOURCE: Erreur parsing date: $moisAllocation');
             return false;
           }
         }).toList();
-
-        print(
-            '🔍 COMPTE_SOURCE: ${allocationsFinales.length} allocations apres filtrage par mois');
-      }
-
-      print(
-          '🔍 COMPTE_SOURCE: ${allocationsFinales.length} allocations finales a traiter');
-
-      // Afficher les allocations filtrées
-      for (int i = 0; i < allocationsFinales.length; i++) {
-        final allocation = allocationsFinales[i];
-        print('🔍 COMPTE_SOURCE: Allocation $i: ID=${allocation.id}');
-        print(
-            '🔍 COMPTE_SOURCE: - enveloppe_id: ${allocation.data['enveloppe_id']}');
-        print('🔍 COMPTE_SOURCE: - mois: ${allocation.data['mois']}');
-        print('🔍 COMPTE_SOURCE: - solde: ${allocation.data['solde']}');
-        print('🔍 COMPTE_SOURCE: - alloué: ${allocation.data['alloue']}');
-        print('🔍 COMPTE_SOURCE: - dépense: ${allocation.data['depense']}');
-        print(
-            '🔍 COMPTE_SOURCE: - compte_source_id: ${allocation.data['compte_source_id']}');
-        print(
-            '🔍 COMPTE_SOURCE: - collection_compte_source: ${allocation.data['collection_compte_source']}');
       }
 
       for (final allocation in allocationsFinales) {
@@ -347,8 +306,6 @@ class AllocationService {
             compteSourceId.isNotEmpty &&
             collectionCompteSource != null &&
             collectionCompteSource.isNotEmpty) {
-          print(
-              '🔍 COMPTE_SOURCE: Compte source trouvé: $compteSourceId ($collectionCompteSource)');
           return {
             'compte_source_id': compteSourceId,
             'collection_compte_source': collectionCompteSource,
@@ -356,10 +313,8 @@ class AllocationService {
         }
       }
 
-      print('🔍 COMPTE_SOURCE: Aucun compte source valide trouvé');
       return {'compte_source_id': null, 'collection_compte_source': null};
     } catch (e) {
-      print('🔍 COMPTE_SOURCE: Erreur: $e');
       return {'compte_source_id': null, 'collection_compte_source': null};
     }
   }
@@ -370,22 +325,17 @@ class AllocationService {
     required String enveloppeId,
     required DateTime mois,
   }) async {
-    print(
-        '🔍🔍 DEBUT CALCUL_SOLDE pour enveloppe: $enveloppeId, mois: ${mois.year}-${mois.month}');
-
     try {
       final now = DateTime.now();
 
       // Si le mois est dans le futur, retourner null (pas de solde à afficher)
       if (mois.isAfter(DateTime(now.year, now.month + 1, 1))) {
-        print('🔍 CALCUL_SOLDE: Mois dans le futur, retourne null');
         return null;
       }
 
       final pb = await _getPocketBaseInstance();
       final userId = pb.authStore.model?.id;
       if (userId == null) {
-        print('❌ CALCUL_SOLDE: Utilisateur non connecté');
         return null;
       }
 
@@ -398,9 +348,6 @@ class AllocationService {
       final filtre2 =
           'enveloppe_id = "$enveloppeId" && utilisateur_id = "$userId"';
 
-      print('🔍 CALCUL_SOLDE: Filtre de recherche 1: $filtre1');
-      print('🔍 CALCUL_SOLDE: Filtre de recherche 2: $filtre2');
-
       // Essayer avec le premier filtre (date exacte)
       var allocations = await pb.collection('allocations_mensuelles').getList(
             filter: filtre1,
@@ -408,8 +355,6 @@ class AllocationService {
 
       // Si aucune allocation trouvée avec le premier filtre, essayer avec le second (sans filtre de date)
       if (allocations.items.isEmpty) {
-        print(
-            '⚠️ Aucune allocation trouvée avec le filtre de date exacte, essai sans filtre de date...');
         allocations = await pb.collection('allocations_mensuelles').getList(
               filter: filtre2,
             );
@@ -420,13 +365,9 @@ class AllocationService {
             final dateAlloc = DateTime.parse(alloc.data['mois']);
             return dateAlloc.year == mois.year && dateAlloc.month == mois.month;
           } catch (e) {
-            print('❌ Erreur parsing date: ${alloc.data['mois']}');
             return false;
           }
         }).toList();
-
-        print(
-            '🔍 CALCUL_SOLDE: ${allocationsFiltrees.length} allocations trouvées après filtrage manuel');
 
         // Si on a trouvé des allocations avec le filtre manuel, les utiliser
         if (allocationsFiltrees.isNotEmpty) {
@@ -434,21 +375,8 @@ class AllocationService {
         }
       }
 
-      // Afficher toutes les allocations trouvées pour débogage
-      print(
-          '🔍 CALCUL_SOLDE: ${allocations.items.length} allocations trouvées pour ce mois');
-      for (var i = 0; i < allocations.items.length; i++) {
-        final alloc = allocations.items[i];
-        print('🔍 ALLOCATION $i: ID=${alloc.id}');
-        print('   - Mois: ${alloc.data['mois']}');
-        print('   - Solde: ${alloc.data['solde']}');
-        print('   - Alloué: ${alloc.data['alloue']}');
-        print('   - Dépense: ${alloc.data['depense']}');
-      }
-
       // Si aucune allocation trouvée pour ce mois, retourner null
       if (allocations.items.isEmpty) {
-        print('❌ CALCUL_SOLDE: Aucune allocation trouvée pour ce mois');
         return null;
       }
 
@@ -461,7 +389,6 @@ class AllocationService {
 
       return soldeTotal;
     } catch (e) {
-      print('❌ Erreur calcul solde enveloppe: $e');
       return null;
     }
   }
@@ -517,8 +444,6 @@ class AllocationService {
             allocAvecSource.data['collection_compte_source']?.toString();
       }
 
-      print(
-          '🔄 [SYNC] enveloppe=$enveloppeId solde=$soldeTotal compte_source_id=$compteSourceId collection=$collectionCompteSource');
       // 4. Mettre à jour l'enveloppe
       try {
         final resp =
@@ -527,12 +452,11 @@ class AllocationService {
           'compte_provenance_id': compteSourceId, // Correction ici
           'collection_compte_source': collectionCompteSource,
         });
-        print('✅ [SYNC] update enveloppe $enveloppeId OK: ${resp.id}');
       } catch (e) {
-        print('❌ [SYNC] update enveloppe $enveloppeId ERROR: $e');
+        // Gestion silencieuse des erreurs
       }
     } catch (e) {
-      print('❌ Erreur synchronisation enveloppe: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 
@@ -550,14 +474,11 @@ class AllocationService {
       final enveloppes = await pb.collection('enveloppes').getFullList(
             filter: 'utilisateur_id = "$userId"',
           );
-      print('🔄 Synchronisation de ${enveloppes.length} enveloppes...');
       for (final env in enveloppes) {
-        print('🔄 [SYNC] enveloppe ${env.id} (${env.data['nom']})');
         await synchroniserEnveloppeDepuisAllocations(env.id, mois: moisCible);
       }
-      print('✅ Synchronisation de masse terminée.');
     } catch (e) {
-      print('❌ Erreur synchronisation de masse des enveloppes: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 }
