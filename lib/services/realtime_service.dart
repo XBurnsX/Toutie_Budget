@@ -25,8 +25,6 @@ class RealtimeService {
       final userId = pb.authStore.model?.id;
       if (userId == null) return;
 
-      print('🔥 Initialisation du temps réel PocketBase...');
-
       // S'abonner aux collections principales
       await _subscribeToCollection('comptes_cheques', userId);
       await _subscribeToCollection('comptes_credits', userId);
@@ -37,9 +35,8 @@ class RealtimeService {
       await _subscribeToCollection('enveloppes', userId);
 
       _isInitialized = true;
-      print('✅ Temps réel PocketBase initialisé avec succès');
     } catch (e) {
-      print('❌ Erreur initialisation temps réel: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 
@@ -57,9 +54,8 @@ class RealtimeService {
           );
 
       _subscriptions[collectionName] = subscription;
-      print('📡 Subscription active pour $collectionName');
     } catch (e) {
-      print('❌ Erreur subscription $collectionName: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 
@@ -68,8 +64,6 @@ class RealtimeService {
     try {
       final action = data.action;
       final record = data.record;
-
-      print('🔄 Temps réel: $action sur $collectionName - ID: ${record?.id}');
 
       // Notifier les listeners appropriés selon la collection
       switch (collectionName) {
@@ -88,24 +82,21 @@ class RealtimeService {
           break;
       }
     } catch (e) {
-      print('❌ Erreur traitement temps réel: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 
   // Notifier la mise à jour des comptes
   static void _notifyComptesUpdate() {
     // Les streams PocketBaseService se mettront à jour automatiquement
-    print('💰 Mise à jour comptes en temps réel');
   }
 
   // Notifier la mise à jour des catégories
   static void _notifyCategoriesUpdate() {
-    print('📂 Mise à jour catégories en temps réel');
   }
 
   // Notifier la mise à jour des enveloppes
   static void _notifyEnveloppesUpdate() {
-    print('📁 Mise à jour enveloppes en temps réel');
   }
 
   // Nettoyer toutes les subscriptions
@@ -118,9 +109,8 @@ class RealtimeService {
       }
       _subscriptions.clear();
       _isInitialized = false;
-      print('🧹 Temps réel nettoyé');
     } catch (e) {
-      print('❌ Erreur nettoyage temps réel: $e');
+      // Gestion silencieuse des erreurs
     }
   }
 

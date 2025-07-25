@@ -16,13 +16,13 @@ class InvestissementService {
   // Démarrer le service d'investissement
   void startService() {
     _alphaVantage.startBatchUpdate();
-    print('🚀 Service d\'investissement démarré');
+
   }
 
   // Arrêter le service
   void stopService() {
     _alphaVantage.stopBatchUpdate();
-    print('⏹️ Service d\'investissement arrêté');
+
   }
 
   // Ajouter une action à un compte
@@ -94,7 +94,6 @@ class InvestissementService {
           'dateAchat':
               dateAchat.toIso8601String(), // On met à jour la date d'achat
         });
-        print('✅ Action $symbol fusionnée (quantité + prix moyen mis à jour)');
       } else {
         // Créer une nouvelle action
         await _firebaseService.firestore.collection('actions').add({
@@ -105,13 +104,11 @@ class InvestissementService {
           'dateAchat': dateAchat.toIso8601String(),
           'dateCreation': DateTime.now().toIso8601String(),
         });
-        print('✅ Nouvelle action $symbol ajoutée au compte $compteId');
       }
 
       // Ajouter le symbole à la queue de mise à jour Alpha Vantage
       _alphaVantage.addSymbolToQueue(symbol);
     } catch (e) {
-      print('❌ Erreur ajout action: $e');
       rethrow;
     }
   }
@@ -187,11 +184,7 @@ class InvestissementService {
             .doc(actionId)
             .delete();
       }
-
-      print(
-          '✅ Action $symbol vendue ($quantite/$quantiteRestante) du compte $compteId');
     } catch (e) {
-      print('❌ Erreur suppression action: $e');
       rethrow;
     }
   }
@@ -369,8 +362,6 @@ class InvestissementService {
         dateAchat: DateTime.now().subtract(Duration(days: 30)),
       );
     }
-
-    print('✅ Actions de test ajoutées');
   }
 
   // Ajouter un dividende à un compte d'investissement
@@ -412,10 +403,7 @@ class InvestissementService {
           .update({
         'pretAPlacer': nouveauPretAPlacer,
       });
-
-      print('✅ Dividende $montant ajouté au cash du compte $compteId');
     } catch (e) {
-      print('❌ Erreur ajout dividende: $e');
       rethrow;
     }
   }
@@ -457,7 +445,6 @@ class InvestissementService {
           'date': aujourdhui,
           'valeur': valeurTotale,
         });
-        print('📸 Snapshot du $aujourdhui sauvegardé ! Valeur: $valeurTotale');
       }
     }
   }

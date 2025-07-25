@@ -541,10 +541,10 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
   Future<void> _effectuerAssignationAsync() async {
     try {
       // Récupérer le compte sélectionné
-      final comptes = widget.comptes;
-      final compte = comptes.firstWhere((c) => c['id'] == _compteId);
-      // print('🔍 Compte sélectionné: $_compteId');
-      // print('🔍 Compte trouvé: ${compte['nom']} (${compte['id']})');
+      final compte = widget.comptes.firstWhere(
+        (c) => c['id'] == _compteId,
+        orElse: () => <String, dynamic>{},
+      );
 
       // Créer l'allocation
       await AllocationService.creerAllocationMensuelle(

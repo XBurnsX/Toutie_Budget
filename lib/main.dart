@@ -49,13 +49,11 @@ void main() async {
 
   // Synchronisation de masse avec délai pour s'assurer que l'auth est complète
   await Future.delayed(const Duration(seconds: 2));
-  print('🔄 Début de la synchronisation de masse...');
   try {
     // Synchronisation automatique désactivée pour éviter les rechargements multiples
     // await AllocationService.synchroniserToutesLesEnveloppesUtilisateur();
-    print('✅ Synchronisation de masse terminée avec succès');
   } catch (e) {
-    print('❌ Erreur lors de la synchronisation de masse: $e');
+    // Gestion silencieuse des erreurs
   }
 
   runApp(MyApp(themeService: themeService));

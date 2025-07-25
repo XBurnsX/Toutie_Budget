@@ -60,16 +60,7 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         .join('_')
         .hashCode;
 
-    print('🔍 DEBUG HASHCODE - Ancien: $_lastCategoriesHashCode, Nouveau: $newHashCode');
-    print('🔍 DEBUG HASHCODE - Nombres de catégories: ${widget.categories.length}');
-
     if (newHashCode != _lastCategoriesHashCode) {
-      print('🔄 Données des catégories modifiées, mise à jour du cache');
-      print('🔍 DEBUG - Détail des catégories qui ont changé:');
-      for (int i = 0; i < widget.categories.length; i++) {
-        final cat = widget.categories[i];
-        print('   Catégorie $i: ${cat['id']} - ${cat['nom']} - ${(cat['enveloppes'] as List).length} enveloppes');
-      }
       // Invalider le cache des soldes quand les données changent
       _soldesCache.clear();
       _pendingSoldesFutures.clear();
@@ -78,7 +69,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
     // Également vérifier si le mois sélectionné a changé
     if (oldWidget.selectedMonthKey != widget.selectedMonthKey) {
-      print('📅 Mois sélectionné changé, invalidation du cache des soldes');
       _soldesCache.clear();
       _pendingSoldesFutures.clear();
     }
@@ -90,18 +80,15 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
     // Vérifier si le solde est déjà en cache
     if (_soldesCache.containsKey(cacheKey)) {
-      print('💰 Cache hit pour enveloppe $enveloppeId');
       return _soldesCache[cacheKey];
     }
 
     // Vérifier si une requête est déjà en cours
     if (_pendingSoldesFutures.containsKey(cacheKey)) {
-      print('⏳ Requête en cours pour enveloppe $enveloppeId, attente...');
       return await _pendingSoldesFutures[cacheKey]!;
     }
 
     // Créer une nouvelle requête
-    print('🔍 Nouveau calcul de solde pour enveloppe $enveloppeId');
     final future = AllocationService.calculerSoldeEnveloppe(
       enveloppeId: enveloppeId,
       mois: moisAllocation,
@@ -416,8 +403,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     final enveloppeId = enveloppe['id'] ?? 'unknown';
     final enveloppeNom = enveloppe['nom'] ?? 'Sans nom';
 
-    print('🏗️ BUILD _buildEnveloppeWidget appelé pour: $enveloppeNom (ID: $enveloppeId)');
-
     // --- Logique d'affichage de l'historique ---
     Map<String, dynamic> historique = enveloppe['historique'] != null
         ? Map<String, dynamic>.from(enveloppe['historique'])
@@ -439,17 +424,12 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
     // Pour les mois futurs, ne rien afficher
     if (isFutureMonth) {
-      print('⏭️ Enveloppe $enveloppeNom - Mois futur, masquée');
       return const SizedBox.shrink();
     }
-
-    print('💼 Appel _getSoldeEnveloppe pour: $enveloppeNom (ID: $enveloppeId)');
 
     return FutureBuilder<double?>(
       future: _getSoldeEnveloppe(enveloppeId, moisAllocation),
       builder: (context, snapshot) {
-        print('📊 FutureBuilder appelé pour: $enveloppeNom - État: ${snapshot.connectionState}');
-
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Card(
             key: Key('loading_$enveloppeId'),
@@ -472,7 +452,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         }
 
         if (snapshot.hasError) {
-          print('❌ Erreur FutureBuilder pour $enveloppeNom: ${snapshot.error}');
           return Card(
             key: Key('error_$enveloppeId'),
             color: const Color(0xFF232526),
@@ -486,7 +465,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
         // Récupérer le solde de l'allocation
         final soldeAllocation = snapshot.hasData ? snapshot.data! : 0.0;
-        print('💰 Solde calculé pour $enveloppeNom: $soldeAllocation');
 
         // Variables pour les calculs
         double soldeEnveloppe;
@@ -504,15 +482,11 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
           soldeEnveloppe = soldeAllocation;
           objectif = (enveloppe['objectif_montant'] ?? 0.0).toDouble();
           depense = (enveloppe['depense'] ?? 0.0).toDouble();
-          print(
-              '📅 Mois courant - Solde: $soldeEnveloppe, Objectif: $objectif');
         } else if (histoMois != null) {
           // Mois passé avec historique -> valeurs de l'historique
           soldeEnveloppe = (histoMois['solde'] ?? 0.0).toDouble();
           objectif = (histoMois['objectif'] ?? 0.0).toDouble();
           depense = (histoMois['depense'] ?? 0.0).toDouble();
-          print(
-              '📅 Mois passé avec historique - Solde: $soldeEnveloppe, Objectif: $objectif');
         } else {
           // Mois passé sans historique -> on affiche avec solde 0
           soldeEnveloppe = 0.0;
@@ -524,8 +498,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         // Variables utilisées plus bas dans le code
         final bool estDepenseAtteint = (depense >= objectif && objectif > 0);
 
-        print(
-            '📊 Enveloppe ${enveloppe['nom']} - Solde final: $soldeEnveloppe, Négatif: $estNegative');
 
         // --- Widget bulle enveloppe interactif ---
         return FutureBuilder<Color>(
