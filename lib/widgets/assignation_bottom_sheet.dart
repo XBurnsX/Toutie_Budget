@@ -543,7 +543,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
       // Récupérer le compte sélectionné
       final compte = widget.comptes.firstWhere(
         (c) => c['id'] == _compteId,
-        orElse: () => <String, dynamic>{},
+        orElse: () => <String, Object>{},
       );
 
       // Créer l'allocation
