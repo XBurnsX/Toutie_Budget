@@ -17,7 +17,7 @@ class SectionInformationsCles extends StatelessWidget {
   final Function(String?) onCompteChanged;
   final String? enveloppeSelectionnee;
   final List<Map<String, dynamic>> categoriesFirebase;
-  final List<dynamic> comptesFirebase;
+  final List<dynamic> comptes;
   final TypeTransaction typeSelectionne;
   final Function(String?) onEnveloppeChanged;
   final Color Function(Map<String, dynamic>) getCouleurCompteEnveloppe;
@@ -40,7 +40,7 @@ class SectionInformationsCles extends StatelessWidget {
     required this.onCompteChanged,
     required this.enveloppeSelectionnee,
     required this.categoriesFirebase,
-    required this.comptesFirebase,
+    required this.comptes,
     required this.typeSelectionne,
     required this.onEnveloppeChanged,
     required this.getCouleurCompteEnveloppe,
@@ -175,7 +175,14 @@ class SectionInformationsCles extends StatelessWidget {
                 widgetContenu: ChampEnveloppe(
                   enveloppeSelectionnee: enveloppeSelectionnee,
                   categoriesFirebase: categoriesFirebase,
-                  comptesFirebase: comptesFirebase.cast(),
+                  comptes: comptes
+                      .map((c) => {
+                            'id': c.id,
+                            'nom': c.nom,
+                            'couleur': c.couleur,
+                            'collection': '', // Compte n'a pas de collection
+                          })
+                      .toList(),
                   typeSelectionne: typeSelectionne,
                   typeMouvementSelectionne: typeMouvementSelectionne,
                   compteSelectionne: compteSelectionne,

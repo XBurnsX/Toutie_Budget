@@ -4,11 +4,12 @@ import '../../models/transaction_model.dart';
 import '../../themes/dropdown_theme_extension.dart';
 import '../../services/color_service.dart';
 import '../../services/allocation_service.dart';
+import '../../services/pocketbase_service.dart';
 
 class ChampEnveloppe extends StatelessWidget {
   final String? enveloppeSelectionnee;
   final List<Map<String, dynamic>> categoriesFirebase;
-  final List<Compte> comptesFirebase;
+  final List<Map<String, dynamic>> comptes;
   final TypeTransaction typeSelectionne;
   final TypeMouvementFinancier typeMouvementSelectionne;
   final String? compteSelectionne;
@@ -19,7 +20,7 @@ class ChampEnveloppe extends StatelessWidget {
     super.key,
     required this.enveloppeSelectionnee,
     required this.categoriesFirebase,
-    required this.comptesFirebase,
+    required this.comptes,
     required this.typeSelectionne,
     required this.typeMouvementSelectionne,
     required this.compteSelectionne,
@@ -32,44 +33,110 @@ class ChampEnveloppe extends StatelessWidget {
     // Couleur automatique du thème pour les dropdowns
     final dropdownColor = Theme.of(context).dropdownColor;
 
-    // Construire la liste des items une seule fois
-    final items = _buildEnveloppeItems(context);
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _getEnveloppesCompletes(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return DropdownButtonFormField<String>(
+            value: null,
+            items: const [],
+            onChanged: null,
+            decoration: InputDecoration(
+              hintText: 'Chargement...',
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 10.0,
+                horizontal: 12.0,
+              ),
+            ),
+            isExpanded: true,
+            alignment: Alignment.centerLeft,
+            dropdownColor: dropdownColor,
+          );
+        }
 
-    // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
-    String? valeurActuelle = enveloppeSelectionnee;
-    final occurences = items.where((item) => item.value == valeurActuelle);
-    if (valeurActuelle != null && occurences.length != 1) {
-      valeurActuelle = null;
-    }
+        if (snapshot.hasError) {
+          return DropdownButtonFormField<String>(
+            value: null,
+            items: const [],
+            onChanged: null,
+            decoration: InputDecoration(
+              hintText: 'Erreur de chargement',
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 10.0,
+                horizontal: 12.0,
+              ),
+            ),
+            isExpanded: true,
+            alignment: Alignment.centerLeft,
+            dropdownColor: dropdownColor,
+          );
+        }
 
-    return DropdownButtonFormField<String>(
-      value: valeurActuelle,
-      items: items,
-      onChanged: (String? newValue) => onEnveloppeChanged(newValue),
-      selectedItemBuilder: (context) {
-        return items.map((item) {
-          if (item.value == null) {
-            return const Text('Aucune');
-          }
-          return item.child ?? const SizedBox.shrink();
-        }).toList();
+        // Construire la liste des items une seule fois
+        final items = _buildEnveloppeItems(context, snapshot.data!);
+
+        // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
+        String? valeurActuelle = enveloppeSelectionnee;
+        final occurences = items.where((item) => item.value == valeurActuelle);
+        if (valeurActuelle != null && occurences.length != 1) {
+          valeurActuelle = null;
+        }
+
+        return DropdownButtonFormField<String>(
+          value: valeurActuelle,
+          items: items,
+          onChanged: (String? newValue) => onEnveloppeChanged(newValue),
+          selectedItemBuilder: (context) {
+            return items.map((item) {
+              if (item.value == null) {
+                return const Text('Aucune');
+              }
+              return item.child ?? const SizedBox.shrink();
+            }).toList();
+          },
+          decoration: InputDecoration(
+            hintText: 'Optionnel',
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 10.0,
+              horizontal: 12.0,
+            ),
+          ),
+          isExpanded: true,
+          alignment: Alignment.centerLeft,
+          dropdownColor: dropdownColor,
+        );
       },
-      decoration: InputDecoration(
-        hintText: 'Optionnel',
-        border: InputBorder.none,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 10.0,
-          horizontal: 12.0,
-        ),
-      ),
-      isExpanded: true,
-      alignment: Alignment.centerLeft,
-      dropdownColor: dropdownColor,
     );
   }
 
-  List<DropdownMenuItem<String>> _buildEnveloppeItems(BuildContext context) {
+  Future<List<Map<String, dynamic>>> _getEnveloppesCompletes() async {
+    final List<Map<String, dynamic>> toutesEnveloppes = [];
+
+    // Récupérer toutes les catégories
+    final categories = await PocketBaseService.lireCategories().first;
+
+    // Pour chaque catégorie, récupérer ses enveloppes complètes
+    for (final categorie in categories) {
+      final enveloppesData =
+          await PocketBaseService.lireEnveloppesParCategorie(categorie.id);
+      for (final enveloppeData in enveloppesData) {
+        // Ajouter les informations de la catégorie à l'enveloppe
+        enveloppeData['categorie_nom'] = categorie.nom;
+        toutesEnveloppes.add(enveloppeData);
+      }
+    }
+
+    return toutesEnveloppes;
+  }
+
+  List<DropdownMenuItem<String>> _buildEnveloppeItems(
+      BuildContext context, List<Map<String, dynamic>> enveloppesCompletes) {
     final items = <DropdownMenuItem<String>>[];
 
     // Option "Aucune"
@@ -83,98 +150,38 @@ class ChampEnveloppe extends StatelessWidget {
     // Prêts à placer dynamiques (seulement pour les revenus)
     if (typeSelectionne != TypeTransaction.depense &&
         compteSelectionne != null) {
-      final comptesAvecPret = comptesFirebase.where(
-        (c) => c.pretAPlacer > 0 && c.id == compteSelectionne,
+      final comptesAvecPret = comptes.where(
+        (c) => c['pretAPlacer'] > 0 && c['id'] == compteSelectionne,
       );
 
       for (final compte in comptesAvecPret) {
         items.add(
           DropdownMenuItem<String>(
-            value: 'pret_${compte.id}',
-            child: Text(
-              '${compte.nom} : Prêt à placer ${compte.pretAPlacer.toStringAsFixed(2)}',
-            ),
-          ),
-        );
-      }
-    }
-
-    // Parcourir chaque catégorie pour ajouter un en-tête puis ses enveloppes
-    for (final cat in categoriesFirebase) {
-      final String nomCat = cat['nom'] ?? '';
-      final List enveloppesCat = cat['enveloppes'] ?? [];
-
-      // Filtrer les enveloppes selon la logique existante
-      final enveloppesVisibles = enveloppesCat
-          .where((e) => _estEnveloppeAffichable(e as Map<String, dynamic>))
-          .toList();
-
-      if (enveloppesVisibles.isEmpty) {
-        continue; // Rien à afficher pour cette catégorie
-      }
-
-      // Ajouter un séparateur/entête pour la catégorie
-      items.add(
-        DropdownMenuItem<String>(
-          enabled: false,
-          value: 'header_$nomCat',
-          child: Center(
-            child: Text(
-              nomCat.toUpperCase(),
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
-        ),
-      );
-
-      // Ajouter les enveloppes de cette catégorie
-      for (final env in enveloppesVisibles) {
-        // Utiliser les champs synchronisés de la collection enveloppes
-        final solde = (env['solde_enveloppe'] as num?)?.toDouble() ??
-            (env['solde'] as num?)?.toDouble() ??
-            0.0;
-        final compteSourceInfo = {
-          'compte_source_id': env['compte_source_id']?.toString(),
-          'collection_compte_source':
-              env['collection_compte_source']?.toString(),
-        };
-        final comptesMap = comptesFirebase
-            .map((c) => {
-                  'id': c.id,
-                  'couleur': c.couleur,
-                  'collection': c.type == 'Chèque'
-                      ? 'comptes_cheques'
-                      : c.type == 'Carte de crédit'
-                          ? 'comptes_credit'
-                          : c.type == 'Dette'
-                              ? 'comptes_dettes'
-                              : c.type == 'Investissement'
-                                  ? 'comptes_investissement'
-                                  : null,
-                })
-            .toList();
-        final couleurCompte = ColorService.getCouleurCompteSourceEnveloppe(
-          enveloppe: env,
-          comptes: comptesMap,
-          compteSourceInfo: compteSourceInfo,
-        );
-        items.add(
-          DropdownMenuItem<String>(
-            value: env['id'],
+            value: 'pret_${compte['id']}',
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(env['nom'], overflow: TextOverflow.ellipsis),
-                const SizedBox(width: 6),
-                Text(
-                  '${solde.toStringAsFixed(2)} \$',
-                  style: TextStyle(
-                    color: couleurCompte,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                Expanded(
+                  child: Text(
+                    '💰 Prêt à placer (${compte['nom']})',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Color(compte['couleur']),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${compte['pretAPlacer'].toStringAsFixed(2)}\$',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
@@ -182,6 +189,67 @@ class ChampEnveloppe extends StatelessWidget {
           ),
         );
       }
+    }
+
+    // Enveloppes normales
+    for (final env in enveloppesCompletes) {
+      final solde = (env['solde_enveloppe'] as num?)?.toDouble() ??
+          (env['solde'] as num?)?.toDouble() ??
+          0.0;
+
+      // Utiliser ColorService pour la couleur de l'enveloppe
+      items.add(
+        DropdownMenuItem<String>(
+          value: env['id'],
+          child: FutureBuilder<Color>(
+            future: ColorService.getCouleurCompteSourceEnveloppeAsync(
+              enveloppeId: env['id'],
+              comptes: comptes
+                  .map((c) => {
+                        'id': c['id'],
+                        'nom': c['nom'],
+                        'couleur': c['couleur'],
+                        'collection':
+                            c.containsKey('collection') ? c['collection'] : '',
+                      })
+                  .toList(),
+              solde: solde,
+              mois: DateTime.now(),
+            ),
+            builder: (context, couleurSnapshot) {
+              final couleurCompte = couleurSnapshot.data ?? Colors.grey;
+              return Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      env['nom'],
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: couleurCompte,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${solde.toStringAsFixed(2)}\$',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
     }
 
     return items;

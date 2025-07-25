@@ -255,11 +255,20 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                               ),
                             ),
                             child: ChampEnveloppe(
-                              enveloppeSelectionnee: sousItem.enveloppeId.isEmpty
-                                  ? null
-                                  : sousItem.enveloppeId,
+                              enveloppeSelectionnee:
+                                  sousItem.enveloppeId.isEmpty
+                                      ? null
+                                      : sousItem.enveloppeId,
                               categoriesFirebase: widget.categoriesFirebase,
-                              comptesFirebase: widget.comptesFirebase,
+                              comptes: widget.comptesFirebase
+                                  .map((c) => {
+                                        'id': c.id,
+                                        'nom': c.nom,
+                                        'couleur': c.couleur,
+                                        'collection':
+                                            '', // Compte n'a pas de collection
+                                      })
+                                  .toList(),
                               typeSelectionne: TypeTransaction.depense,
                               typeMouvementSelectionne:
                                   TypeMouvementFinancier.depenseNormale,
@@ -271,10 +280,11 @@ class _ModaleFractionnementState extends State<ModaleFractionnement> {
                                   orElse: () => {'nom': 'Enveloppe inconnue'},
                                 );
                                 setState(() {
-                                  _sousItems[index] = _sousItems[index].copyWith(
+                                  _sousItems[index] =
+                                      _sousItems[index].copyWith(
                                     enveloppeId: value ?? '',
-                                    description:
-                                        enveloppe['nom'] ?? 'Enveloppe inconnue',
+                                    description: enveloppe['nom'] ??
+                                        'Enveloppe inconnue',
                                   );
                                 });
                               },

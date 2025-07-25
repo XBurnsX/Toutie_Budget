@@ -326,8 +326,7 @@ class _EcranAjoutTransactionRefactoredState
                           onFractionnementSupprime: () =>
                               controller.setFractionnement(null),
                           onMontantChange: () {
-                            // Déclencher la validation du contrôleur
-                            controller.notifyListeners();
+                            // Le contrôleur se met à jour automatiquement
                           },
                         ),
 
@@ -345,7 +344,7 @@ class _EcranAjoutTransactionRefactoredState
                           enveloppeSelectionnee:
                               controller.enveloppeSelectionnee,
                           categoriesFirebase: controller.categoriesFirebase,
-                          comptesFirebase: controller.listeComptesAffichables,
+                          comptes: _controller.listeComptesAffichables,
                           typeSelectionne: controller.typeSelectionne,
                           onEnveloppeChanged:
                               controller.setEnveloppeSelectionnee,
@@ -387,7 +386,7 @@ class _EcranAjoutTransactionRefactoredState
                     color: const Color(0xFF18191A),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 4,
                         offset: const Offset(0, -2),
                       ),
