@@ -6,10 +6,8 @@ import '../models/dette.dart';
 import '../services/firebase_service.dart';
 import '../services/dette_service.dart';
 import '../services/data_service_config.dart';
-import '../services/allocation_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/pocketbase_service.dart';
-import '../services/cache_service.dart';
 
 class AjoutTransactionController extends ChangeNotifier {
   // Variables d'état

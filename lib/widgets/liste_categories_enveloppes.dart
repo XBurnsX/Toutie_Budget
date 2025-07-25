@@ -30,10 +30,17 @@ class ListeCategoriesEnveloppes extends StatefulWidget {
 
 class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
   final ScrollController _scrollController = ScrollController();
+  List<Map<String, dynamic>>? _cachedSortedCategories;
+  int _lastCategoriesHashCode = 0;
+
+  // Cache des soldes des enveloppes pour éviter les appels multiples
+  final Map<String, double?> _soldesCache = {};
+  final Map<String, Future<double?>> _pendingSoldesFutures = {};
 
   @override
   void initState() {
     super.initState();
+    _updateCachedCategories();
   }
 
   @override
@@ -45,21 +52,62 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
   @override
   void didUpdateWidget(ListeCategoriesEnveloppes oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Plus besoin de recharger les données car on affiche tout directement
+
+    // Ne recalculer que si les données ont vraiment changé
+    final newHashCode = widget.categories
+        .map((c) => '${c['id']}_${c['nom']}_${(c['enveloppes'] as List).length}')
+        .join('_')
+        .hashCode;
+    if (newHashCode != _lastCategoriesHashCode) {
+      print('🔄 Données des catégories modifiées, mise à jour du cache');
+      // Invalider le cache des soldes quand les données changent
+      _soldesCache.clear();
+      _pendingSoldesFutures.clear();
+      _updateCachedCategories();
+    }
+
+    // Également vérifier si le mois sélectionné a changé
+    if (oldWidget.selectedMonthKey != widget.selectedMonthKey) {
+      print('📅 Mois sélectionné changé, invalidation du cache des soldes');
+      _soldesCache.clear();
+      _pendingSoldesFutures.clear();
+    }
   }
 
-  List<Map<String, dynamic>> _getSortedCategories() {
-    final sortedCategories = List<Map<String, dynamic>>.from(widget.categories);
-    sortedCategories.sort((a, b) {
-      final aNom = (a['nom'] as String).toLowerCase();
-      final bNom = (b['nom'] as String).toLowerCase();
-      if (aNom == 'dette' || aNom == 'dettes') return -1;
-      if (bNom == 'dette' || bNom == 'dettes') return 1;
-      final aOrdre = (a['ordre'] as int?) ?? 999999;
-      final bOrdre = (b['ordre'] as int?) ?? 999999;
-      return aOrdre.compareTo(bOrdre);
-    });
-    return sortedCategories;
+  // Méthode pour obtenir le solde d'une enveloppe avec cache
+  Future<double?> _getSoldeEnveloppe(String enveloppeId, DateTime moisAllocation) async {
+    final cacheKey = '${enveloppeId}_${moisAllocation.toIso8601String()}';
+
+    // Vérifier si le solde est déjà en cache
+    if (_soldesCache.containsKey(cacheKey)) {
+      print('💰 Cache hit pour enveloppe $enveloppeId');
+      return _soldesCache[cacheKey];
+    }
+
+    // Vérifier si une requête est déjà en cours
+    if (_pendingSoldesFutures.containsKey(cacheKey)) {
+      print('⏳ Requête en cours pour enveloppe $enveloppeId, attente...');
+      return await _pendingSoldesFutures[cacheKey]!;
+    }
+
+    // Créer une nouvelle requête
+    print('🔍 Nouveau calcul de solde pour enveloppe $enveloppeId');
+    final future = AllocationService.calculerSoldeEnveloppe(
+      enveloppeId: enveloppeId,
+      mois: moisAllocation,
+    );
+
+    _pendingSoldesFutures[cacheKey] = future;
+
+    try {
+      final solde = await future;
+      _soldesCache[cacheKey] = solde;
+      _pendingSoldesFutures.remove(cacheKey);
+      return solde;
+    } catch (e) {
+      _pendingSoldesFutures.remove(cacheKey);
+      rethrow;
+    }
   }
 
   void _showViderEnveloppeMenu(
@@ -214,6 +262,24 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     return Colors.orange;
   }
 
+  void _updateCachedCategories() {
+    final sortedCategories = List<Map<String, dynamic>>.from(widget.categories);
+    sortedCategories.sort((a, b) {
+      final aNom = (a['nom'] as String).toLowerCase();
+      final bNom = (b['nom'] as String).toLowerCase();
+      if (aNom == 'dette' || aNom == 'dettes') return -1;
+      if (bNom == 'dette' || bNom == 'dettes') return 1;
+      final aOrdre = (a['ordre'] as int?) ?? 999999;
+      final bOrdre = (b['ordre'] as int?) ?? 999999;
+      return aOrdre.compareTo(bOrdre);
+    });
+
+    setState(() {
+      _cachedSortedCategories = sortedCategories;
+      _lastCategoriesHashCode = widget.categories.hashCode;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.categories.isEmpty) {
@@ -223,9 +289,9 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _getSortedCategories().length,
+      itemCount: _cachedSortedCategories?.length ?? 0,
       itemBuilder: (context, index) {
-        final categorie = _getSortedCategories()[index];
+        final categorie = _cachedSortedCategories![index];
 
         final toutesEnveloppes =
             (categorie['enveloppes'] as List<Map<String, dynamic>>);
@@ -337,6 +403,11 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
 
   Widget _buildEnveloppeWidget(
       Map<String, dynamic> enveloppe, Map<String, dynamic> categorie) {
+    final enveloppeId = enveloppe['id'] ?? 'unknown';
+    final enveloppeNom = enveloppe['nom'] ?? 'Sans nom';
+
+    print('🏗️ BUILD _buildEnveloppeWidget appelé pour: $enveloppeNom (ID: $enveloppeId)');
+
     // --- Logique d'affichage de l'historique ---
     Map<String, dynamic> historique = enveloppe['historique'] != null
         ? Map<String, dynamic>.from(enveloppe['historique'])
@@ -345,10 +416,6 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
             historique[widget.selectedMonthKey] != null)
         ? Map<String, dynamic>.from(historique[widget.selectedMonthKey])
         : null;
-
-    // Pour le débogage
-    print(
-        '📊 Enveloppe ${enveloppe['nom']} - Mois sélectionné: ${widget.selectedMonthKey}');
 
     final now = DateTime.now();
     final currentMonthKey =
@@ -360,30 +427,31 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
     final isFutureMonth =
         moisAllocation.isAfter(DateTime(now.year, now.month + 1, 1));
 
-    print('🔍 ID enveloppe: ${enveloppe['id']}');
+    // Pour les mois futurs, ne rien afficher
+    if (isFutureMonth) {
+      print('⏭️ Enveloppe $enveloppeNom - Mois futur, masquée');
+      return const SizedBox.shrink();
+    }
+
+    print('💼 Appel _getSoldeEnveloppe pour: $enveloppeNom (ID: $enveloppeId)');
+
     return FutureBuilder<double?>(
-      future: AllocationService.calculerSoldeEnveloppe(
-        enveloppeId: enveloppe['id'],
-        mois: moisAllocation,
-      ),
+      future: _getSoldeEnveloppe(enveloppeId, moisAllocation),
       builder: (context, snapshot) {
-        // Pour les mois futurs, ne rien afficher
-        if (isFutureMonth) {
-          print('⏭️ Enveloppe ${enveloppe['nom']} - Mois futur, masquée');
-          return const SizedBox.shrink();
-        }
+        print('📊 FutureBuilder appelé pour: $enveloppeNom - État: ${snapshot.connectionState}');
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Card(
-            color: Color(0xFF232526),
+          return Card(
+            key: Key('loading_$enveloppeId'),
+            color: const Color(0xFF232526),
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
               child: Row(
                 children: [
                   Expanded(
-                      child: Text('Chargement...',
-                          style: TextStyle(color: Colors.white))),
-                  SizedBox(
+                      child: Text('Chargement $enveloppeNom...',
+                          style: const TextStyle(color: Colors.white))),
+                  const SizedBox(
                       width: 12,
                       height: 12,
                       child: CircularProgressIndicator(strokeWidth: 2)),
@@ -394,23 +462,21 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
         }
 
         if (snapshot.hasError) {
-          print('❌ Erreur FutureBuilder: ${snapshot.error}');
+          print('❌ Erreur FutureBuilder pour $enveloppeNom: ${snapshot.error}');
           return Card(
+            key: Key('error_$enveloppeId'),
             color: const Color(0xFF232526),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              child: Text('Erreur de chargement',
-                  style: TextStyle(color: Colors.red)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              child: Text('Erreur: $enveloppeNom',
+                  style: const TextStyle(color: Colors.red)),
             ),
           );
         }
 
         // Récupérer le solde de l'allocation
-        // Si pas de données, on considère que le solde est 0
         final soldeAllocation = snapshot.hasData ? snapshot.data! : 0.0;
-
-        print(
-            '💰 Enveloppe ${enveloppe['nom']} - Solde allocation: $soldeAllocation');
+        print('💰 Solde calculé pour $enveloppeNom: $soldeAllocation');
 
         // Variables pour les calculs
         double soldeEnveloppe;

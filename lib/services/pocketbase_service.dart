@@ -7,12 +7,10 @@ import '../models/enveloppe.dart';
 import 'auth_service.dart';
 import '../models/categorie.dart';
 import '../models/compte.dart';
-
 import 'dart:async';
 import 'dart:convert'; // Added for jsonEncode and jsonDecode
 import '../models/transaction_model.dart' as app_model;
 import '../models/dette.dart';
-import '../models/fractionnement_model.dart';
 
 class PocketBaseService {
   static final PocketBaseService _instance = PocketBaseService._internal();
