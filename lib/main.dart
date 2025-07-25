@@ -22,6 +22,7 @@ import 'pages/page_pret_personnel.dart';
 import 'themes/dropdown_theme_extension.dart';
 import 'firebase_options.dart';
 import 'services/investissement_service.dart';
+import 'services/allocation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,23 @@ void main() async {
 
   // Démarrer le service d'investissement
   InvestissementService().startService();
+
+  // Authentification Google automatique (si déjà connecté)
+  try {
+    if (!AuthService.isSignedIn) {
+      print('🔑 Tentative de connexion Google...');
+      await AuthService.signInWithGoogle();
+      print('✅ Connexion Google OK');
+    } else {
+      print('✅ Déjà connecté à PocketBase');
+    }
+  } catch (e) {
+    print('❌ Erreur connexion Google/PocketBase: $e');
+  }
+
+  // Synchronisation de masse
+  await AllocationService.synchroniserToutesLesEnveloppesUtilisateur();
+  print('✅ Synchronisation de masse terminée.');
 
   runApp(MyApp(themeService: themeService));
 }

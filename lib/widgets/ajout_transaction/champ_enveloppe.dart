@@ -3,6 +3,7 @@ import '../../models/compte.dart';
 import '../../models/transaction_model.dart';
 import '../../themes/dropdown_theme_extension.dart';
 import '../../services/color_service.dart';
+import '../../services/allocation_service.dart';
 
 class ChampEnveloppe extends StatelessWidget {
   final String? enveloppeSelectionnee;
@@ -131,18 +132,15 @@ class ChampEnveloppe extends StatelessWidget {
 
       // Ajouter les enveloppes de cette catégorie
       for (final env in enveloppesVisibles) {
-        final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
-        // Chercher le compte source si possible
-        Map<String, String?>? compteSourceInfo;
-        if (env['compte_source_id'] != null &&
-            env['collection_compte_source'] != null) {
-          compteSourceInfo = {
-            'compte_source_id': env['compte_source_id']?.toString(),
-            'collection_compte_source':
-                env['collection_compte_source']?.toString(),
-          };
-        }
-        // Conversion manuelle des comptes pour garantir les champs nécessaires
+        // Utiliser les champs synchronisés de la collection enveloppes
+        final solde = (env['solde_enveloppe'] as num?)?.toDouble() ??
+            (env['solde'] as num?)?.toDouble() ??
+            0.0;
+        final compteSourceInfo = {
+          'compte_source_id': env['compte_source_id']?.toString(),
+          'collection_compte_source':
+              env['collection_compte_source']?.toString(),
+        };
         final comptesMap = comptesFirebase
             .map((c) => {
                   'id': c.id,
@@ -158,17 +156,11 @@ class ChampEnveloppe extends StatelessWidget {
                                   : null,
                 })
             .toList();
-        Color couleurCompte;
-        try {
-          couleurCompte = ColorService.getCouleurCompteSourceEnveloppe(
-            enveloppe: env,
-            comptes: comptesMap,
-            compteSourceInfo: compteSourceInfo,
-          );
-        } catch (e) {
-          couleurCompte = Colors.grey;
-        }
-
+        final couleurCompte = ColorService.getCouleurCompteSourceEnveloppe(
+          enveloppe: env,
+          comptes: comptesMap,
+          compteSourceInfo: compteSourceInfo,
+        );
         items.add(
           DropdownMenuItem<String>(
             value: env['id'],
