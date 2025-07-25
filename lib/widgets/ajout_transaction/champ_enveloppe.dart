@@ -33,7 +33,8 @@ class ChampEnveloppe extends StatefulWidget {
 }
 
 class _ChampEnveloppeState extends State<ChampEnveloppe> {
-  List<Map<String, dynamic>> _enveloppesCache = [];
+  static List<Map<String, dynamic>> _enveloppesCacheGlobal = [];
+  static bool _cacheInitialise = false;
   bool _isLoading = true;
 
   @override
@@ -43,7 +44,8 @@ class _ChampEnveloppeState extends State<ChampEnveloppe> {
   }
 
   Future<void> _chargerEnveloppes() async {
-    if (_enveloppesCache.isNotEmpty) {
+    // Utiliser le cache global si déjà initialisé
+    if (_cacheInitialise && _enveloppesCacheGlobal.isNotEmpty) {
       setState(() {
         _isLoading = false;
       });
@@ -54,7 +56,8 @@ class _ChampEnveloppeState extends State<ChampEnveloppe> {
       final enveloppes = await _getEnveloppesCompletes();
       if (mounted) {
         setState(() {
-          _enveloppesCache = enveloppes;
+          _enveloppesCacheGlobal = enveloppes;
+          _cacheInitialise = true;
           _isLoading = false;
         });
       }
@@ -93,7 +96,7 @@ class _ChampEnveloppeState extends State<ChampEnveloppe> {
     }
 
     // Construire la liste des items une seule fois
-    final items = _buildEnveloppeItems(context, _enveloppesCache);
+    final items = _buildEnveloppeItems(context, _enveloppesCacheGlobal);
 
     // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
     String? valeurActuelle = widget.enveloppeSelectionnee;
