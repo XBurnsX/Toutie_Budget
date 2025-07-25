@@ -6,7 +6,7 @@ import '../../services/color_service.dart';
 import '../../services/allocation_service.dart';
 import '../../services/pocketbase_service.dart';
 
-class ChampEnveloppe extends StatelessWidget {
+class ChampEnveloppe extends StatefulWidget {
   final String? enveloppeSelectionnee;
   final List<Map<String, dynamic>> categoriesFirebase;
   final List<Map<String, dynamic>> comptes;
@@ -29,101 +29,115 @@ class ChampEnveloppe extends StatelessWidget {
   });
 
   @override
+  State<ChampEnveloppe> createState() => _ChampEnveloppeState();
+}
+
+class _ChampEnveloppeState extends State<ChampEnveloppe> {
+  List<Map<String, dynamic>> _enveloppesCache = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerEnveloppes();
+  }
+
+  Future<void> _chargerEnveloppes() async {
+    if (_enveloppesCache.isNotEmpty) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final enveloppes = await _getEnveloppesCompletes();
+      if (mounted) {
+        setState(() {
+          _enveloppesCache = enveloppes;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Couleur automatique du thème pour les dropdowns
     final dropdownColor = Theme.of(context).dropdownColor;
 
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _getEnveloppesCompletes(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return DropdownButtonFormField<String>(
-            value: null,
-            items: const [],
-            onChanged: null,
-            decoration: InputDecoration(
-              hintText: 'Chargement...',
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 10.0,
-                horizontal: 12.0,
-              ),
-            ),
-            isExpanded: true,
-            alignment: Alignment.centerLeft,
-            dropdownColor: dropdownColor,
-          );
-        }
-
-        if (snapshot.hasError) {
-          return DropdownButtonFormField<String>(
-            value: null,
-            items: const [],
-            onChanged: null,
-            decoration: InputDecoration(
-              hintText: 'Erreur de chargement',
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 10.0,
-                horizontal: 12.0,
-              ),
-            ),
-            isExpanded: true,
-            alignment: Alignment.centerLeft,
-            dropdownColor: dropdownColor,
-          );
-        }
-
-        // Construire la liste des items une seule fois
-        final items = _buildEnveloppeItems(context, snapshot.data!);
-
-        // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
-        String? valeurActuelle = enveloppeSelectionnee;
-        final occurences = items.where((item) =>
-            item.value == valeurActuelle &&
-            item.value != null &&
-            !item.value!.startsWith('cat_'));
-        if (valeurActuelle != null && occurences.length != 1) {
-          valeurActuelle = null;
-        }
-
-        return DropdownButtonFormField<String>(
-          value: valeurActuelle,
-          items: items,
-          onChanged: (String? newValue) {
-            // Ignorer les en-têtes de catégorie
-            if (newValue != null && newValue.startsWith('cat_')) {
-              return;
-            }
-            onEnveloppeChanged(newValue);
-          },
-          selectedItemBuilder: (context) {
-            return items.map((item) {
-              if (item.value == null) {
-                return const Text('Aucune');
-              }
-              if (item.value!.startsWith('cat_')) {
-                return const SizedBox.shrink(); // Ignorer les en-têtes
-              }
-              return item.child ?? const SizedBox.shrink();
-            }).toList();
-          },
-          decoration: InputDecoration(
-            hintText: 'Optionnel',
-            border: InputBorder.none,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 10.0,
-              horizontal: 12.0,
-            ),
+    if (_isLoading) {
+      return DropdownButtonFormField<String>(
+        value: null,
+        items: const [],
+        onChanged: null,
+        decoration: InputDecoration(
+          hintText: 'Chargement...',
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 10.0,
+            horizontal: 12.0,
           ),
-          isExpanded: true,
-          alignment: Alignment.centerLeft,
-          dropdownColor: dropdownColor,
-        );
+        ),
+        isExpanded: true,
+        alignment: Alignment.centerLeft,
+        dropdownColor: dropdownColor,
+      );
+    }
+
+    // Construire la liste des items une seule fois
+    final items = _buildEnveloppeItems(context, _enveloppesCache);
+
+    // S'assurer que la valeur sélectionnée existe dans la liste ; sinon la remettre à null
+    String? valeurActuelle = widget.enveloppeSelectionnee;
+    final occurences = items.where((item) =>
+        item.value == valeurActuelle &&
+        item.value != null &&
+        !item.value!.startsWith('cat_'));
+    if (valeurActuelle != null && occurences.length != 1) {
+      valeurActuelle = null;
+    }
+
+    return DropdownButtonFormField<String>(
+      value: valeurActuelle,
+      items: items,
+      onChanged: (String? newValue) {
+        // Ignorer les en-têtes de catégorie
+        if (newValue != null && newValue.startsWith('cat_')) {
+          return;
+        }
+        widget.onEnveloppeChanged(newValue);
       },
+      selectedItemBuilder: (context) {
+        return items.map((item) {
+          if (item.value == null) {
+            return const Text('Aucune');
+          }
+          if (item.value!.startsWith('cat_')) {
+            return const SizedBox.shrink(); // Ignorer les en-têtes
+          }
+          return item.child ?? const SizedBox.shrink();
+        }).toList();
+      },
+      decoration: InputDecoration(
+        hintText: 'Optionnel',
+        border: InputBorder.none,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 10.0,
+          horizontal: 12.0,
+        ),
+      ),
+      isExpanded: true,
+      alignment: Alignment.centerLeft,
+      dropdownColor: dropdownColor,
     );
   }
 
@@ -160,10 +174,10 @@ class ChampEnveloppe extends StatelessWidget {
     );
 
     // Prêts à placer dynamiques (seulement pour les revenus)
-    if (typeSelectionne != TypeTransaction.depense &&
-        compteSelectionne != null) {
-      final comptesAvecPret = comptes.where(
-        (c) => c['pretAPlacer'] > 0 && c['id'] == compteSelectionne,
+    if (widget.typeSelectionne != TypeTransaction.depense &&
+        widget.compteSelectionne != null) {
+      final comptesAvecPret = widget.comptes.where(
+        (c) => c['pretAPlacer'] > 0 && c['id'] == widget.compteSelectionne,
       );
 
       for (final compte in comptesAvecPret) {
@@ -248,7 +262,7 @@ class ChampEnveloppe extends StatelessWidget {
             child: FutureBuilder<Color>(
               future: ColorService.getCouleurCompteSourceEnveloppeAsync(
                 enveloppeId: env['id'],
-                comptes: comptes
+                comptes: widget.comptes
                     .map((c) => {
                           'id': c['id'],
                           'nom': c['nom'],
@@ -305,8 +319,8 @@ class ChampEnveloppe extends StatelessWidget {
     final solde = (env['solde'] as num?)?.toDouble() ?? 0.0;
 
     // Vérifier si l'enveloppe est dans la catégorie Dette
-    if (typeSelectionne == TypeTransaction.depense) {
-      for (final categorie in categoriesFirebase) {
+    if (widget.typeSelectionne == TypeTransaction.depense) {
+      for (final categorie in widget.categoriesFirebase) {
         if ((categorie['nom'] as String).toLowerCase() == 'dette' ||
             (categorie['nom'] as String).toLowerCase() == 'dettes') {
           // Si on trouve l'enveloppe dans la catégorie Dette, on ne l'affiche pas
@@ -320,20 +334,21 @@ class ChampEnveloppe extends StatelessWidget {
       }
     }
 
-    if (typeSelectionne == TypeTransaction.depense &&
-        compteSelectionne != null) {
+    if (widget.typeSelectionne == TypeTransaction.depense &&
+        widget.compteSelectionne != null) {
       // Gestion multi-provenances
       if (env['provenances'] != null &&
           (env['provenances'] as List).isNotEmpty) {
         return (env['provenances'] as List).any(
-              (prov) => prov['compte_id'] == compteSelectionne,
+              (prov) => prov['compte_id'] == widget.compteSelectionne,
             ) ||
             solde <= 0;
       }
 
       // Gestion ancienne provenance unique
       if (env['provenance_compte_id'] != null) {
-        return env['provenance_compte_id'] == compteSelectionne || solde <= 0;
+        return env['provenance_compte_id'] == widget.compteSelectionne ||
+            solde <= 0;
       }
 
       // Sinon, ne pas afficher sauf si solde == 0
