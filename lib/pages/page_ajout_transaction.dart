@@ -119,6 +119,8 @@ class _EcranAjoutTransactionRefactoredState
 
   Future<void> _chargerDonnees() async {
     await _controller.chargerDonnees();
+    // Forcer un rechargement complet pour avoir les données synchronisées
+    await _controller.chargerDonnees();
   }
 
   void _ouvrirModaleFractionnement() async {
@@ -207,25 +209,16 @@ class _EcranAjoutTransactionRefactoredState
         return;
       }
 
-      print('DEBUG: Sauvegarde terminée');
-      print(
-          'DEBUG: Transaction existante: ${_controller.transactionExistante?.id}');
-
       // Détecter le contexte de navigation
       final bool estDansNavigationOnglets = widget.onTransactionSaved != null;
-      print('DEBUG: Contexte détecté - Onglets: $estDansNavigationOnglets');
 
       if (estDansNavigationOnglets) {
         // Navigation par onglets - utiliser le callback
-        print('DEBUG: Appel du callback onTransactionSaved');
         widget.onTransactionSaved!();
-        print('DEBUG: Callback onTransactionSaved terminé');
       } else {
         // Navigation normale (push/pop) - retourner à la page précédente
         if (mounted) {
-          print('DEBUG: Navigation.pop() appelé');
           Navigator.of(context).pop(_controller.transactionExistante);
-          print('DEBUG: Navigation.pop() terminé');
         }
       }
     } catch (e) {

@@ -41,19 +41,21 @@ void main() async {
   // Authentification Google automatique (si déjà connecté)
   try {
     if (!AuthService.isSignedIn) {
-      print('🔑 Tentative de connexion Google...');
       await AuthService.signInWithGoogle();
-      print('✅ Connexion Google OK');
-    } else {
-      print('✅ Déjà connecté à PocketBase');
     }
   } catch (e) {
-    print('❌ Erreur connexion Google/PocketBase: $e');
+    // Erreur silencieuse
   }
 
-  // Synchronisation de masse
-  await AllocationService.synchroniserToutesLesEnveloppesUtilisateur();
-  print('✅ Synchronisation de masse terminée.');
+  // Synchronisation de masse avec délai pour s'assurer que l'auth est complète
+  await Future.delayed(const Duration(seconds: 2));
+  print('🔄 Début de la synchronisation de masse...');
+  try {
+    await AllocationService.synchroniserToutesLesEnveloppesUtilisateur();
+    print('✅ Synchronisation de masse terminée avec succès');
+  } catch (e) {
+    print('❌ Erreur lors de la synchronisation de masse: $e');
+  }
 
   runApp(MyApp(themeService: themeService));
 }
@@ -218,13 +220,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-
-    // Mettre à jour les dettes existantes pour ajouter le champ estManuelle
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        //DetteService().mettreAJourDettesExistantes();
-      }
-    });
   }
 
   @override

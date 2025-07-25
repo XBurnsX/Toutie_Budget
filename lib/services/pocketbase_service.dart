@@ -82,7 +82,6 @@ class PocketBaseService {
       if (_comptesTimer != null &&
           _categoriesTimer != null &&
           _enveloppesTimer != null) {
-        print('🔄 Streams déjà initialisés, skip...');
         return;
       }
 
@@ -90,8 +89,6 @@ class PocketBaseService {
       final userId = pb.authStore.model?.id;
 
       if (userId == null) return;
-
-      print('🔥 Initialisation du temps réel PocketBase...');
 
       // Créer les contrôleurs de stream
       _comptesControllers['comptes'] =
@@ -115,10 +112,8 @@ class PocketBaseService {
           const Duration(milliseconds: 750), (_) => _updateCategoriesData());
       _enveloppesTimer = Timer.periodic(
           const Duration(milliseconds: 1000), (_) => _updateEnveloppesData());
-
-      print('✅ Temps réel PocketBase initialisé avec succès');
     } catch (e) {
-      print('❌ Erreur initialisation temps réel: $e');
+      // Erreur initialisation temps réel
     }
   }
 
@@ -153,7 +148,7 @@ class PocketBaseService {
       // Charger les données initiales
       await _loadInitialData(collectionName, userId, cacheKey);
     } catch (e) {
-      print('❌ Erreur subscription $collectionName: $e');
+      // Erreur subscription
     }
   }
 
@@ -173,7 +168,7 @@ class PocketBaseService {
           break;
       }
     } catch (e) {
-      print('❌ Erreur traitement temps réel: $e');
+      // Erreur traitement temps réel
     }
   }
 
@@ -217,7 +212,7 @@ class PocketBaseService {
           break;
       }
     } catch (e) {
-      print('❌ Erreur création temps réel: $e');
+      // Erreur création temps réel
     }
   }
 
@@ -273,7 +268,7 @@ class PocketBaseService {
           break;
       }
     } catch (e) {
-      print('❌ Erreur mise à jour temps réel: $e');
+      // Erreur mise à jour temps réel
     }
   }
 
@@ -302,7 +297,7 @@ class PocketBaseService {
           break;
       }
     } catch (e) {
-      print('❌ Erreur suppression temps réel: $e');
+      // Erreur suppression temps réel
     }
   }
 
@@ -370,7 +365,7 @@ class PocketBaseService {
           break;
       }
     } catch (e) {
-      print('❌ Erreur chargement initial $collectionName: $e');
+      // Erreur chargement initial
     }
   }
 
@@ -390,8 +385,6 @@ class PocketBaseService {
     _comptesCache.clear();
     _categoriesCache.clear();
     _enveloppesCache.clear();
-
-    print('🧹 Nettoyage des streams terminé');
   }
 
   // Nettoyer tous les contrôleurs
@@ -446,7 +439,6 @@ class PocketBaseService {
 
       yield categories;
     } catch (e) {
-      print('❌ Erreur lecture catégories: $e');
       yield [];
     }
   }
@@ -654,7 +646,6 @@ class PocketBaseService {
 
       yield tousLesComptes;
     } catch (e) {
-      print('❌ Erreur lecture tous les comptes: $e');
       yield [];
     }
   }
@@ -725,7 +716,6 @@ class PocketBaseService {
               Compte.fromPocketBase(record.data, record.id, 'Chèque'))
           .toList();
     } catch (e) {
-      print('❌ Erreur chargement comptes chèques: $e');
       return [];
     }
   }
@@ -745,7 +735,6 @@ class PocketBaseService {
               Compte.fromPocketBase(record.data, record.id, 'Crédit'))
           .toList();
     } catch (e) {
-      print('❌ Erreur chargement comptes crédits: $e');
       return [];
     }
   }
@@ -765,7 +754,6 @@ class PocketBaseService {
               Compte.fromPocketBase(record.data, record.id, 'Investissement'))
           .toList();
     } catch (e) {
-      print('❌ Erreur chargement comptes investissement: $e');
       return [];
     }
   }
@@ -785,7 +773,6 @@ class PocketBaseService {
               Compte.fromPocketBase(record.data, record.id, 'Dette'))
           .toList();
     } catch (e) {
-      print('❌ Erreur chargement comptes dettes: $e');
       return [];
     }
   }
@@ -795,9 +782,7 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
       await pb.collection('categories').delete(categorieId);
-      print('✅ Catégorie supprimée: $categorieId');
     } catch (e) {
-      print('❌ Erreur suppression catégorie: $e');
       rethrow;
     }
   }
@@ -812,9 +797,6 @@ class PocketBaseService {
       if (userId == null) {
         throw Exception('Utilisateur non connecté');
       }
-
-      print(
-          '🔍 PocketBaseService: Lecture enveloppes catégorie $categorieId...');
 
       final records = await pb.collection('enveloppes').getFullList(
             filter:
@@ -834,10 +816,8 @@ class PocketBaseService {
         };
       }).toList();
 
-      print('✅ ${enveloppes.length} enveloppes lues');
       return enveloppes;
     } catch (e) {
-      print('❌ Erreur lecture enveloppes: $e');
       rethrow;
     }
   }
@@ -877,7 +857,6 @@ class PocketBaseService {
 
       return enveloppesParCategorie;
     } catch (e) {
-      print('❌ Erreur lecture enveloppes groupées: $e');
       return {};
     }
   }
@@ -1085,10 +1064,7 @@ class PocketBaseService {
 
       for (final nomCollection in collections) {
         try {
-          print(
-              '🔍 Tentative de mise à jour dans $nomCollection pour le compte $compteId');
           await pb.collection(nomCollection).update(compteId, body: donnees);
-          print('✅ Compte mis à jour avec succès dans $nomCollection');
 
           // Forcer une mise à jour du cache temps réel avec délai
           await Future.delayed(const Duration(milliseconds: 100));
@@ -1096,7 +1072,6 @@ class PocketBaseService {
 
           return;
         } catch (e) {
-          print('❌ Erreur dans $nomCollection: $e');
           // Continuer vers la collection suivante si le compte n'est pas trouvé
           continue;
         }
@@ -1104,7 +1079,6 @@ class PocketBaseService {
 
       throw Exception('Compte non trouvé dans aucune collection');
     } catch (e) {
-      print('❌ Erreur updateCompte: $e');
       rethrow;
     }
   }
@@ -1243,7 +1217,7 @@ class PocketBaseService {
         _updateEnveloppesData(),
       ]);
     } catch (e) {
-      print('❌ Erreur chargement initial: $e');
+      // Erreur chargement initial
     }
   }
 
@@ -1277,7 +1251,6 @@ class PocketBaseService {
                   record.data, record.id, _getCompteType(collection)))
               .toList();
         } catch (e) {
-          print('❌ Erreur lecture $collection: $e');
           return <Compte>[];
         }
       });
@@ -1291,7 +1264,7 @@ class PocketBaseService {
       _comptesCache['comptes'] = tousLesComptes;
       _comptesControllers['comptes']?.add(tousLesComptes);
     } catch (e) {
-      print('❌ Erreur mise à jour comptes: $e');
+      // Erreur mise à jour comptes
     }
   }
 
@@ -1320,7 +1293,7 @@ class PocketBaseService {
       _categoriesCache['categories'] = categories;
       _categoriesControllers['categories']?.add(categories);
     } catch (e) {
-      print('❌ Erreur mise à jour catégories: $e');
+      // Erreur mise à jour catégories
     }
   }
 
@@ -1351,7 +1324,7 @@ class PocketBaseService {
       _enveloppesCache['enveloppes'] = enveloppes;
       _enveloppesControllers['enveloppes']?.add(enveloppes);
     } catch (e) {
-      print('❌ Erreur mise à jour enveloppes: $e');
+      // Erreur mise à jour enveloppes
     }
   }
 
@@ -1367,8 +1340,6 @@ class PocketBaseService {
       if (userId == null) {
         throw Exception('Utilisateur non connecté');
       }
-
-      print('🔍 PocketBaseService: Ajout transaction ${transaction.tiers}...');
 
       // 1. Créer l'entrée dans transactions
       final transactionData = {
@@ -1392,7 +1363,6 @@ class PocketBaseService {
 
       final transactionRecord =
           await pb.collection('transactions').create(body: transactionData);
-      print('✅ Transaction créée: ${transactionRecord.id}');
 
       // 2. Créer l'entrée dans allocation_mensuelles
       final mois = DateTime(transaction.date.year, transaction.date.month, 1);
@@ -1412,7 +1382,6 @@ class PocketBaseService {
       final allocationRecord = await pb
           .collection('allocations_mensuelles')
           .create(body: allocationData);
-      print('✅ Allocation mensuelle créée: ${allocationRecord.id}');
 
       // 3. Si transaction fractionnée, créer les allocations pour chaque sous-item
       if (transaction.estFractionnee && transaction.sousItems != null) {
@@ -1432,13 +1401,9 @@ class PocketBaseService {
           await pb
               .collection('allocations_mensuelles')
               .create(body: sousAllocationData);
-          print('✅ Allocation sous-item créée pour ${sousItem['description']}');
         }
       }
-
-      print('✅ Transaction ajoutée avec succès');
     } catch (e) {
-      print('❌ Erreur ajout transaction: $e');
       rethrow;
     }
   }
@@ -1452,9 +1417,6 @@ class PocketBaseService {
       if (transaction.id == null) {
         throw Exception('ID de transaction manquant');
       }
-
-      print(
-          '🔍 PocketBaseService: Mise à jour transaction ${transaction.id}...');
 
       final transactionData = {
         'type': _convertirTypeTransaction(transaction.type),
@@ -1477,9 +1439,7 @@ class PocketBaseService {
       await pb
           .collection('transactions')
           .update(transaction.id!, body: transactionData);
-      print('✅ Transaction mise à jour avec succès');
     } catch (e) {
-      print('❌ Erreur mise à jour transaction: $e');
       rethrow;
     }
   }
@@ -1489,14 +1449,9 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
 
-      print('🔍 PocketBaseService: Suppression transaction $transactionId...');
-
       // TODO: Supprimer aussi les allocations mensuelles associées
       await pb.collection('transactions').delete(transactionId);
-
-      print('✅ Transaction supprimée avec succès');
     } catch (e) {
-      print('❌ Erreur suppression transaction: $e');
       rethrow;
     }
   }
@@ -1511,9 +1466,6 @@ class PocketBaseService {
       if (userId == null) {
         throw Exception('Utilisateur non connecté');
       }
-
-      print(
-          '🔍 PocketBaseService: Lecture transactions du compte $compteId...');
 
       final records = await pb.collection('transactions').getFullList(
             filter: 'utilisateur_id = "$userId" && compte_id = "$compteId"',
@@ -1543,10 +1495,8 @@ class PocketBaseService {
         );
       }).toList();
 
-      print('✅ ${transactions.length} transactions lues');
       return transactions;
     } catch (e) {
-      print('❌ Erreur lecture transactions: $e');
       rethrow;
     }
   }
@@ -1563,8 +1513,6 @@ class PocketBaseService {
         throw Exception('Utilisateur non connecté');
       }
 
-      print('🔍 PocketBaseService: Lecture des tiers...');
-
       final records = await pb.collection('tiers').getFullList(
             filter: 'utilisateur_id = "$userId"',
             sort: 'nom',
@@ -1572,10 +1520,8 @@ class PocketBaseService {
 
       final tiers =
           records.map((record) => record.data['nom'] as String).toList();
-      print('✅ ${tiers.length} tiers lus');
       return tiers;
     } catch (e) {
-      print('❌ Erreur lecture tiers: $e');
       rethrow;
     }
   }
@@ -1590,17 +1536,13 @@ class PocketBaseService {
         throw Exception('Utilisateur non connecté');
       }
 
-      print('🔍 PocketBaseService: Ajout du tiers $nomTiers...');
-
       final data = {
         'utilisateur_id': userId,
         'nom': nomTiers,
       };
 
       await pb.collection('tiers').create(body: data);
-      print('✅ Tiers ajouté avec succès');
     } catch (e) {
-      print('❌ Erreur ajout tiers: $e');
       rethrow;
     }
   }
@@ -1617,8 +1559,6 @@ class PocketBaseService {
         throw Exception('Utilisateur non connecté');
       }
 
-      print('🔍 PocketBaseService: Création dette ${dette.nomTiers}...');
-
       final data = {
         'utilisateur_id': userId,
         'nom': dette.nomTiers,
@@ -1631,9 +1571,7 @@ class PocketBaseService {
       };
 
       await pb.collection('comptes_dettes').create(body: data);
-      print('✅ Dette créée avec succès');
     } catch (e) {
-      print('❌ Erreur création dette: $e');
       rethrow;
     }
   }
@@ -1644,12 +1582,8 @@ class PocketBaseService {
     try {
       final pb = await _getPocketBaseInstance();
 
-      print('🔍 PocketBaseService: Mise à jour dette $detteId...');
-
       await pb.collection('comptes_dettes').update(detteId, body: data);
-      print('✅ Dette mise à jour avec succès');
     } catch (e) {
-      print('❌ Erreur mise à jour dette: $e');
       rethrow;
     }
   }
@@ -1664,8 +1598,6 @@ class PocketBaseService {
       if (userId == null) {
         throw Exception('Utilisateur non connecté');
       }
-
-      print('🔍 PocketBaseService: Ajout mouvement dette $detteId...');
 
       // Créer une transaction de type Pret/Emprunt
       final transactionData = {
@@ -1685,9 +1617,7 @@ class PocketBaseService {
       };
 
       await pb.collection('transactions').create(body: transactionData);
-      print('✅ Mouvement dette ajouté avec succès');
     } catch (e) {
-      print('❌ Erreur ajout mouvement dette: $e');
       rethrow;
     }
   }
@@ -1701,8 +1631,6 @@ class PocketBaseService {
       if (userId == null) {
         throw Exception('Utilisateur non connecté');
       }
-
-      print('🔍 PocketBaseService: Lecture des dettes actives...');
 
       final records = await pb.collection('comptes_dettes').getFullList(
             filter: 'utilisateur_id = "$userId" && archive = false',
@@ -1727,10 +1655,8 @@ class PocketBaseService {
         );
       }).toList();
 
-      print('✅ ${dettes.length} dettes actives lues');
       return dettes;
     } catch (e) {
-      print('❌ Erreur lecture dettes: $e');
       rethrow;
     }
   }
@@ -1748,8 +1674,6 @@ class PocketBaseService {
         throw Exception('Utilisateur non connecté');
       }
 
-      print('🔍 PocketBaseService: Création prêt personnel $nomTiers...');
-
       final data = {
         'utilisateur_id': userId,
         'nom_tiers': nomTiers,
@@ -1761,9 +1685,7 @@ class PocketBaseService {
       };
 
       await pb.collection('pret_personnel').create(body: data);
-      print('✅ Prêt personnel créé avec succès');
     } catch (e) {
-      print('❌ Erreur création prêt personnel: $e');
       rethrow;
     }
   }
@@ -1808,7 +1730,6 @@ class PocketBaseService {
       final List<dynamic> jsonList = jsonDecode(jsonString);
       return jsonList.map((item) => Map<String, dynamic>.from(item)).toList();
     } catch (e) {
-      print('❌ Erreur parsing sous-items: $e');
       return [];
     }
   }
@@ -1818,9 +1739,6 @@ class PocketBaseService {
       double montant, app_model.TypeTransaction type) async {
     try {
       final pb = await _getPocketBaseInstance();
-
-      print(
-          '🔍 PocketBaseService: Mise à jour solde enveloppe $enveloppeId...');
 
       // Récupérer l'enveloppe actuelle
       final record = await pb.collection('enveloppes').getOne(enveloppeId);
@@ -1845,9 +1763,7 @@ class PocketBaseService {
       };
 
       await pb.collection('enveloppes').update(enveloppeId, body: data);
-      print('✅ Solde enveloppe mis à jour: $nouveauSolde');
     } catch (e) {
-      print('❌ Erreur mise à jour solde enveloppe: $e');
       rethrow;
     }
   }

@@ -133,7 +133,6 @@ class Enveloppe {
       // Retourne 0.0 si pas d'allocation pour ce mois
       return solde ?? 0.0;
     } catch (e) {
-      print('❌ Erreur calcul solde réel: $e');
       return 0.0;
     }
   }

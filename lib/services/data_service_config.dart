@@ -22,24 +22,20 @@ class DataServiceConfig {
   /// Créer le service approprié selon la configuration
   static DataServiceInterface _createService() {
     if (_usePocketBase) {
-      print('🔧 DataServiceConfig: Utilisation de PocketBase');
       return PocketBaseAdapter();
     } else {
-      print('🔧 DataServiceConfig: Utilisation de Firebase');
       return FirebaseAdapter();
     }
   }
 
   /// Basculer vers PocketBase
   static void usePocketBase() {
-    print('🔄 DataServiceConfig: Basculement vers PocketBase');
     _usePocketBase = true;
     _instance = null; // Forcer la recréation de l'instance
   }
 
   /// Basculer vers Firebase
   static void useFirebase() {
-    print('🔄 DataServiceConfig: Basculement vers Firebase');
     _usePocketBase = false;
     _instance = null; // Forcer la recréation de l'instance
   }

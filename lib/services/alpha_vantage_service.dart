@@ -60,9 +60,6 @@ class AlphaVantageService {
       await _processNextBatch();
     });
 
-    print(
-        '🔄 Batch update Alpha Vantage démarré (5 actions toutes les 10 min)');
-
     // Sauvegarder les métadonnées initiales
     _saveMetadataToFirestore();
   }
@@ -71,15 +68,12 @@ class AlphaVantageService {
   void stopBatchUpdate() {
     _batchTimer?.cancel();
     _batchTimer = null;
-    print('⏹️ Batch update Alpha Vantage arrêté');
   }
 
   // Ajouter une action à la queue de mise à jour
   void addSymbolToQueue(String symbol) {
     if (!_pendingSymbols.contains(symbol)) {
       _pendingSymbols.add(symbol);
-      print(
-          '📝 $symbol ajouté à la queue de mise à jour (${_pendingSymbols.length} en attente)');
     }
   }
 
@@ -96,28 +90,20 @@ class AlphaVantageService {
 
     // Vérifier si on peut faire des requêtes
     if (_requestsToday >= MAX_REQUESTS_PER_DAY) {
-      print(
-          '⚠️ Limite quotidienne Alpha Vantage atteinte (500), pause jusqu\'à demain');
       return;
     }
 
     // Prendre les 5 prochaines actions
     final batch = _pendingSymbols.take(BATCH_SIZE).toList();
     if (batch.isEmpty) {
-      print('ℹ️ Aucune action en attente de mise à jour');
       return;
     }
 
-    print('🔄 Traitement du batch: ${batch.join(', ')}');
-
-    // Traiter le batch
     for (String symbol in batch) {
       if (_requestsToday < MAX_REQUESTS_PER_DAY) {
         await _updatePrice(symbol);
         _requestsToday++;
         _pendingSymbols.remove(symbol);
-
-        print('✅ Mise à jour $symbol ($_requestsToday/500 aujourd\'hui)');
 
         // Pause entre chaque requête pour respecter la limite de 5 req/min
         if (batch.indexOf(symbol) < batch.length - 1) {
@@ -126,7 +112,6 @@ class AlphaVantageService {
       }
     }
 
-    print('📊 Batch terminé. Actions restantes: ${_pendingSymbols.length}');
     _lastBatchTime = DateTime.now();
     await _savePersistentStats();
 
@@ -143,7 +128,6 @@ class AlphaVantageService {
       _requestsToday = 0;
       _lastResetDate = now;
       _savePersistentStats();
-      print('🔄 Nouveau jour, compteur Alpha Vantage remis à zéro');
     }
   }
 
@@ -152,8 +136,6 @@ class AlphaVantageService {
     try {
       final url = Uri.parse(
           '$BASE_URL?function=GLOBAL_QUOTE&symbol=$symbol&apikey=$API_KEY');
-
-      print('🌐 Requête Alpha Vantage pour $symbol...');
 
       final response = await http.get(url);
 
@@ -168,21 +150,10 @@ class AlphaVantageService {
           if (price != null && price > 0) {
             // Sauvegarder dans Firestore
             await _savePriceToFirestore(symbol, price);
-            print('💾 Prix $symbol sauvegardé: \$${price.toStringAsFixed(2)}');
-          } else {
-            print(
-                '❌ Prix invalide pour $symbol: ${data['Global Quote']['05. price']}');
-          }
-        } else {
-          print(
-              '❌ Pas de données pour $symbol: ${data['Note'] ?? 'Données manquantes'}');
-        }
-      } else {
-        print('❌ Erreur HTTP ${response.statusCode} pour $symbol');
-      }
-    } catch (e) {
-      print('❌ Erreur mise à jour $symbol: $e');
-    }
+          } else {}
+        } else {}
+      } else {}
+    } catch (e) {}
   }
 
   // Sauvegarder le prix dans Firestore
@@ -205,9 +176,7 @@ class AlphaVantageService {
         'date': now.toIso8601String(),
         'source': 'alpha_vantage',
       });
-    } catch (e) {
-      print('❌ Erreur sauvegarde Firestore pour $symbol: $e');
-    }
+    } catch (e) {}
   }
 
   // Récupérer le prix actuel depuis Firestore
@@ -217,15 +186,12 @@ class AlphaVantageService {
       if (doc.exists && doc.data() != null) {
         return doc.data()!['prix']?.toDouble();
       }
-    } catch (e) {
-      print('❌ Erreur récupération prix $symbol: $e');
-    }
+    } catch (e) {}
     return null;
   }
 
   // Forcer une mise à jour immédiate (pour le bouton "Rafraîchir")
   Future<void> forceUpdate() async {
-    print('🔄 Mise à jour forcée Alpha Vantage...');
     await _processNextBatch();
 
     // Sauvegarder les métadonnées après la mise à jour forcée
@@ -262,7 +228,6 @@ class AlphaVantageService {
   // Nettoyer les anciens symboles de la queue
   void clearQueue() {
     _pendingSymbols.clear();
-    print('🧹 Queue de mise à jour vidée');
   }
 
   // Sauvegarder les métadonnées dans Firestore pour tous les comptes d'investissement
@@ -286,11 +251,6 @@ class AlphaVantageService {
           'pendingSymbols': _pendingSymbols.length,
         }, SetOptions(merge: true));
       }
-
-      print(
-          '💾 Métadonnées sauvegardées pour ${comptesSnapshot.docs.length} comptes d\'investissement');
-    } catch (e) {
-      print('❌ Erreur sauvegarde métadonnées Firestore: $e');
-    }
+    } catch (e) {}
   }
 }

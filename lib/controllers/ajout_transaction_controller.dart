@@ -8,6 +8,8 @@ import '../services/dette_service.dart';
 import '../services/data_service_config.dart';
 import '../services/allocation_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/pocketbase_service.dart';
+import '../services/cache_service.dart';
 
 class AjoutTransactionController extends ChangeNotifier {
   // Variables d'état
@@ -176,98 +178,53 @@ class AjoutTransactionController extends ChangeNotifier {
 
   Future<void> _chargerComptesFirebase() async {
     try {
-      print(
-          '🔍 AjoutTransactionController: Chargement des comptes via DataServiceConfig...');
       final dataService = DataServiceConfig.instance;
       final comptes = await dataService.lireComptes();
       _comptesFirebase = comptes;
       _mettreAJourListeComptesAffichables();
-      print('✅ AjoutTransactionController: ${comptes.length} comptes chargés');
       notifyListeners();
     } catch (e) {
-      print('❌ AjoutTransactionController: Erreur chargement comptes: $e');
       rethrow;
     }
   }
 
   Future<void> _chargerTiersConnus() async {
     try {
-      print(
-          '🔍 AjoutTransactionController: Chargement des tiers via DataServiceConfig...');
       final dataService = DataServiceConfig.instance;
       final liste = await dataService.lireTiers();
       _listeTiersConnus = liste
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-      print('✅ AjoutTransactionController: ${liste.length} tiers chargés');
       notifyListeners();
     } catch (e) {
-      print('❌ AjoutTransactionController: Erreur chargement tiers: $e');
       rethrow;
     }
   }
 
   Future<void> _chargerCategoriesFirebase() async {
     try {
-      print(
-          '🔍 AjoutTransactionController: Chargement des catégories via DataServiceConfig...');
       final dataService = DataServiceConfig.instance;
       final categories = await dataService.lireCategories();
 
-      // Charger les enveloppes pour chaque catégorie avec calcul des soldes
+      // Charger les enveloppes pour chaque catégorie SANS recalculer les soldes
       List<Map<String, dynamic>> categoriesAvecEnveloppes = [];
       for (final cat in categories) {
         try {
           final enveloppes = await dataService.lireEnveloppesCategorie(cat.id);
 
-          // Calculer les soldes pour chaque enveloppe
-          List<Map<String, dynamic>> enveloppesAvecSoldes = [];
+          // On garde les enveloppes telles quelles (champs synchronisés)
+          List<Map<String, dynamic>> enveloppesAvecChamps = [];
           for (final enveloppe in enveloppes) {
-            try {
-              // Utiliser la même logique que la page budget
-              final now = DateTime.now();
-              final currentMonthKey =
-                  "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}";
-              final moisAllocation = DateTime.parse('${currentMonthKey}-01');
+            final env = Map<String, dynamic>.from(enveloppe);
 
-              final soldeAllocation =
-                  await AllocationService.calculerSoldeEnveloppe(
-                enveloppeId: enveloppe['id'],
-                mois: moisAllocation,
-              );
-
-              // Créer une enveloppe avec le solde calculé
-              final enveloppeAvecSolde = Map<String, dynamic>.from(enveloppe);
-              enveloppeAvecSolde['solde'] = soldeAllocation ?? 0.0;
-              enveloppeAvecSolde['objectif_montant'] =
-                  enveloppe['objectif_montant'] ?? 0.0;
-              enveloppeAvecSolde['depense'] = enveloppe['depense'] ?? 0.0;
-
-              enveloppesAvecSoldes.add(enveloppeAvecSolde);
-              print(
-                  '💰 Enveloppe ${enveloppe['nom']}: solde calculé = ${soldeAllocation ?? 0.0}');
-            } catch (e) {
-              print(
-                  '⚠️ Erreur calcul solde pour enveloppe ${enveloppe['nom']}: $e');
-              // Garder l'enveloppe avec solde 0 en cas d'erreur
-              final enveloppeAvecSolde = Map<String, dynamic>.from(enveloppe);
-              enveloppeAvecSolde['solde'] = 0.0;
-              enveloppeAvecSolde['objectif_montant'] =
-                  enveloppe['objectif_montant'] ?? 0.0;
-              enveloppeAvecSolde['depense'] = enveloppe['depense'] ?? 0.0;
-              enveloppesAvecSoldes.add(enveloppeAvecSolde);
-            }
+            enveloppesAvecChamps.add(env);
           }
 
           categoriesAvecEnveloppes.add({
             'id': cat.id,
             'nom': cat.nom,
-            'enveloppes': enveloppesAvecSoldes,
+            'enveloppes': enveloppesAvecChamps,
           });
-          print(
-              '✅ Catégorie ${cat.nom}: ${enveloppesAvecSoldes.length} enveloppes chargées avec soldes');
         } catch (e) {
-          print(
-              '⚠️ Erreur chargement enveloppes pour catégorie ${cat.nom}: $e');
           categoriesAvecEnveloppes.add({
             'id': cat.id,
             'nom': cat.nom,
@@ -277,13 +234,15 @@ class AjoutTransactionController extends ChangeNotifier {
       }
 
       _categoriesFirebase = categoriesAvecEnveloppes;
-      print(
-          '✅ AjoutTransactionController: ${categories.length} catégories chargées avec enveloppes');
       notifyListeners();
     } catch (e) {
-      print('❌ AjoutTransactionController: Erreur chargement catégories: $e');
       rethrow;
     }
+  }
+
+  // Méthode pour forcer le rechargement des catégories
+  Future<void> rechargerCategories() async {
+    await _chargerCategoriesFirebase();
   }
 
   void _mettreAJourListeComptesAffichables() {
@@ -339,12 +298,9 @@ class AjoutTransactionController extends ChangeNotifier {
       try {
         final dataService = DataServiceConfig.instance;
         await dataService.ajouterTiers(nomTiers);
-        print('✅ Tiers "$nomTiers" ajouté via DataServiceConfig');
       } catch (e) {
-        print('❌ Erreur ajout tiers via DataServiceConfig: $e');
         // Fallback vers Firebase si nécessaire
         await FirebaseService().ajouterTiers(nomTiers);
-        print('✅ Tiers "$nomTiers" ajouté via Firebase (fallback)');
       }
 
       notifyListeners();
@@ -371,7 +327,6 @@ class AjoutTransactionController extends ChangeNotifier {
               c.nom.toLowerCase() == tiersTexte.toLowerCase()) {
             _remboursementId = c.id;
             _remboursementType = 'compte';
-            print('[SauvegardeTx] Id compte déduit: $_remboursementId');
             break;
           }
         }
@@ -473,7 +428,6 @@ class AjoutTransactionController extends ChangeNotifier {
         await _traiterRevenuNormal(compte, montant, firebaseService);
       }
 
-      print('DEBUG: Création de l\'objet transaction');
       // Créer la transaction
       final transaction = app_model.Transaction(
         id: transactionId,
@@ -496,15 +450,11 @@ class AjoutTransactionController extends ChangeNotifier {
             : null,
       );
 
-      print('DEBUG: Transaction créée, sauvegarde dans Firebase...');
       if (_transactionExistante != null) {
-        print('DEBUG: Mise à jour de transaction existante');
-        await firebaseService.mettreAJourTransaction(transaction);
+        await PocketBaseService.mettreAJourTransaction(transaction);
       } else {
-        print('DEBUG: Ajout de nouvelle transaction');
-        await firebaseService.ajouterTransaction(transaction);
+        await PocketBaseService.ajouterTransaction(transaction);
       }
-      print('DEBUG: Transaction sauvegardée avec succès');
       _transactionExistante = transaction;
 
       // Retourner l'information de finalisation si applicable
@@ -532,7 +482,7 @@ class AjoutTransactionController extends ChangeNotifier {
         typeDette = 'dette'; // Je dois de l'argent
       } else if (typeMouvement ==
           app_model.TypeMouvementFinancier.pretAccorde) {
-        typeDette = 'pret'; // On me doit de l'argent
+        typeDette = 'pret'; // On me dois de l'argent
       } else {
         return; // Pour les remboursements, on ne crée pas de nouvelle dette
       }
@@ -569,21 +519,14 @@ class AjoutTransactionController extends ChangeNotifier {
         estManuelle: false,
       );
 
-      print(
-          'DEBUG: Création de la dette - ID: $detteId, Type: $typeDette, Montant: $montant');
-
       await detteService.creerDette(
         nouvelleDette,
         creerCompteAutomatique: false,
       );
 
-      print('DEBUG: Dette créée avec succès');
       // Plus besoin de créer un compte de dette automatique
       // Les dettes sont maintenant affichées directement dans la page comptes
     } catch (e) {
-      print('DEBUG: Erreur lors de la création de la dette: $e');
-      print('DEBUG: Stack trace: ${StackTrace.current}');
-      // Relancer l'erreur pour qu'elle soit visible
       rethrow;
     }
   }

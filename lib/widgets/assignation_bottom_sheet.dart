@@ -531,35 +531,35 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
     }
 
     try {
-      print('🔍 Compte sélectionné: $_compteId');
-      print('🔍 Compte trouvé: ${compte['nom']} (${compte['id']})');
+      // Récupérer le compte sélectionné
+      final comptes = widget.comptes;
+      final compte = comptes.firstWhere((c) => c['id'] == _compteId);
+      // print('🔍 Compte sélectionné: $_compteId');
+      // print('🔍 Compte trouvé: ${compte['nom']} (${compte['id']})');
 
-      // Utiliser le système d'allocations pour placer de l'argent
+      // Créer l'allocation
       await AllocationService.creerAllocationMensuelle(
         enveloppeId: widget.enveloppe['id'],
-        montant: montantDouble,
-        compteSourceId: _compteId!,
-        collectionCompteSource: _getCompteCollection(_compteId!),
-        estAllocation: true, // Placer de l'argent dans l'enveloppe
+        montant: _ctrl.text.isEmpty ? 0.0 : double.parse(_ctrl.text),
+        compteSourceId: compte['id'],
+        collectionCompteSource: compte['collection'] ?? 'comptes_cheques',
+        estAllocation: true,
       );
 
       if (mounted) {
-        Navigator.of(_sheetContext).pop();
-        ScaffoldMessenger.of(_sheetContext).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Assignation de ${montantDouble.toStringAsFixed(2)} \$ réussie',
-            ),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-
-        // Forcer le rafraîchissement de la page parent
+        Navigator.of(context).pop();
         widget.onAssignationComplete?.call();
       }
     } catch (e) {
-      print('❌ Erreur assignation: $e');
-      _afficherErreur('Erreur lors de l\'assignation : $e');
+      // print('❌ Erreur assignation: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'assignation: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }
