@@ -302,7 +302,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _effectuerAssignation,
+                    onPressed: _effectuerAssignationAsync,
                     child: const Text('Assigner'),
                   ),
                 ),
@@ -382,7 +382,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
           NumericKeyboard(
             controller: _ctrl,
             onClear: () => _ctrl.clear(),
-            onDone: _effectuerAssignation,
+            onDone: _handleDone,
           ),
         ],
       ),
@@ -392,8 +392,12 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
   // ========  LOGIQUE D'ASSIGNATION  ========
 
   double _parseMontant(String text) {
-    final cleaned =
-        text.replaceAll(RegExp(r'[^0-9\-,\.]'), '').replaceAll(',', '.').trim();
+    // Nettoyer le texte en enlevant les symboles $, espaces et autres caractères non numériques
+    final cleaned = text
+        .replaceAll('\$', '')
+        .replaceAll(' ', '')
+        .replaceAll(',', '.')
+        .trim();
     return double.tryParse(cleaned) ?? 0.0;
   }
 
@@ -505,7 +509,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
     );
   }
 
-  Future<void> _effectuerAssignation() async {
+  void _handleDone() {
     if (!_peutAssigner()) {
       _afficherErreur('Veuillez sélectionner un compte.');
       return;
@@ -530,6 +534,11 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
       return;
     }
 
+    // Lancer l'assignation de manière asynchrone
+    _effectuerAssignationAsync();
+  }
+
+  Future<void> _effectuerAssignationAsync() async {
     try {
       // Récupérer le compte sélectionné
       final comptes = widget.comptes;
@@ -540,7 +549,7 @@ class _AssignationBottomSheetState extends State<AssignationBottomSheet> {
       // Créer l'allocation
       await AllocationService.creerAllocationMensuelle(
         enveloppeId: widget.enveloppe['id'],
-        montant: _ctrl.text.isEmpty ? 0.0 : double.parse(_ctrl.text),
+        montant: _parseMontant(_ctrl.text),
         compteSourceId: compte['id'],
         collectionCompteSource: compte['collection'] ?? 'comptes_cheques',
         estAllocation: true,
