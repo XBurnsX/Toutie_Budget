@@ -22,7 +22,6 @@ import 'pages/page_pret_personnel.dart';
 import 'themes/dropdown_theme_extension.dart';
 import 'firebase_options.dart';
 import 'services/investissement_service.dart';
-import 'services/allocation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

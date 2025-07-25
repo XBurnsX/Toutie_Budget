@@ -53,25 +53,16 @@ class _ListeCategoriesEnveloppesState extends State<ListeCategoriesEnveloppes> {
   void didUpdateWidget(ListeCategoriesEnveloppes oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Ne recalculer que si les données ont vraiment changé
-    // Hashcode basé uniquement sur les IDs et noms des catégories/enveloppes (pas les soldes)
-    final newHashCode = widget.categories
-        .map((c) => '${c['id']}_${c['nom']}_${(c['enveloppes'] as List).map((e) => '${e['id']}_${e['nom']}').join('|')}')
-        .join('_')
-        .hashCode;
+    // SOLUTION: Ignorer complètement les mises à jour temps réel PocketBase
+    // Le cache intelligent des soldes évite déjà les appels inutiles
 
-    if (newHashCode != _lastCategoriesHashCode) {
-      // Invalider le cache des soldes quand les données changent
-      _soldesCache.clear();
-      _pendingSoldesFutures.clear();
-      _updateCachedCategories();
-    }
-
-    // Également vérifier si le mois sélectionné a changé
+    // Seule exception: changement de mois sélectionné par l'utilisateur
     if (oldWidget.selectedMonthKey != widget.selectedMonthKey) {
       _soldesCache.clear();
       _pendingSoldesFutures.clear();
     }
+
+    // Tout le reste est géré par le cache des soldes qui évite les calculs redondants
   }
 
   // Méthode pour obtenir le solde d'une enveloppe avec cache
